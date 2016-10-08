@@ -1,0 +1,18 @@
+citHeader("To cite linkR in a publication use:")
+
+citEntry(entry="Article",
+	title = "Linkage mechanisms in the vertebrate skull: Structure and function of three-dimensional, parallel transmission systems",
+        author = personList(as.person("AM Olsen"),as.person("MW Westneat")),
+	journal = "Journal of Morphology",
+  	year = 2016,
+	volume = "Early View",
+	pages = "",
+        textVersion = "Olsen Aaron M, Mark W Westneat. 2016. Linkage mechanisms in the vertebrate skull: Structure and function of three-dimensional, parallel transmission systems. Journal of Morphology Early View.")
+
+citEntry(entry = "Manual",
+	title = "{linkR}: 3D Lever and Linkage Mechanism Modeling",
+	author = person("Aaron", "Olsen"),
+	note = "version 1.1.1",
+	year = 2016,
+    textVersion  = "Olsen (2016). linkR: 3D Lever and Linkage Mechanism Modeling. Version 1.1.1. https://CRAN.R-project.org/package=linkR."
+)

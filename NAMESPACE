@@ -1,0 +1,7 @@
+importFrom("grDevices", "bmp", "cairo_ps", "dev.off", "jpeg", "png", "rgb", "tiff")
+importFrom("graphics", "lines", "par", "plot", "points", "polygon")
+importFrom("stats", "na.omit", "sd", "setNames")
+importFrom("utils", "read.table")
+import("svgViewR")
+
+exportPattern("^[[:alpha:]]+")
