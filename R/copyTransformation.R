@@ -1,5 +1,9 @@
 copyTransformation <- function(m1, m2, mn, translate = TRUE, lar.cons = NULL, lar.compare = NULL){
 
+	## Written to work with point sets that are identical except for translation/rotation
+	#if(!identical.sets){
+	#}
+
 	# IF ONLY ONE POINT PROVIDED ONLY APPLY TRANSLATION
 	if(!is.matrix(m1)){
 		if(is.matrix(mn)){
@@ -45,12 +49,15 @@ copyTransformation <- function(m1, m2, mn, translate = TRUE, lar.cons = NULL, la
 
 		# REMOVE ANY POINTS THAT ARE COLLINEAR WITH FIRST TWO
 		retain <- rep(TRUE, nrow(m1))
-		for(i in 3:nrow(m1)) if(distPointToLine(pt=m2[i, ], l1=m1[1, ], l2=m1[2, ]) > 1e-10) retain[i] <- FALSE
+		for(i in 3:nrow(m1)){
+			#if(distPointToLine(pt=m2[i, ], l1=m1[1, ], l2=m1[2, ]) > 1e-10) retain[i] <- FALSE		# Changed this - not sure what error it was intended to prevent
+			if(distPointToLine(pt=m1[i, ], l1=m1[1, ], l2=m1[2, ]) < 1e-10) retain[i] <- FALSE
+		}
 
 		m1 <- m1[retain, ]
 		m2 <- m2[retain, ]
 	}
-
+	
 	# TRANSFORMATION GIVEN ONLY TWO POINTS (MINIMIZE ROTATION ABOUT LONG AXIS)
 	two_ref_pts <- ifelse(nrow(m1) == 2, TRUE, FALSE)
 
@@ -73,9 +80,12 @@ copyTransformation <- function(m1, m2, mn, translate = TRUE, lar.cons = NULL, la
 
 	# FIND ROTATION MATRIX TO TRANSFORM TO FINAL COORDINATE SYSTEM
 	rm <- tMatrixDC(ca)
-	
+
 	# TRANSFORM POINTS
 	mr <- (mn_ref %*% t(rm)) + matrix(m2[1, ], nrow=nrow(mn_ref), ncol=3, byrow=TRUE)
+
+	# GET ALIGNMENT ERROR AFTER UNIFICATION
+	#align_error <- sum(abs(round(m2 - mr[rownames(mr) %in% rownames(m2), ], 6)))
 
 	# CENTER BY PREVIOUS ORIGIN
 	if(!translate){
