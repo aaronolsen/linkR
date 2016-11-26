@@ -8,16 +8,28 @@ findBestAlignment <- function(m1, m2, sign = NULL){
 
 	# USE ROWNAMES, IF GIVEN, TO REMOVE NON-CORRESPONDING POINTS
 	if(!is.null(rownames(m1)) && !is.null(rownames(m2))){
+
+		m1o <- m1o[sort(rownames(m1o)), ]
+		m2o <- m2o[sort(rownames(m2o)), ]
+
+		# REMOVE NA VALUES
+		m1o <- m1o[!is.na(m1o[, 1]), ]
+		m2o <- m2o[!is.na(m2o[, 1]), ]
+
 		m1o[!rownames(m1o) %in% rownames(m2o), ] <- NA
 		m2o[!rownames(m2o) %in% rownames(m1o), ] <- NA
+
+	}else{
+
+		# REPLACE NON-COMMON LANDMARKS BETWEEN TWO MATRICES WITH NA
+		m1o[which(is.na(m2o))] <- NA
+		m2o[which(is.na(m1o))] <- NA
 	}
 
-	# REPLACE NON-COMMON LANDMARKS BETWEEN TWO MATRICES WITH NA
+	# REMOVE NA VALUES
 	m1o <- m1o[!is.na(m1o[, 1]), ]
 	m2o <- m2o[!is.na(m2o[, 1]), ]
-	#m1o[which(is.na(m2))] <- NA
-	#m2o[which(is.na(m1))] <- NA
-
+	
 	# CENTER M2 ABOUT CENTROID OF COMMON POINTS
 	m2c <- m2 - matrix(colMeans(m2o, na.rm=TRUE), nrow=nrow(m2), ncol=ncol(m2), byrow=TRUE)
 
