@@ -1,6 +1,8 @@
-findBestAlignment <- function(m1, m2, sign = NULL){
+findBestAlignment <- function(m1, m2, m3 = NULL, sign = NULL){
 	
 	# IF INPUTTING A MATRIX WITH ALL ZEROS IN ONE DIMENSION, MAKE IT M2, NOT M1
+
+	if(is.null(m3)) m3r <- NULL
 
 	# SET INITIAL COMMON POINT MATRIX VALUES
 	m1o <- m1
@@ -29,10 +31,16 @@ findBestAlignment <- function(m1, m2, sign = NULL){
 	# REMOVE NA VALUES
 	m1o <- m1o[!is.na(m1o[, 1]), ]
 	m2o <- m2o[!is.na(m2o[, 1]), ]
+
+	# CREATE FIRST TRANSLATION TRANSFORMATION MATRIX
+	tmat1 <- diag(4);tmat1[1:3, 4] <- -colMeans(m2o, na.rm=TRUE)
 	
 	# CENTER M2 ABOUT CENTROID OF COMMON POINTS
-	m2c <- m2 - matrix(colMeans(m2o, na.rm=TRUE), nrow=nrow(m2), ncol=ncol(m2), byrow=TRUE)
+	m2c <- mtransform(m2, tmat1)
 
+	# APPLY TRANSLATION TO EXTRA MATRIX, IF PROVIDED
+	if(!is.null(m3)) m3c <- mtransform(m3, tmat1)
+	
 	# CENTER COMMON POINTS
 	m1oc <- scale(m1o, center=TRUE, scale=FALSE)
 	m2oc <- scale(m2o, center=TRUE, scale=FALSE)
@@ -56,13 +64,17 @@ findBestAlignment <- function(m1, m2, sign = NULL){
 	# CAUSES PROBLEM IN DETERMINING FIT PERHAPS
 	RM <- SVD$v %*% S %*% t(SVD$u)
 
+	# CREATE ROTATION TRANSFORMATION MATRIX
+	tmat2 <- diag(4);tmat2[1:3, 1:3] <- t(RM)
+
 	# TEST ALIGNMENT
 	#t2 <- m2c %*% RM
 	#print(m1oc[!is.na(m1oc[, 1]), ])
 	#print(t2[!is.na(t2[, 1]), ])
 
 	# ROTATE ALL CENTER LANDMARKS IN M2
-	m2r <- m2c %*% RM
+	m2r <- mtransform(m2c, tmat2)
+	if(!is.null(m3)) m3r <- mtransform(m3c, tmat2)
 
 	# TEST WHETHER CHIRALITY OF POINT SET HAS FLIPPED
 	if(nrow(m1o) == 3 && nrow(m2) > 3){
@@ -84,7 +96,9 @@ findBestAlignment <- function(m1, m2, sign = NULL){
 		if(sum(round(abs(dpp - dpp_r), 7)) > 0.001){
 			SVD$v[, 3] <- -SVD$v[, 3]
 			RM <- SVD$v %*% S %*% t(SVD$u)
-			m2r <- m2c %*% RM
+			tmat2[1:3, 1:3] <- t(RM)
+			m2r <- mtransform(m2c, tmat2)
+			if(!is.null(m3)) m3r <- mtransform(m3c, tmat2)
 		}else{
 		}
 
@@ -94,11 +108,15 @@ findBestAlignment <- function(m1, m2, sign = NULL){
 		#cat('\n')
 	}
 
-	m2or <- m2oc %*% RM
+	m2or <- mtransform(m2oc, tmat2)
+
+	# CREATE SECOND TRANSLATION TRANSFORMATION MATRIX
+	tmat3 <- diag(4);tmat3[1:3, 4] <- colMeans(m1o, na.rm=TRUE)
 
 	# APPLY TRANSLATION PARAMETERS
-	m2r <- m2r + matrix(colMeans(m1o, na.rm=TRUE), nrow=nrow(m2r), ncol=ncol(m2r), byrow=TRUE)
-	#m2or <- m2or + matrix(colMeans(m1o, na.rm=TRUE), nrow=nrow(m2or), ncol=ncol(m2or), byrow=TRUE)
+	m2r <- mtransform(m2r, tmat3)
+#	m2r <- m2r + matrix(colMeans(m1o, na.rm=TRUE), nrow=nrow(m2r), ncol=ncol(m2r), byrow=TRUE)
+	if(!is.null(m3)) m3r <- mtransform(m3r, tmat3)
 
 	# GET ALIGNMENT ERROR
 	errors <- m1oc - m2or
@@ -106,9 +124,14 @@ findBestAlignment <- function(m1, m2, sign = NULL){
 	
 	dist.errors <- matrix(sqrt(rowSums(errors^2)), ncol=1, dimnames=list(rownames(errors), NULL))
 
+	# GET FINAL TRANSFORMATION MATRIX
+	tmat <- tmat3 %*% tmat2 %*% tmat1
+	
 	list(
 		mat=m2r,
 		pos.errors=errors,
-		dist.errors=dist.errors
+		dist.errors=dist.errors,
+		mc=m3r,
+		tmat=tmat
 	)
 }
