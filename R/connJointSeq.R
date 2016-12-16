@@ -80,10 +80,13 @@ connJointSeq <- function(joint.links, joint.types, joints.pair, ground.joints){
 
 	# REMOVE ZEROS FROM PATHS
 	for(i in 1:length(paths)) paths[[i]] <- paths[[i]][paths[[i]] > 0]
-
+	
 	# BREAK UP PATHS INTO FRAGMENTS
 	frag_len_min <- 3
 	frag_len_max <- solveKinematicChain(query='max path length')
+
+	#print(paths)
+	#print(frag_len_max)
 
 	path_frags <- c()
 	for(path in paths){
