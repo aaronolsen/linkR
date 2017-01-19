@@ -4,6 +4,9 @@ pointPlaneProj <- function(q, p, n){
 		warning("Input point non-coincident")
 		return(c(NA, NA, NA))
 	}
+	
+	# MAKE SURE N IS A UNIT VECTOR
+	n <- uvector(n)
 
 	# PROJECTION OF POINT Q ONTO PLANE DEFINED BY POINT P AND NORMAL VECTOR N
 	q - sum((q - p) * n) * n
