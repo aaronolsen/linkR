@@ -10,7 +10,7 @@ linkR_data <- function(name, fdir=NULL){
 		}, warning = function(w) {
 		}, error = function(e) {
 			if(e[1]$message == 'none of the packages are loaded'){
-				fdir_dev <- '/Users/aaron/Documents/Research/R dev/linkR/inst/extdata/'
+				fdir_dev <- '/Users/aaron/Documents/Research/github/linkR/inst/extdata/'
 				if(file.exists(fdir_dev)){
 					return(fdir_dev)
 				}else{
