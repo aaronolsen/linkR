@@ -270,9 +270,6 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 			}
 		}
 		
-		# DRAW FRAME
-		svg.frame(x=xyz)
-
 		# ANIMATED
 		if(animate || (length(dim(joints)) > 2 && dim(joints)[3] == 1)){
 
@@ -414,6 +411,9 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 				}
 			}
 		}
+
+		# DRAW FRAME
+		svg.frame(x=xyz)
 		
 		svg.close()
 	}
