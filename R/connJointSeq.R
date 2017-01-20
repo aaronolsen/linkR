@@ -96,8 +96,12 @@ connJointSeq <- function(joint.links, joint.types, joints.pair, ground.joints){
 				# CHECK IF FRAGMENT ALREADY EXISTS
 				if(paste(path[seq(i, i+frag_len-1)], collapse=',') %in% path_frags) next
 
+				#print(path[seq(i, i+frag_len-1)])
+
 				# CHECK IF FRAGMENT TYPE SEQUENCE IS SOLVABLE
 				if(!solveKinematicChain(joint.types=joint.types[path[seq(i, i+frag_len-1)]])) next
+
+				#print(joint.types[path[seq(i, i+frag_len-1)]])
 
 				# MAKE SEQUENCE INTO STRING FOR EASY LOOK-UP
 				path_string <- paste(path[seq(i, i+frag_len-1)], collapse=',')
@@ -107,11 +111,15 @@ connJointSeq <- function(joint.links, joint.types, joints.pair, ground.joints){
 			}
 		}
 	}
-
-#print(path_frags)
-
-	# CONVERT STRINGS INTO VECTORS
-	paths <- list();for(i in 1:length(path_frags)) paths[[i]] <- as.numeric(strsplit(path_frags[i], ",")[[1]])
+	
+	# CHECK WHETHER ANY FRAGMENTS WERE FOUND
+	if(is.null(path_frags)){
+		warning("No solvable kinematic chains found.")
+		paths <- NULL
+	}else{
+		# CONVERT STRINGS INTO VECTORS
+		paths <- list();for(i in 1:length(path_frags)) paths[[i]] <- as.numeric(strsplit(path_frags[i], ",")[[1]])
+	}
 
 	paths
 }
