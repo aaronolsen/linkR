@@ -36,8 +36,18 @@ defineLinkage <- function(joint.coor, joint.types, joint.cons,
 		joint.cons <- joints_cvec
 	}
 
-	# ADD ROWNAMES TO JOINTS
-	if(is.null(rownames(joint.coor))) rownames(joint.coor) <- paste0("Joint", 1:nrow(joint.coor))
+	# ADD ROWNAMES TO JOINTS (NAME BASED ON JOINT TYPE AND ORDER IN INPUT SEQUENCE)
+	if(is.null(rownames(joint.coor))){
+		joint_names <- rep(NA, nrow(joint.coor))
+		for(i in 1:nrow(joint.coor)){
+			if(i == 1){
+				joint_names[i] <- paste0(joint.types[i], i)
+			}else{
+				joint_names[i] <- paste0(joint.types[i], 1 + sum(joint.types[1:(i-1)] == joint.types[i]))
+			}
+		}
+		rownames(joint.coor) <- joint_names
+	}
 
 	# ADD ROWNAMES TO CONSTRAINT LIST
 	if(is.null(names(joint.cons))) names(joint.cons) <- rownames(joint.coor)
@@ -59,6 +69,18 @@ defineLinkage <- function(joint.coor, joint.types, joint.cons,
 
 	# ASSIGN DEGREES OF FREEDOM
 	dof_joints <- setNames(c(1,1,2,3), c("R", "L", "P", "S"))
+
+	# CHECK FOR LINK NAMED 'GROUND'
+	if(is.null(ground.link) && !is.numeric(joint.conn[1,1])){
+		all_link_names <- unique(c(joint.conn))
+		ground_grepl <- grepl('^ground$', all_link_names, ignore.case=TRUE)
+		if(sum(ground_grepl) > 0){
+			ground.link <- all_link_names[ground_grepl]
+			link.names <- c(ground.link, all_link_names[all_link_names != ground.link])
+		}else{
+			stop('Please indicate one of the links in "joint.conn" as "Ground".')
+		}
+	}
 
 	# SET LINK NAMES IF GROUND IS DEFINED
 	if(is.null(link.names) && !is.null(ground.link)){
