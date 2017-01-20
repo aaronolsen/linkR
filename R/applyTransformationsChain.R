@@ -83,7 +83,7 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 		# MAKE SURE VECTOR IS NOT NA
 		if(is.na(joint_cons[[joint_base]][1])) stop("Joint constraint vector for body rotation has NA values.")
 		
-		if(print.progress) cat(paste0('\t\t\t\tApply tranformation chain: rotate ', paste(linkage$link.names[links+1], collapse=', '), '\n'))
+		if(print.progress) cat(paste0('\t\t\t\tapplyTransformationsChain(): rotate ', paste(linkage$link.names[links+1], collapse=', '), ' link(s)\n'))
 		
 		# ROTATE ASSOCIATED JOINTS
 		linkage_r$joint.coor[joints_1, , itr] <- rotateBody(m=linkage_r$joint.coor[joints_1, , itr], 
@@ -138,12 +138,24 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 			))
 		}
 
-		if(print.progress) cat(paste0('\t\t\t\tApply tranformations chain: translate ', paste(linkage$link.names[links+1], collapse=', '), '\n'))
+		if(print.progress){
+			if(!'r' %in% names(solve_chain)){
+				cat(paste0('\t\t\t\tapplyTransformationsChain(): translate ', paste(linkage$link.names[links+1], collapse=', '), ' link(s)\n'))
+			}else{
+				cat(paste0('\t\t\t\tapplyTransformationsChain(): translate and rotate ', paste(linkage$link.names[links+1], collapse=', '), ' link(s)\n'))
+			}
+		}
 
 		# SET POSITION OF JOINT
 		if(joints_unknown[joint_init] != ''){
 
-			linkage_r$joint.coor[joint_init, , itr] <- linkage_r$joint.coor[joint_init, , itr] + solve_chain[[type_solve]]
+			if(!'r' %in% names(solve_chain)){
+				linkage_r$joint.coor[joint_init, , itr] <- linkage_r$joint.coor[joint_init, , itr] + solve_chain[[type_solve]]
+			}else{
+				linkage_r$joint.coor[joint_init, , itr] <- linkage_r$joint.coor[joint_init, , itr] + solve_chain[['t']]
+				linkage_r$joint.coor[joint_init, , itr] <- rotateBody(m=linkage_r$joint.coor[joint_init, , itr], 
+					p=solve_chain[['p']], v=joint_cons[[joint_init]], a=solve_chain[['r']])
+			}
 	
 			# SET CHANGE
 			unknown_changed <- TRUE
@@ -155,8 +167,17 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 		if(length(joints_1) > 0){
 
 			# TRANSLATE ASSOCIATED JOINTS
-			linkage_r$joint.coor[joints_1, , itr] <- linkage_r$joint.coor[joints_1, , itr] + 
-				matrix(solve_chain[[type_solve]], nrow=length(joints_1), ncol=3, byrow=TRUE)
+			if(!'r' %in% names(solve_chain)){
+				linkage_r$joint.coor[joints_1, , itr] <- linkage_r$joint.coor[joints_1, , itr] + 
+					matrix(solve_chain[[type_solve]], nrow=length(joints_1), ncol=3, byrow=TRUE)
+			}else{
+				linkage_r$joint.coor[joints_1, , itr] <- linkage_r$joint.coor[joints_1, , itr] + 
+					matrix(solve_chain[['t']], nrow=length(joints_1), ncol=3, byrow=TRUE)
+				linkage_r$joint.coor[joints_1, , itr] <- rotateBody(m=linkage_r$joint.coor[joints_1, , itr], 
+					p=solve_chain[['p']], v=joint_cons[[joint_init]], a=solve_chain[['r']])
+			}
+			
+			#print(linkage_r$joint.coor[joints_1, , itr])
 
 			# SET CHANGE
 			unknown_changed <- TRUE
@@ -169,8 +190,15 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 
 			# TRANSLATE ASSOCIATED POINTS
 			if(!is.null(points_t)){
-				linkage_r$link.points[points_t, , itr] <- linkage_r$link.points[points_t, , itr] + 
-					matrix(solve_chain[[type_solve]], nrow=length(points_t), ncol=3, byrow=TRUE)
+				if(!'r' %in% names(solve_chain)){
+					linkage_r$link.points[points_t, , itr] <- linkage_r$link.points[points_t, , itr] + 
+						matrix(solve_chain[[type_solve]], nrow=length(points_t), ncol=3, byrow=TRUE)
+				}else{
+					linkage_r$link.points[points_t, , itr] <- linkage_r$link.points[points_t, , itr] + 
+						matrix(solve_chain[['t']], nrow=length(points_t), ncol=3, byrow=TRUE)
+					linkage_r$link.points[points_t, , itr] <- rotateBody(m=linkage_r$link.points[points_t, , itr], 
+						p=solve_chain[['p']], v=joint_cons[[joint_init]], a=solve_chain[['r']])
+				}
 			}
 
 			# SET TRANSFORMED LINK
@@ -179,8 +207,16 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 
 		# TRANSLATE ASSOCIATED LOCAL COORDINATE SYSTEMS
 		for(link_name in linkage$link.names[links+1]){
-			linkage_r$link.lcs[[link_name]][, , itr] <- linkage_r$link.lcs[[link_name]][, , itr] + 
-				matrix(solve_chain[[type_solve]], nrow=dim(linkage_r$link.lcs[[link_name]])[1], ncol=3, byrow=TRUE)
+
+			if(!'r' %in% names(solve_chain)){
+				linkage_r$link.lcs[[link_name]][, , itr] <- linkage_r$link.lcs[[link_name]][, , itr] + 
+					matrix(solve_chain[[type_solve]], nrow=dim(linkage_r$link.lcs[[link_name]])[1], ncol=3, byrow=TRUE)
+			}else{
+				linkage_r$link.lcs[[link_name]][, , itr] <- linkage_r$link.lcs[[link_name]][, , itr] + 
+					matrix(solve_chain[['t']], nrow=dim(linkage_r$link.lcs[[link_name]])[1], ncol=3, byrow=TRUE)
+				linkage_r$link.lcs[[link_name]][, , itr] <- rotateBody(m=linkage_r$link.lcs[[link_name]][, , itr], 
+					p=solve_chain[['p']], v=joint_cons[[joint_init]], a=solve_chain[['r']])
+			}
 		}
 	}
 
