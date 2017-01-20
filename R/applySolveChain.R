@@ -1,7 +1,7 @@
 applySolveChain <- function(linkage, linkage_r, solve_chain, path, itr, joint_cons, 
 	joints_unknown, link_points_tform, print.progress = FALSE){
 
-	if(print.progress) cat('\t\t\tApply solve chain\n')
+	if(print.progress) cat('\t\t\tapplySolveChain()\n')
 
 	points_t <- NULL
 	unknown_changed <- FALSE
@@ -19,7 +19,7 @@ applySolveChain <- function(linkage, linkage_r, solve_chain, path, itr, joint_co
 		apply_t <- applyTransformationsChain(linkage, linkage_r, joint_cons, joints_unknown, 
 			link_points_tform, itr, path, solve_chain=solve_chain[[j]], joint_init=j_idx, 
 			joint_base=j_idx, unknown_changed, print.progress=print.progress)
-		
+
 		linkage_r <- apply_t$linkage_r
 		joint_cons <- apply_t$joint_cons
 		joints_unknown <- apply_t$joints_unknown
@@ -47,7 +47,7 @@ applySolveChain <- function(linkage, linkage_r, solve_chain, path, itr, joint_co
 		known_idx <- joints_assoc[joints_unknown[joints_assoc] == ""]
 		unknown_idx <- joints_assoc[joints_unknown[joints_assoc] == "p"]
 
-		if(print.progress) cat(paste0('\t\t\t\tCopy transformation to associated joint(s): ', paste(rownames(linkage_r$joint.coor)[unknown_idx], collapse=', '), '\n'))
+		if(print.progress) cat(paste0('\t\t\t\tcopyTransformation() to associated joint(s): ', paste(rownames(linkage_r$joint.coor)[unknown_idx], collapse=', '), '\n'))
 
 		# COPY TRANSFORMATION
 		#print(unknown_idx)

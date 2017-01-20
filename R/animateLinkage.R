@@ -72,7 +72,10 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 	## FIX: REPLACE WITH linkage$ground.joints??
 	joints_ground <- unique(c(linkage$joint.links[linkage$joint.links[, 1] == 0, c('Joint1', 'Joint2')]))
 	joints_ground <- joints_ground[joints_ground > 0]
-		
+
+	# GET JOINT NAMES
+	joint_names <- rownames(linkage$joint.coor)
+
 	#### SET CUSTOM PATHS FOR DEBUGGING
 	#linkage$joint.paths <- list(c(11, 12, 1), c(2,3,4), c(5,6,7), c(13,14,15))
 
@@ -146,6 +149,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 					cat(paste0(paste(linkage$joint.types[path], collapse='-'), '; '))
 					#cat(paste0(paste(joints_unknown[path], collapse='-')))
 					for(k in 1:length(path)){
+						#if(path[k] == 0) next
 						if(joints_unknown[path[k]] == ''){cat('_')}else{cat(joints_unknown[path[k]])}
 						#cat(paste0(linkage$joint.types[path[k]], joints_unknown[path[k]]))
 						#cat(paste0(linkage$joint.types[path[k]], joints_unknown[path[k]]))
@@ -182,7 +186,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 						expr={
 							solveKinematicChain(joint.types=linkage$joint.types[path], joints.unknown=joints_unknown[path], 
 								joint.coor=linkage_r$joint.coor[path, , itr], joint.cons=joint_cons[path], 
-								joints.dist=path_joint_lengths[[i]], joints.prev=joints.prev[path, ], 
+								joints.dist=path_joint_lengths[[i]], joints.prev=joints.prev[path, ], joint.init=linkage$joint.init[path, ],
 								print.progress=print.progress)
 						},
 						error=function(cond){return(0)},
@@ -317,7 +321,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 
 	# CHECK THAT DISTANCES WITHIN LINKS HAVE NOT CHANGED
 	if(check.inter.joint.dist && dim(linkage_r$joint.coor)[3] > 1){
-
+	
 		# EACH PAIR OF JOINED JOINTS
 		for(i in 1:nrow(linkage$joint.links)){
 
@@ -331,11 +335,12 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 			### FIX!
 			# FOR NOW SKIP TRANSLATION ALONG ROTATING LINK
 			if(sum(c('R', 'L') %in% linkage_r$joint.types[c(linkage$joint.links[i, 'Joint1'], linkage$joint.links[i, 'Joint2'])]) == 2) next
+			
+			#print(joint_names[linkage$joint.links[i, c('Joint1', 'Joint2')]])
 
 			# COMPARE TO INITIAL JOINT PAIR POSITIONS
 			d <- abs(linkage$joint.links[i, 'Length'] - sqrt(colSums((joint1 - joint2)^2)))
 			#cat(linkage$joint.links[i, 'Joint1'], '-', linkage$joint.links[i, 'Joint2'], '\n')
-			#print(d)
 
 			# CHANGE IN DISTANCE
 			dist_sd <- abs(sd(d) / linkage_size)
@@ -346,8 +351,10 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 			# ALL DISTANCES CONSTANT
 			if(dist_sd < 1e-7) next
 
+			#print(sqrt(colSums((joint1 - joint2)^2)))
+
 			# PRINT DISTANCES THAT CHANGE
-			warning(paste0("The distance between joints ", linkage$joint.links[i, 'Joint1'], " and ", linkage$joint.links[i, 'Joint2'], " is non-constant (", sd(d), ")."))
+			warning(paste0("The distance between joints ", joint_names[linkage$joint.links[i, 'Joint1']], " and ", joint_names[linkage$joint.links[i, 'Joint2']], " is non-constant (", sd(d), ")."))
 		}
 	}
 
@@ -383,7 +390,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 
 			if(linkage$joint.types[i] == 'P' && i %in% joints_ground){
 
-				# FIND DISTANCES FROM JOINT TO LINE
+				# FIND DISTANCES FROM JOINT TO PLANE
 				d <- abs(distPointToPlane(t(linkage_r$joint.coor[i, , ]), linkage_r$joint.cons[[i]], linkage_r$joint.coor[i, , 1]))
 
 				# ALL DISTANCES CONSTANT
