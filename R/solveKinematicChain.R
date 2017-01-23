@@ -133,13 +133,25 @@ solveKinematicChain <- function(joint.types = NULL, joints.unknown = NULL, joint
 					r_angle <- -r_angle
 				}
 
+				#
+				j1_init_proj_adj <- j_init_proj[3,] + c(j1_proj - j_proj[3,])
+				rotate_angle <- avec(j_init_proj[4,]-j_init_proj[3,], j_proj[4,]-j_proj[3,])
+				j_transform <- rotateBody(m=j_init_proj, p=j1_prev_proj, v=plane$n, a=rotate_angle)
+				if(abs(avec(j_transform[4,]-j_transform[3,], j_proj[4,]-j_proj[3,])) > 1e-5){
+					j_transform <- rotateBody(m=j_init_proj, p=j1_init_proj_adj, v=plane$n, a=-rotate_angle)
+					rotate_angle <- -rotate_angle
+				}
+				translate3 <- j_proj[3,]-j_transform[3,]
+
+
 				#print(joint.coor)
 				#print(r_points)
 				#print(j_proj)
 
 				r_list <- list(
 					list('r'=0, 'p'=0),
-					list('t'=translate, 'r'=r_angle, 'p'=pnl),
+					#list('t'=translate, 'r'=r_angle, 'p'=pnl),
+					list('t'=translate3, 'r'=rotate_angle, 'p'=j1_init_proj_adj),
 					list('p'=0)
 				)
 			}
