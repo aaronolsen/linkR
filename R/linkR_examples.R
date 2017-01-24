@@ -20,7 +20,7 @@ linkR_examples <- function(name, fdir=NULL){
 		}, warning = function(w) {
 		}, error = function(e) {
 			if(e[1]$message == 'none of the packages are loaded'){
-				fdir_dev <- '/Users/aaron/Documents/Research/R dev/linkR/inst/extdata/'
+				fdir_dev <- '/Users/aaron/Documents/Research/github/linkR/inst/extdata/'
 				if(file.exists(fdir_dev)){
 					return(fdir_dev)
 				}else{
@@ -30,9 +30,18 @@ linkR_examples <- function(name, fdir=NULL){
 		}, finally = {
 		})
 	}
+
+	kinematic_data_list <- list.files(paste0(fdir, 'kinematic_data/'))
 	
 	test_configs_list <- list.files(paste0(fdir, 'test_configs/'))
 	
+	#
+	if(paste0(name, '.txt') %in% kinematic_data_list){
+
+		# Read and return motion data
+		return(readMotionData(paste0(fdir, 'kinematic_data/', name, '.txt')))
+	}
+
 	if(paste0(name, '.R') %in% test_configs_list)
 		return(sourcePartial_linkR(paste0(fdir, 'test_configs/', name, '.R'), 
 			startTag='(# Define joint coordinates)|(# Get specimen data)',endTag='(# Animate linkage)|(# Set number of animation iterations)'))
