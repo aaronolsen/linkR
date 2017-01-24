@@ -1,0 +1,60 @@
+readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
+
+	# Get number of frames from first file
+	tmta <- time_mat_to_arr(as.matrix(read.table(file[1])))
+	lm_array_ex <- tmta$arr
+
+	# Set number of iterations
+	num_iter <- dim(lm_array_ex)[3]
+	
+	# Set landmark names
+	if(is.null(landmark.names)) landmark.names <- dimnames(lm_array_ex)[[1]]
+
+	# Create array for coordinates from all strikes
+	if(multiple.as == 'list' && length(file) > 1){
+		marker_array <- list()
+		for(ii in 1:length(file)){
+			marker_array[[ii]] <- array(NA, dim=c(dim(lm_array_ex)[1:2], num_iter), dimnames=list(landmark.names, letters[24:26], NULL))
+		}
+	}else if(multiple.as == 'array' && length(file) > 1){
+
+		# Get file names from paths
+		file_names <- rep(NA, length(file))
+		for(i in 1:length(file)){
+			str_split <- strsplit(file[i], split='/')[[1]]
+			file_names[i] <- gsub('[.](txt|csv)$', '', str_split[length(str_split)], ignore.case=TRUE)
+		}
+
+		# Create array
+		marker_array <- array(NA, dim=c(dim(lm_array_ex)[1:2], num_iter, length(file)), dimnames=list(landmark.names, letters[24:26], NULL, file_names))
+
+	}else{
+		marker_array <- array(NA, dim=c(dim(lm_array_ex)[1:2], num_iter*length(file)), dimnames=list(landmark.names, letters[24:26], NULL))
+	}
+
+	# Read coordinates into list/array
+	for(i in 1:length(file)){
+
+		# Read coordinates
+		tmta <- time_mat_to_arr(as.matrix(read.table(file[i])))
+		lm_array <- tmta$arr
+
+		# Add to array/list
+		if(multiple.as == 'list' && length(file) > 1){
+			marker_array[[i]][landmark.names, , ] <- lm_array[landmark.names, , ]
+		}else if(multiple.as == 'array' && length(file) > 1){
+			marker_array[landmark.names, , , i] <- lm_array[landmark.names, , ]
+		}else{
+			# Set frame indices
+			frames_idx <- ((i-1)*num_iter+1):(i*num_iter)
+
+			# Add to array
+			marker_array[landmark.names, , frames_idx] <- lm_array[landmark.names, , ]
+		}
+	}
+	
+	list(
+		'xyz'=marker_array, 
+		'time'=tmta$times
+	)
+}
