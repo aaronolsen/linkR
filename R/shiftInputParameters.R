@@ -1,4 +1,4 @@
-shiftInputParameters <- function(linkage, ref.coor, ref.iter = 'start'){
+shiftInputParameters <- function(linkage, ref.coor){
 
 	if('fit.linkage' %in% names(linkage)){
 
@@ -48,10 +48,8 @@ shiftInputParameters <- function(linkage, ref.coor, ref.iter = 'start'){
 		link$RA[[2]] <- link$RA[[1]]
 	}
 	
-	# Set reference iteration
-	if(ref.iter == 'start') itr <- 1
-	if(ref.iter == 'end') itr <- dim(ref.coor)[3]
-
+	itr <- 1
+	
 	# Find rotation matrix
 	RM <- tMatrixEP(v=link$RA[[names(link$RA)[1]]][1, ], a=linkage[[input_param_name]][[1]][itr])
 
