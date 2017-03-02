@@ -3,6 +3,9 @@ defineLinkage <- function(joint.coor, joint.types, joint.cons,
 	link.names = NULL, ground.link = NULL, path.connect = NULL, 
 	lar.cons = NULL){
 
+	# MAKE SURE JOINT COORDINATES ARE MATRIX
+	if(is.vector(joint.coor)) joint.coor <- matrix(joint.coor, nrow=1)
+
 	# VALIDATE INPUTS
 	if(!is.null(link.points) && is.null(link.assoc)) stop("'link.assoc' is NULL. If 'link.points' is defined, 'link.assoc' must be non-NULL.")
 	if(!is.null(joint.conn) && nrow(joint.conn) != length(joint.types)) stop(paste0("The number of rows in 'joint.conn' (", nrow(joint.conn), ") must be equal to the number of joints specified in 'joint.types' (", length(joint.types), ")."))
@@ -137,28 +140,38 @@ defineLinkage <- function(joint.coor, joint.types, joint.cons,
 
 	# CREATE MATRIX FOR CONSTRAINED LENGTHS BETWEEN JOINTS
 	joint.links <- matrix(NA, nrow=0, ncol=4, dimnames=list(NULL, c('Link.idx', 'Joint1', 'Joint2', 'Length')))
+	if(nrow(joint.coor) > 1){
 
-	for(link_idx in link_idx_unique){
+		for(link_idx in link_idx_unique){
 
-		# FIND ALL JOINTS CONNECTED TO LINK
-		joints_comm <- (1:nrow(joint.conn))[(rowSums(link_idx == joint.conn) == 1)]
+			# FIND ALL JOINTS CONNECTED TO LINK
+			joints_comm <- (1:nrow(joint.conn))[(rowSums(link_idx == joint.conn) == 1)]
 		
-		# JOINTS CONNECTED TO GROUND
-		if(link_idx == 0){
-			for(i in 1:length(joints_comm)) joint.links <- rbind(joint.links, c(link_idx, 0, joints_comm[i], 0))
-			next
-		}
+			# JOINTS CONNECTED TO GROUND
+			if(link_idx == 0){
+				for(i in 1:length(joints_comm)) joint.links <- rbind(joint.links, c(link_idx, 0, joints_comm[i], 0))
+				next
+			}
 
-		# GENERATE UNIQUE PAIRS AND CALCULATE DISTANCE BETWEEN JOINTS IN PAIR
-		for(i in 1:(length(joints_comm)-1)){
-			for(j in (i+1):(length(joints_comm))){
-				joint.links <- rbind(joint.links, c(link_idx, joints_comm[i], joints_comm[j], sqrt(sum((joint.coor[joints_comm[i], ]-joint.coor[joints_comm[j], ])^2))))
+			# GENERATE UNIQUE PAIRS AND CALCULATE DISTANCE BETWEEN JOINTS IN PAIR
+			for(i in 1:(length(joints_comm)-1)){
+				for(j in (i+1):(length(joints_comm))){
+					joint.links <- rbind(joint.links, c(link_idx, joints_comm[i], joints_comm[j], sqrt(sum((joint.coor[joints_comm[i], ]-joint.coor[joints_comm[j], ])^2))))
+				}
 			}
 		}
-	}
 
-	# IDENTIFY GROUND JOINTS - REMOVE ZERO
-	ground_joints <- joint.links[joint.links[, 1] == 0, 'Joint2']
+		# IDENTIFY GROUND JOINTS - REMOVE ZERO
+		ground_joints <- joint.links[joint.links[, 1] == 0, 'Joint2']
+
+		# CREATE CONNECTED JOINT SEQUENCES
+		joint_paths <- connJointSeq(joint.links, joint.types, joint.conn, ground_joints)
+
+	}else{
+		joint.links <- rbind(joint.links, c(0,0,NA,0))
+		ground_joints <- 0
+		joint_paths <- NULL
+	}
 
 	# CREATE LOCAL COORDINATE SYSTEMS
 	link.lcs <- setNames(vector("list", length(link.names)), link.names)
@@ -170,26 +183,48 @@ defineLinkage <- function(joint.coor, joint.types, joint.cons,
 		# FIND ALL JOINTS CONNECTED TO LINK
 		joints_comm <- unique(c(joint.links[joint.links[, 'Link.idx'] == link_idx, c('Joint1', 'Joint2')]))
 
+		# REMOVE ZERO JOINT
 		joints_comm <- joints_comm[joints_comm > 0]
 
-		is_ground <- rep(FALSE, length(joints_comm))
-		for(i in 1:length(joints_comm)){
-			is_ground[i] <- joints_comm[i] %in% ground_joints
-		}
+		# REMOVE NA VALUES
+		joints_comm <- joints_comm[!is.na(joints_comm)]
+		
+		if(length(joints_comm) > 0){
 
-		# IF THERE IS ONE GROUND JOINT MAKE THAT THE ORIGIN
-		if(sum(is_ground) == 1){
-			lcs_origin <- joint.coor[joints_comm[is_ground], ]
+			is_ground <- rep(FALSE, length(joints_comm))
+			for(i in 1:length(joints_comm)) is_ground[i] <- joints_comm[i] %in% ground_joints
+
+			# IF THERE IS ONE GROUND JOINT MAKE THAT THE ORIGIN
+			if(sum(is_ground) == 1){
+				lcs_origin <- joint.coor[joints_comm[is_ground], ]
+			}else{
+				lcs_origin <- colMeans(joint.coor[joints_comm, ])
+			}
 		}else{
-			lcs_origin <- colMeans(joint.coor[joints_comm, ])
+
+			# GET LINK NAME
+			lcs_link_name <- link.names[link_idx+1]
+
+			# 
+			if(is.null(link.points) || (!is.null(link.points) && !lcs_link_name %in% link.assoc)){
+
+				# IF NO POINTS ASSOCIATED WITH LINK, CENTER LCS AROUND SOLE JOINT
+				lcs_origin <- joint.coor[1, ]
+
+			}else{
+
+				# GET POINTS ASSOCIATED WITH LCS LINK
+				lcs_pts <- matrix(link.points[link.assoc == lcs_link_name, ], nrow=sum(link.assoc == lcs_link_name), ncol=3)
+
+				# SET ORIGIN
+				lcs_origin <- colMeans(lcs_pts, na.rm=TRUE)
+			}
 		}
 
-		link.lcs[[names(link.lcs)[link_idx+1]]] <- matrix(c(lcs_origin, lcs_origin+c(1,0,0), lcs_origin+c(0,1,0), lcs_origin+c(0,0,1)), nrow=4, ncol=3, byrow=TRUE)
+		link.lcs[[names(link.lcs)[link_idx+1]]] <- matrix(c(lcs_origin, lcs_origin+c(1,0,0), 
+			lcs_origin+c(0,1,0), lcs_origin+c(0,0,1)), nrow=4, ncol=3, byrow=TRUE)
 	}
-
-	# CREATE CONNECTED JOINT SEQUENCES
-	joint_paths <- connJointSeq(joint.links, joint.types, joint.conn, ground_joints)
-
+	
 	if(!is.null(link.points)){
 		
 		# IF link.points ARE VECTOR CONVERT TO MATRIX
