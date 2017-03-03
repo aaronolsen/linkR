@@ -59,7 +59,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 	}
 
 	# GET XYZ CENTROID SIZE
-	cs_xyz <- mean(distPointToPoint(xyz, colMeans(xyz)))
+	cs_xyz <- mean(distPointToPoint(xyz, colMeans(xyz, na.rm=TRUE)), na.rm=TRUE)
 
 	# GET XYZ RANGE
 	#range_xyz <- apply(xyz, 2, range)
