@@ -31,8 +31,8 @@ fitLinkageToJoints <- function(ref.coor, joint.types, fixed.link, input.joint, m
 	}
 
 	if(model_tl %in% c('constant lengths', 'constant length')){
-		start <- c(mean_lengths, RI_vector)
-		#start <- mean_lengths
+		#start <- c(mean_lengths, RI_vector)
+		start <- mean_lengths
 		NA.penalty <- 0.01
 	}
 
