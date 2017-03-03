@@ -2,6 +2,8 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 	link_points_tform, itr, path, solve_chain, joint_init, joint_base, unknown_changed, 
 	call=1, joints_excl=c(), print.progress = FALSE){
 
+	if(print.progress) cat('\t\t\tapplyTransformationsChain()\n')
+
 	#print(linkage$joint.links)
 
 	# SET SOLVE TYPE
@@ -11,41 +13,54 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 	#print(solve_chain)
 	
 	# FIND CONNECTED JOINTS
-	joints_1 <- unique(c(linkage$joint.links[rowSums(linkage$joint.links[, c('Joint1', 'Joint2')] == joint_init) > 0, c('Joint1', 'Joint2')]))
+	if(linkage$num.links > 2){
 
-	# REMOVE GROUND AND INPUT JOINT
-	joints_1 <- joints_1[!joints_1 %in% c(0, joint_init, linkage$ground.joints, joints_excl)]
+		joints_1 <- unique(c(linkage$joint.links[rowSums(linkage$joint.links[, c('Joint1', 'Joint2')] == joint_init) > 0, c('Joint1', 'Joint2')]))
 
-	# REMOVE ALREADY DETERMINED JOINT POSITIONS FOR ROTATION
-	if(type_solve == 'r') if(length(path) > 1) joints_1 <- joints_1[grepl('p', joints_unknown[joints_1])]
-	if(type_solve == 't') joints_1 <- joints_1[grepl('t|p', joints_unknown[joints_1])]
-	if(type_solve == 'p') joints_1 <- joints_1[grepl('t', joints_unknown[joints_1])]
+		# REMOVE GROUND AND INPUT JOINT
+		joints_1 <- joints_1[!joints_1 %in% c(0, joint_init, linkage$ground.joints, joints_excl)]
 
-	if(joint_init != joint_base){
-		joints_1_excl <- c()
-		for(joint_1 in joints_1){
+		# REMOVE ALREADY DETERMINED JOINT POSITIONS FOR ROTATION
+		if(type_solve == 'r') if(length(path) > 1) joints_1 <- joints_1[grepl('p', joints_unknown[joints_1])]
+		if(type_solve == 't') joints_1 <- joints_1[grepl('t|p', joints_unknown[joints_1])]
+		if(type_solve == 'p') joints_1 <- joints_1[grepl('t', joints_unknown[joints_1])]
 
-			# FIND CONNECTED JOINTS
-			joints_2 <- unique(c(linkage$joint.links[rowSums(linkage$joint.links[, c('Joint1', 'Joint2')] == joint_1) > 0, c('Joint1', 'Joint2')]))
-			joints_2 <- joints_2[!joints_2 %in% c(joint_init, joint_base, joints_1)]
+		if(joint_init != joint_base){
+			joints_1_excl <- c()
+			for(joint_1 in joints_1){
+
+				# FIND CONNECTED JOINTS
+				joints_2 <- unique(c(linkage$joint.links[rowSums(linkage$joint.links[, c('Joint1', 'Joint2')] == joint_1) > 0, c('Joint1', 'Joint2')]))
+				joints_2 <- joints_2[!joints_2 %in% c(joint_init, joint_base, joints_1)]
 		
-			# SKIP SECONDARY JOINTS CONNECTED TO AN L-, P- OR R-JOINT
-			if(sum(linkage$joint.types[joints_2] %in% c('L', 'P', 'R')) > 0) joints_1_excl <- joint_1
+				# SKIP SECONDARY JOINTS CONNECTED TO AN L-, P- OR R-JOINT
+				if(sum(linkage$joint.types[joints_2] %in% c('L', 'P', 'R')) > 0) joints_1_excl <- joint_1
+			}
+
+			joints_1 <- joints_1[!joints_1 %in% joints_1_excl]
 		}
 
-		joints_1 <- joints_1[!joints_1 %in% joints_1_excl]
+	}else{
+		#joints_1 <- unique(c(linkage$joint.links[sum(linkage$joint.links[, c('Joint1', 'Joint2')] == joint_init) > 0, c('Joint1', 'Joint2')]))
+		joints_1 <- c()
 	}
 
-	# FIND ASSOCIATED LINK(S)
-	links <- c()
-#print(joints_1)
-#print(linkage$joint.links)
-	for(joint_1 in joints_1){
-		curr_and_path <- (rowSums(joint_init == linkage$joint.links[, c('Joint1', 'Joint2')]) == 1) * (rowSums(joint_1 == linkage$joint.links[, c('Joint1', 'Joint2')]) == 1) == 1
-		links <- c(links, linkage$joint.links[curr_and_path, c('Link.idx')][1])
+	# IF NO CONNECTED JOINTS, THEN SINGLE JOINT LINKAGE
+	if(linkage$num.links == 2){
+		#joints_1 <- joint_init
+		links <- 1
+	}else{
+
+		# FIND ASSOCIATED LINK(S)
+		links <- c()
+		#print(joints_1)
+		#print(linkage$joint.links)
+		for(joint_1 in joints_1){
+			curr_and_path <- (rowSums(joint_init == linkage$joint.links[, c('Joint1', 'Joint2')]) == 1) * (rowSums(joint_1 == linkage$joint.links[, c('Joint1', 'Joint2')]) == 1) == 1
+			links <- c(links, linkage$joint.links[curr_and_path, c('Link.idx')][1])
+		}
+		links <- unique(links)
 	}
-	links <- unique(links)
-#print(links)
 #cat('---\n')
 
 	# SINGLE UNKNOWN JOINT WILL RETURN 0 LINKS BECAUSE ALL OTHER JOINTS DETERMINED, NO LINK THAT SHARES JOINTS
@@ -64,11 +79,11 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 
 	# FIND ASSOCIATED POINTS
 	points_t <- NULL
+	#print(links)
 	if(!is.null(linkage$link.points)) points_t <- as.vector(unlist(linkage$point.assoc[linkage$link.names[links+1]]))
-	#print(points_t)
 
 	# NO JOINTS TO TRANSFORM
-	if(length(joints_1) == 0){
+	if(linkage$num.links > 2 && length(joints_1) == 0){
 		#cat('Insert return() here.\n')
 		return(list(
 				'linkage_r' = linkage_r, 'joint_cons' = joint_cons, 'joints_unknown' = joints_unknown, 
@@ -85,27 +100,31 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 		
 		if(print.progress) cat(paste0('\t\t\t\tapplyTransformationsChain(): rotate ', paste(linkage$link.names[links+1], collapse=', '), ' link(s)\n'))
 		
-		# ROTATE ASSOCIATED JOINTS
-		linkage_r$joint.coor[joints_1, , itr] <- rotateBody(m=linkage_r$joint.coor[joints_1, , itr], 
-			p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]], a=solve_chain[[type_solve]])
+		if(length(joints_1) > 0){
 
+			# ROTATE ASSOCIATED JOINTS
+			linkage_r$joint.coor[joints_1, , itr] <- rotateBody(m=linkage_r$joint.coor[joints_1, , itr], 
+				p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]], a=solve_chain[[type_solve]])
+
+			if(joint_init == joint_base) joints_unknown[joints_1] <- gsub('p', '', joints_unknown[joints_1])
+
+			# APPLY ROTATION TO CONSTRAINT VECTORS
+			for(joint_1 in joints_1){
+				joint_cons_m <- rotateBody(m=rbind(linkage_r$joint.coor[joint_1, , itr], linkage_r$joint.coor[joint_1, , itr]+linkage$joint.cons[[joint_1]]), 
+					p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]], a=solve_chain[[type_solve]])
+				joint_cons[[joint_1]] <- joint_cons_m[2, ] - joint_cons_m[1, ]
+			}
+		}
+		
 		# SET CHANGE
 		unknown_changed <- TRUE
 
 		# REMOVE POSITIONS AND ROTATIONS FROM UNKNOWNS
 		#print(joints_unknown)
 		if(joint_init == joint_base){
-			joints_unknown[joints_1] <- gsub('p', '', joints_unknown[joints_1])
 			joints_unknown[joint_init] <- gsub('r', '', joints_unknown[joint_init])
 		}
 		#print(joints_unknown)
-
-		# APPLY ROTATION TO CONSTRAINT VECTORS
-		for(joint_1 in joints_1){
-			joint_cons_m <- rotateBody(m=rbind(linkage_r$joint.coor[joint_1, , itr], linkage_r$joint.coor[joint_1, , itr]+linkage$joint.cons[[joint_1]]), 
-				p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]], a=solve_chain[[type_solve]])
-			joint_cons[[joint_1]] <- joint_cons_m[2, ] - joint_cons_m[1, ]
-		}
 
 		# ROTATE ASSOCIATED POINTS
 		if(!is.null(points_t)){
@@ -232,8 +251,7 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 	}
 
 	#cat('\n')
-
-	if(length(path) == 1 && joint_init == joint_base){
+	if(linkage$num.links > 2 && length(path) == 1 && joint_init == joint_base){
 
 		for(joint_1 in joints_1){
 
