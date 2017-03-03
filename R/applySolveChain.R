@@ -15,7 +15,7 @@ applySolveChain <- function(linkage, linkage_r, solve_chain, path, itr, joint_co
 
 		j_idx <- j_idxx[j]
 
-		# APPLY TRANSFORMATION TO CONNECTED JOINTS
+		# APPLY TRANSFORMATION TO CONNECTED JOINTS AND ASSOCIATED POINTS
 		apply_t <- applyTransformationsChain(linkage, linkage_r, joint_cons, joints_unknown, 
 			link_points_tform, itr, path, solve_chain=solve_chain[[j]], joint_init=j_idx, 
 			joint_base=j_idx, unknown_changed, print.progress=print.progress)
