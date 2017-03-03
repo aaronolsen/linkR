@@ -168,8 +168,8 @@ defineLinkage <- function(joint.coor, joint.types, joint.cons,
 		joint_paths <- connJointSeq(joint.links, joint.types, joint.conn, ground_joints)
 
 	}else{
-		joint.links <- rbind(joint.links, c(0,0,NA,0))
-		ground_joints <- 0
+		joint.links <- rbind(joint.links, c(0,0,1,0))
+		ground_joints <- 0:1
 		joint_paths <- NULL
 	}
 
