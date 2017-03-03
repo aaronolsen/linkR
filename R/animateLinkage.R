@@ -93,8 +93,13 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 		}
 	}
 
-	# GET LINKAGE SIZE
-	linkage_size <- mean(sqrt(rowSums((linkage$joint.coor - matrix(colMeans(linkage$joint.coor), nrow=nrow(linkage$joint.coor), ncol=3, byrow=TRUE))^2)))
+	# SET DEFAULT LINKAGE SIZE
+	linkage_size <- 1
+	
+	# GET LINKAGE SIZE (IF MORE THAN ONE JOINT AND JOINTS ARE NOT THE SAME
+	if(nrow(linkage$joint.coor) > 1 && sum(apply(linkage$joint.coor, 2, 'sd', na.rm=TRUE)) > 1e-5){
+		linkage_size <- mean(sqrt(rowSums((linkage$joint.coor - matrix(colMeans(linkage$joint.coor), nrow=nrow(linkage$joint.coor), ncol=3, byrow=TRUE))^2)))
+	}
 
 	if(print.progress) cat(paste0('animateLinkage()\n'))
 
@@ -178,7 +183,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 					if(linkage$joint.types[path[1]] == 'R') solve_chain <- list(list('r' = input.param[[i]][itr, ]))
 					if(linkage$joint.types[path[1]] == 'L') solve_chain <- list(list('t' = uvector(linkage$joint.cons[[path[1]]])*input.param[[i]][itr, 1]))
 					if(linkage$joint.types[path[1]] == 'P') solve_chain <- list(list('t' = input.param[[i]][itr, ]))
-					
+
 				}else{
 
 					# SOLVE POSITION
@@ -221,7 +226,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 				}
 				#cat(paste0('\t', paste(linkage$joint.types[path], collapse='', sep=''), '\t', paste(joints_unknown[path], collapse=',', sep=''), '\n'));
 				#if(is.na(solve_chain[[1]][['r']])) return(1)
-
+				
 				# APPLY SOLVE TO JOINTS AND POINTS
 				apply_solve_chain <- applySolveChain(linkage=linkage, linkage_r=linkage_r, 
 					solve_chain=solve_chain, path=path, itr=itr, joint_cons=joint_cons,
@@ -279,7 +284,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 			}
 
 			# MAKE SURE THAT JOINTS ARE NOT COINCIDENT
-			if(sum(abs(linkage$joint.coor[joints_assoc, ] - matrix(colMeans(linkage$joint.coor[joints_assoc, ]), nrow=length(joints_assoc), ncol=3, byrow=TRUE))) < 1e-7){
+			if(nrow(linkage$joint.coor) > 1 && sum(abs(linkage$joint.coor[joints_assoc, ] - matrix(colMeans(linkage$joint.coor[joints_assoc, ]), nrow=length(joints_assoc), ncol=3, byrow=TRUE))) < 1e-7){
 				joints_assoc <- joints_assoc[1]
 				#stop(paste0("Joints used to copy transformation to points associated with '", linkage$link.names[i], "' are coincident"))
 			}
