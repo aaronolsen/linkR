@@ -4,7 +4,7 @@ create_body_points <- function(center, shape=c('triangle'), nvector, size = 1){
 	v1 <- uvector(vorthogonal(nvector))
 
 	# Length of side
-	h <- 1
+	h <- size
 
 	# Find distance from triangle center to vertices
 	a <- 2*((sqrt(h^2 - (h/2)^2)) / 3)
