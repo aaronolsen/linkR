@@ -47,10 +47,13 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 
 	# IF MATRIX, CONVERT TO ARRAY
 	if(length(dim(joints)) == 2) joints <- array(joints, dim=c(dim(joints)[1], dim(joints)[2], 1))
-	
+
+	# GET NUMBER OF ITERATIONS
+	num_iter <- dim(joints)[3]
+
 	# GET XYZ OF ALL JOINTS
 	if(is.matrix(joints)) xyz <- joints
-	if(is.array(joints) && length(dim(joints)) > 2) xyz <- apply(joints, 2, matrix, nrow=dim(joints)[1]*dim(joints)[3], ncol=dim(joints)[2])
+	if(is.array(joints) && length(dim(joints)) > 2) xyz <- apply(joints, 2, matrix, nrow=dim(joints)[1]*num_iter, ncol=dim(joints)[2])
 	
 	# GET XYZ OF ALL POINTS
 	if(!is.null(link.points)){
@@ -72,7 +75,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 	arrowhead_len <- cs_xyz*0.03
 
 	col_lcs <- c('red', 'green', 'blue')
-	col_cons <- 'purple'
+	col_cons <- c('purple', 'hotpink')
 	
 	# If input path.connect is NULL and path connect found with linkage, overwrite
 	if(is.null(path.connect) && !is.null(linkage$path.connect)) path.connect <- linkage$path.connect
@@ -142,7 +145,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 		par(mar=c(0,0,0,0))
 		plot(all_points2d, asp=1, type='n', bty='n', yaxt='n', xaxt='n', xlab='', ylab='')
 
-		for(itr in 1:dim(joints)[3]){
+		for(itr in 1:num_iter){
 
 			# PLOT JOINTS
 			points(joints2d[, , itr], pch=20, col=joint.col.stroke, cex=joint.cex)
@@ -176,7 +179,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 
 					# DRAW LINES
 					#if(fade.with.iteration){
-					#	lines(points2d[path, 1, itr], points2d[path, 2, itr], col=rgb(0,0,0, 1 - (itr / (dim(joints)[3]+1))), lwd=path.lwd[i])
+					#	lines(points2d[path, 1, itr], points2d[path, 2, itr], col=rgb(0,0,0, 1 - (itr / (num_iter+1))), lwd=path.lwd[i])
 					#}else{
 					#	lines(points2d[path, 1, itr], points2d[path, 2, itr], col=path.col.stroke[i], lwd=path.lwd[i])
 					#}
@@ -239,16 +242,33 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 				next
 			}
 			
+			# GET NUMBER OF COLUMNS TO USE FOR JOINT CONSTRAINT VECTOR
+			if(is.vector(linkage$joint.cons[[i]])){dim2 <- length(linkage$joint.cons[[i]])}else{dim2 <- ncol(linkage$joint.cons[[i]])}
+
 			# CREATE EMPTY ARRAY
-			cons_vec[[i]] <- array(NA, dim=c(2, dim(joints)[2:3]))
+			cons_vec[[i]] <- array(NA, dim=c(2, dim2, num_iter))
 
 			# FILL ARRAY
-			for(j in 1:dim(joints)[3]){
+			for(j in 1:num_iter){
 				cons_vec[[i]][1, , j] <- joints[i, , j]
 				if(is.null(linkage$joint.cons.dyn)){
-					if(is.vector(linkage$joint.cons[[i]])) cons_vec[[i]][2, , j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons[[i]])
+					if(is.vector(linkage$joint.cons[[i]])){
+
+						cons_vec[[i]][2, 1:3, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons[[i]][1:3])
+
+						# SECOND VECTOR FOR U-JOINT
+						if(linkage$joint.types[i] %in% c('U')){
+							cons_vec[[i]][2, 4:6, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons[[i]][4:6])
+						}
+					}
 				}else{
-					cons_vec[[i]][2, , j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons.dyn[[i]][j, ])
+
+					cons_vec[[i]][2, 1:3, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons.dyn[[i]][j, 1:3])
+
+					# SECOND VECTOR FOR U-JOINT
+					if(linkage$joint.types[i] %in% c('U')){
+						cons_vec[[i]][2, 4:6, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons.dyn[[i]][j, 4:6])
+					}
 				}
 			}
 		}
@@ -263,7 +283,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 
 			lcs_vec[[i]][1,,] <- linkage$link.lcs[[i]][1,,]
 
-			for(j in 1:dim(joints)[3]){
+			for(j in 1:num_iter){
 				for(k in 2:4){
 					lcs_vec[[i]][k, , j] <- linkage$link.lcs[[i]][1, , j] + arrow_len*0.5*(linkage$link.lcs[[i]][k, , j]-linkage$link.lcs[[i]][1, , j])
 				}
@@ -271,7 +291,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 		}
 		
 		# ANIMATED
-		if(animate || (length(dim(joints)) > 2 && dim(joints)[3] == 1)){
+		if(animate || (length(dim(joints)) > 2 && num_iter == 1)){
 
 			# DRAW ANIMATED JOINTS
 			svg.points(joints, col.fill=joint.col.fill, 
@@ -279,9 +299,16 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 
 			# DRAW CONSTRAINT VECTOR
 			for(i in 1:length(cons_vec)){
+
 				if(is.null(cons_vec[[i]])) next
-				svg.arrows(x=cons_vec[[i]], len=arrowhead_len, col=col_cons, 
+
+				svg.arrows(x=cons_vec[[i]][, 1:3, ], len=arrowhead_len, col=col_cons[1], 
 					lwd=2, layer='Joint constraints', z.index=1)
+
+				if(linkage$joint.types[i] %in% c('U')){
+					svg.arrows(x=cons_vec[[i]][, 4:6, ], len=arrowhead_len, col=col_cons[2], 
+						lwd=2, layer='Joint constraints', z.index=1)
+				}
 			}
 
 			# DRAW LOCAL COORDINATE SYSTEMS ASSOCIATED WITH EACH LINK
@@ -294,16 +321,17 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 		}
 		
 		# STATIC
-		if(!animate && (length(dim(joints)) > 2 && dim(joints)[3] > 1)){
+		if(!animate && (length(dim(joints)) > 2 && num_iter > 1)){
 			
 			# DRAW JOINTS
-			for(i in 1:dim(joints)[3]){
+			for(i in 1:num_iter){
 				svg.points(joints[, , i], col.fill=joint.col.fill, 
 					col.stroke=joint.col.stroke, cex=joint.cex, lwd=joint.lwd, layer='Joints')
 			}
 
 			# DRAW CONSTRAINT VECTOR
 			for(i in 1:length(cons_vec)){
+
 				if(is.null(cons_vec[[i]])) next
 				
 				# CHECK THAT JOINT CONSTRAINT VECTOR CHANGES OVER TIME
@@ -311,8 +339,14 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 				if(sum(apply(cons_vec[[i]], 1:2, sd)) < 1e-10) j_max <- 1
 
 				for(j in 1:j_max){
-					svg.arrows(x=cons_vec[[i]][, , j], len=arrowhead_len, col=col_cons, 
+
+					svg.arrows(x=cons_vec[[i]][, 1:3, j], len=arrowhead_len, col=col_cons[1], 
 						lwd=2, layer='Joint constraints', z.index=1)
+
+					if(linkage$joint.types[i] %in% c('U')){
+						svg.arrows(x=cons_vec[[i]][, 4:6, ], len=arrowhead_len, col=col_cons[2], 
+							lwd=2, layer='Joint constraints', z.index=1)
+					}
 				}
 			}
 
@@ -346,7 +380,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 				}
 			}else{
 
-				for(itr in 1:dim(joints)[3]){
+				for(itr in 1:num_iter){
 					
 					for(i in 1:nrow(linkage$joint.links)){
 
@@ -365,7 +399,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 		if(animate){
 			index.add <- index.add + dim(joints)[1]
 		}else{
-			index.add <- index.add + (dim(joints)[1]*dim(joints)[3])
+			index.add <- index.add + (dim(joints)[1]*num_iter)
 		}
 		
 		# DRAW POINTS AND CONNECTING PATHS
@@ -399,7 +433,7 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 						opacity.fill=path.opacity.fill, col.stroke=path.col.stroke, 
 						opacity.stroke=path.opacity.stroke, lwd=path.lwd, layer='Point wire frame')
 				}else{
-					for(i in 1:dim(joints)[3]){
+					for(i in 1:num_iter){
 						for(j in 1:length(path_list)){
 							if(is.null(path_list[[j]])) next
 							path_list_add[[j]] <- path_list[[j]] + index.add + dim(link.points)[1]*(i-1)
