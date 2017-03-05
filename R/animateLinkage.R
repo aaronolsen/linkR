@@ -37,7 +37,8 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 	joint_cons_dyn <- list()
 	for(i in 1:length(joint_cons)){
 		if(is.na(joint_cons[[i]][1])){joint_cons_dyn[[i]] <- NULL;next}
-		joint_cons_dyn[[i]] <- matrix(NA, nrow=num_iter, ncol=3)
+		if(is.vector(joint_cons[[i]])){ncols <- length(joint_cons[[i]])}else{ncols <- ncol(joint_cons[[i]])}
+		joint_cons_dyn[[i]] <- matrix(NA, nrow=num_iter, ncol=ncols)
 	}
 
 	# COPY OVER JOINTS AND POINTS
@@ -117,19 +118,19 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 		link_points_tform <- setNames(rep(FALSE, linkage$num.links), linkage$link.names)
 
 		# SET L AND P JOINTS AS UNKNOWN POSITION
-		joints_unknown[linkage$joint.types %in% c("L", "P")] <- 't'
+		joints_unknown[linkage$joint.types %in% c('L', 'P')] <- 't'
 
 		# SET S JOINTS AS UNKNOWN POSITION
-		joints_unknown[linkage$joint.types %in% c("S")] <- 'p'
+		joints_unknown[linkage$joint.types %in% c('S')] <- 'p'
 
 		# SET NON-GROUND R JOINTS AS UNKNOWN POSITION AND ROTATION
-		joints_unknown[linkage$joint.types %in% c("R")] <- 'rp'
+		joints_unknown[linkage$joint.types %in% c('R', 'U')] <- 'rp'
 
 		# SET R GROUND JOINTS AS UNKNOWN ROTATION
-		joints_unknown[joints_ground[linkage$joint.types[joints_ground] %in% c("R")]] <- 'r'
+		joints_unknown[joints_ground[linkage$joint.types[joints_ground] %in% c('R', 'U')]] <- 'r'
 
 		# SET S GROUND JOINTS AS KNOWN ROTATION AND POSITION
-		joints_unknown[joints_ground[linkage$joint.types[joints_ground] %in% c("S")]] <- ''
+		joints_unknown[joints_ground[linkage$joint.types[joints_ground] %in% c('S')]] <- ''
 
 		# GET POINT FOR COMPARISON FROM PREVIOUS ITERATION
 		if(itr == 1){joints.prev <- linkage$joint.coor}else{joints.prev <- linkage_r$joint.coor[, , itr-1]}
@@ -183,6 +184,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 					if(linkage$joint.types[path[1]] == 'R') solve_chain <- list(list('r' = input.param[[i]][itr, ]))
 					if(linkage$joint.types[path[1]] == 'L') solve_chain <- list(list('t' = uvector(linkage$joint.cons[[path[1]]])*input.param[[i]][itr, 1]))
 					if(linkage$joint.types[path[1]] == 'P') solve_chain <- list(list('t' = input.param[[i]][itr, ]))
+					if(linkage$joint.types[path[1]] == 'U') solve_chain <- list(list('r' = input.param[[i]][itr, ]))
 
 				}else{
 
@@ -368,7 +370,7 @@ animateLinkage <- function(linkage, input.param, input.joint=NULL,
 
 		for(i in 1:length(linkage$joint.types)){
 		
-			if(linkage$joint.types[i] == 'R' && i %in% joints_ground){
+			if(linkage$joint.types[i] %in% c('R', 'U') && i %in% joints_ground){
 			
 				# FIND DISTANCES FROM FIRST JOINT POSITION TO ALL SUBSEQUENT POSITIONS
 				diff <- linkage_r$joint.coor[i, , ] - matrix(linkage_r$joint.coor[i, , 1], nrow=dim(linkage_r$joint.coor)[2], ncol=dim(linkage_r$joint.coor)[3])
