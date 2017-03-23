@@ -132,9 +132,14 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 			linkage_r$link.points[points_t, , itr] <- rotateBody(m=linkage_r$link.points[points_t, , itr], 
 				p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]][1:3], a=solve_chain[[type_solve]][1])
 
-			if(linkage$joint.type[joint_base] %in% c('U')){
+			if(linkage$joint.type[joint_base] %in% c('U', 'S')){
 				linkage_r$link.points[points_t, , itr] <- rotateBody(m=linkage_r$link.points[points_t, , itr], 
 					p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]][4:6], a=solve_chain[[type_solve]][2])
+			}
+
+			if(linkage$joint.type[joint_base] %in% c('S')){
+				linkage_r$link.points[points_t, , itr] <- rotateBody(m=linkage_r$link.points[points_t, , itr], 
+					p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]][7:9], a=solve_chain[[type_solve]][2])
 			}
 		}
 
@@ -144,11 +149,15 @@ applyTransformationsChain <- function(linkage, linkage_r, joint_cons, joints_unk
 			linkage_r$link.lcs[[link_name]][, , itr] <- rotateBody(m=linkage_r$link.lcs[[link_name]][, , itr], 
 				p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]][1:3], a=solve_chain[[type_solve]][1])
 
-			if(linkage$joint.type[joint_base] %in% c('U')){
+			if(linkage$joint.type[joint_base] %in% c('U', 'S')){
 				linkage_r$link.lcs[[link_name]][, , itr] <- rotateBody(m=linkage_r$link.lcs[[link_name]][, , itr], 
 					p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]][4:6], a=solve_chain[[type_solve]][2])
 			}
 
+			if(linkage$joint.type[joint_base] %in% c('S')){
+				linkage_r$link.lcs[[link_name]][, , itr] <- rotateBody(m=linkage_r$link.lcs[[link_name]][, , itr], 
+					p=linkage_r$joint.coor[joint_base, , itr], v=joint_cons[[joint_base]][7:9], a=solve_chain[[type_solve]][2])
+			}
 			#linkage_r$link.lcs[[link_name]][, , itr] <- rotateBody(m=linkage_r$link.lcs[[link_name]][, , itr], 
 			#	p=linkage_r$link.lcs[[link_name]][1, , itr], v=joint_cons[[joint_base]], a=solve_chain[[type_solve]])
 			#if(link_name != 'Link2'){
