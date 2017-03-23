@@ -11,10 +11,16 @@ create_body_points <- function(center, shape=c('triangle'), nvector, size = 1){
 	
 	# Define triangle vertices
 	verts <- rbind(
+		center,
 		center + a*v1,
 		center + a*(v1 %*% tMatrixEP(nvector, (2*pi)/3)),
 		center + a*(v1 %*% tMatrixEP(nvector, (4*pi)/3))
 	)
+	
+	# Create local coordinate system
+	#lcs <- rbind(center, center+uvector(verts[4,]-verts[3,]), center-uvector(verts[2,]-center), center+nvector)
 
+	#list('coor'=verts, 'lcs'=lcs)
+	
 	verts
 }
