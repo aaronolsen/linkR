@@ -1,4 +1,4 @@
-instRot <- function(m1, m2, na.rm = FALSE){
+instRotate <- function(m1, m2, na.rm = FALSE){
 
 	## Finds instantaneous center of rotation (CoR) and axis of rotation (AoR) between 
 	## coordinates in two different orientations. Four possible solutions can be obtained 
@@ -35,16 +35,16 @@ instRot <- function(m1, m2, na.rm = FALSE){
 	rmat_eigen <- eigen(rmat)
 
 	# Find AoR as the eigenvector corresponding to eigenvalue closest to 1 (truncation errors)
-	aor <- Re(rmat_eigen$vectors[, which.min(abs(Re(rmat_eigen$values) - 1))])
+	AoR <- Re(rmat_eigen$vectors[, which.min(abs(Re(rmat_eigen$values) - 1))])
 
 	# Get rotation magnitude/angle
 	angle <- rep(acos((sum(rmat*diag(3)) - 1) / 2), 4)*c(1,1,-1,-1)
 
 	# Find distance from mid-centroid point to CoR
-	dcen <- -(distPointToPoint(m1_centroid, m2_centroid) / 2) / sin(angle[1]/2)
+	dcen <- -(distPointToPoint(m1_centroid, m2_centroid) / 2) / tan(angle[1]/2)
 
 	# Find vector to the CoR
-	v2rcen <- cprod(m2_centroid - m1_centroid, aor)
+	v2rcen <- cprod(m2_centroid - m1_centroid, AoR)
 
 	# Find possible centers of rotation
 	rcen <- matrix(colMeans(rbind(m1_centroid, m2_centroid)), 4, 3, byrow=TRUE) + 
@@ -54,7 +54,7 @@ instRot <- function(m1, m2, na.rm = FALSE){
 	m1r <- array(NA, dim=c(dim(m1)[1:2], 4))
 	
 	# Try all combinations with potential CoR
-	for(i in 1:dim(m1r)[3]) m1r[, , i] <- rotateBody(m1, rcen[i, ], aor, angle[i])
+	for(i in 1:dim(m1r)[3]) m1r[, , i] <- rotateBody(m1, rcen[i, ], AoR, angle[i])
 
 	# Find combination with lowest difference from actual body position
 	min_idx <- which.min(apply(abs(m1r - array(m2, dim=c(dim(m1)[1:2], 4))), 3, 'sum'))
@@ -64,14 +64,14 @@ instRot <- function(m1, m2, na.rm = FALSE){
 	angle <- angle[min_idx]
 
 	# If angle is negative, change angle and AoR sign
-	if(angle < 0){angle <- -angle; aor <- -aor}
+	if(angle < 0){angle <- -angle; AoR <- -AoR}
 
 	# Find error as mean distance between points
-	mean_error <- mean(sqrt(rowSums((rotateBody(m1, p=rcen, v=aor, a=angle) - m2)^2))); print(mean_error)
+	mean_error <- mean(sqrt(rowSums((rotateBody(m1, p=rcen, v=AoR, a=angle) - m2)^2))); print(mean_error)
 
 	list(
-		aor=aor,
-		cor=rcen,
+		AoR=AoR,
+		CoR=rcen,
 		angle=angle
 	)
 }
