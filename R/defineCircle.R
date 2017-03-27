@@ -42,5 +42,7 @@ defineCircle <- function(center, nvector, point_on_radius=NULL, radius=NULL, red
 	}
 	C$V <- cprod(C$N, C$U)
 
+	class(C) <- 'circle'
+
 	C
 }
