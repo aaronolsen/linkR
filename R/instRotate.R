@@ -6,6 +6,9 @@ instRotate <- function(m1, m2, na.rm = FALSE){
 	## constraints are imposed to obtain a single solution:
 	##    1) Only returns positive angles
 	##    2) Returns the minimum of possible positive angles
+	## A single axis of rotation can describe any number and combination of rotations about
+	## the same center of rotation but not more than one rotation about different centers
+	## of rotation.
 
 	# Remove rows with NA values
 	if(na.rm){
