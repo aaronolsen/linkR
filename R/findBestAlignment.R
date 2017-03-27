@@ -1,4 +1,6 @@
 findBestAlignment <- function(m1, m2, m3 = NULL, sign = NULL){
+
+	## See fit_joint_model for revised svd code that fixes bug
 	
 	# IF INPUTTING A MATRIX WITH ALL ZEROS IN ONE DIMENSION, MAKE IT M2, NOT M1
 
