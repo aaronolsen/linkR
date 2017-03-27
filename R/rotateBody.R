@@ -13,7 +13,7 @@ rotateBody <- function(m, p, v, a){
 
 	# FIND ROTATION MATRIX
 	RM <- tMatrixEP(v=v, a=a)
-	
+
 	# ROTATE POINTS
 	m <- m %*% RM
 
