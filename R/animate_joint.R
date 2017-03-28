@@ -1,8 +1,10 @@
-animate_joint <- function(type, cons, param, coor, lcs = NULL, check.joint.cons = TRUE, 
+animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons = TRUE, 
 	print.progress = FALSE){
 
 	## In-progress function for simulating single joint kinematics. Will eventually be 
 	## 	folded into animateLinkage.
+
+	if(print.progress) cat('animate_joint\n')
 
 	# Standardize input parameter to matrix, each row is an iteration
 	if(is.vector(param)) param <- matrix(param, nrow=length(param), ncol=1)
@@ -37,18 +39,20 @@ animate_joint <- function(type, cons, param, coor, lcs = NULL, check.joint.cons 
 	if(is.vector(coor)) coor <- matrix(coor, nrow=1, ncol=3)
 	
 	# Create local coordinate system
-	if(is.null(lcs)){
+	if(length(lcs) == 1){ # lcs == TRUE
 		center <- colMeans(coor, na.rm=TRUE)
 		lcs <- rbind(center, center+c(1,0,0), center+c(0,1,0), center+c(0,0,1))
 	}
 	
 	# Create single array for all points
-	pmat <- rbind(coor, lcs)
+	if(!is.null(lcs)){pmat <- rbind(coor, lcs)}else{pmat <- coor}
 	tarr <- array(diag(4), dim=c(4,4,n_iter))
 	translations <- matrix(0, n_iter, 3)
 
 	# Get rotational and translational DoFs
 	dof <- joint_types()$dof[type, ]
+
+	if(print.progress) cat('\tCreating transformation matrices\n')
 
 	# Animate body
 	for(iter in 1:n_iter){
@@ -74,7 +78,14 @@ animate_joint <- function(type, cons, param, coor, lcs = NULL, check.joint.cons 
 			tmat <- tmat %*% cbind(rbind(diag(3), rep(0,3)), c(cons[iter, 1:3], 1))
 
 			# Apply rotations
-			for(i in dof[1]:1) tmat <- tmat %*% cbind(rbind(tMatrixEP(v=cons[iter, (i*3+1):(i*3+3)], a=param[iter, i]), rep(0,3)), c(0,0,0,1))
+			# 	The negative sign is needed to ensure rotation matrix follows the right-hand 
+			#	rule - because the EP rotation matrix is put in a transformation 
+			#	matrix that precedes the point matrix in the matrix multiplication. If the 
+			#	EP rotation matrix came after the point matrix in the matrix multiplication, 
+			#	the input angle would need to be positive
+			for(i in dof[1]:1){
+				tmat <- tmat %*% cbind(rbind(tMatrixEP(v=cons[iter, (i*3+1):(i*3+3)], a=-param[iter, i]), rep(0,3)), c(0,0,0,1))
+			}
 
 			# Make rotation point origin
 			tmat <- tmat %*% cbind(rbind(diag(3), rep(0,3)), c(-cons[iter, 1:3], 1))
@@ -82,6 +93,8 @@ animate_joint <- function(type, cons, param, coor, lcs = NULL, check.joint.cons 
 		
 		tarr[, , iter] <- tmat
 	}
+
+	if(print.progress) cat('\tApplying transformation matrices\n')
 
 	# Apply transformations
 	tcoor <- applyTransform(pmat, tarr)
@@ -131,9 +144,18 @@ animate_joint <- function(type, cons, param, coor, lcs = NULL, check.joint.cons 
 		}
 	}
 
+	# Get transformed coordinates and lcs, if specified
+	if(!is.null(lcs)){
+		rcoor <- tcoor[1:(dim(tcoor)[1]-4), , ]
+		rlcs <- tcoor[(dim(tcoor)[1]-3):dim(tcoor)[1], , ]
+	}else{
+		rcoor <- tcoor
+		rlcs <- NULL
+	}
+
 	list(
-		'coor'=tcoor[1:(dim(tcoor)[1]-4), , ],
-		'lcs'=tcoor[(dim(tcoor)[1]-3):dim(tcoor)[1], , ],
+		'coor'=rcoor,
+		'lcs'=rlcs,
 		'cons'=cons,
 		'dof'=dof
 	)
