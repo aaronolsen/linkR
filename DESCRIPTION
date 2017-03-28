@@ -1,9 +1,9 @@
 Package: linkR
-Date: 2016-10-01
+Date: 2017-30-27
 Type: Package
 Title: 3D Lever and Linkage Mechanism Modeling
 Description: Creates kinematic and static force models of 3D levers and linkage mechanisms, with particular application to the fields of engineering and biomechanics.
-Version: 1.1.1
+Version: 1.2
 Depends: R (>= 2.11.0), svgViewR (>= 1.2)
 Author: Aaron Olsen
 Maintainer: Aaron Olsen <aarolsen@gmail.com>
