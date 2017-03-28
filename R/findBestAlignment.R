@@ -49,16 +49,10 @@ findBestAlignment <- function(m1, m2, m3 = NULL, sign = NULL){
 
 	# FIND ROTATION MATRIX TO APPLY TO M2 THAT MINIMIZES DISTANCE BETWEEN M1 AND M2
 	SVD <- svd(t(na.omit(m1oc)) %*% na.omit(m2oc))
-	L <- diag(SVD$d)
-	
-	S <- ifelse(L<0, -1, L)
-	S <- ifelse(L>0, 1, L)
-	
-	## NEW ADDITION - WAS GIVING ZERO AT 3,3 BEFORE
-	if(!is.null(sign)){
-		if(S[3,3] == 0) S[3,3] <- sign
-		if(S[3,3] == 1 && sign == -1) S[3,3] <- sign
-	}
+
+	# CORRECTION TO ENSURE A RIGHT-HANDED COORDINATE SYSTEM
+	S <- diag(3)
+	S[3,3] <- sign(det(SVD$v %*% t(SVD$u)))
 
 	# GET ROTATION MATRIX
 	# MIGHT CHANGE POINTS RELATIVE TO ONE ANOTHER (VERY SLIGHTLY)
@@ -103,11 +97,6 @@ findBestAlignment <- function(m1, m2, m3 = NULL, sign = NULL){
 			if(!is.null(m3)) m3r <- mtransform(m3c, tmat2)
 		}else{
 		}
-
-		#print(SVD$v)
-		#print(S)
-		#print(t(SVD$u))
-		#cat('\n')
 	}
 
 	m2or <- mtransform(m2oc, tmat2)
