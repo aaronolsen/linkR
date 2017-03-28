@@ -1,11 +1,19 @@
 fitShape <- function(mat, shape, centroid.align = NULL){
 
-	# Align coor by centroid, if not input
-	if(is.null(centroid.align)) centroid.align <- alignByCentroid(mat)
-
 	## Fits a shape to a set of points
+
+	# Align coor by centroid, if not input
+	if(shape %in% c('circle', 'plane')){
+		if(is.null(centroid.align)) centroid.align <- alignByCentroid(mat)
+	}
 	
-	# Align points by centroid
+	if(shape == 'vector'){
+
+		# Fit line to 3D points
+		fit_line <- fitLine3D(mat)
+		
+		return(fit_line$v)
+	}
 
 	if(shape == 'circle'){
 		
