@@ -21,61 +21,20 @@ fitJointConstraint <- function(coor, type, max.iter.use = 30, ref.iter = 1, opti
 	####################### Fit shape to point position over time ########################
 
 	# Fit single rotational axis constraint
-	if(type == 'R'){
-
-		# Circle parameters
-		CoRs <- matrix(NA, dim(coor_s)[1], 3)
-		AoRs <- matrix(NA, dim(coor_s)[1], 3)
-		rads <- rep(NA, dim(coor_s)[1])
-
-		# Fit a circle to the set of positions of each body point over time
-		for(i in 1:dim(coor_s)[1]){
-
-			# Align points by centroid
-			centroid_align <- t(coor_s[i, , ]) - matrix(colMeans(t(coor_s[i, , ])), dim(coor_s)[3], dim(coor_s)[2], byrow=TRUE)
-
-			# Fit circles to each point across iterations
-			fit_circle_3d <- fitShape(t(coor_s[i, , ]), 'circle', centroid.align=centroid_align)
-
-			# If point lies along axis of rotation, skip
-			if(is.null(fit_circle_3d)) next
-			
-			# Save center, axis of rotation and radius
-			CoRs[i, ] <- fit_circle_3d$C
-			AoRs[i, ] <- fit_circle_3d$N
-			rads[i] <- fit_circle_3d$R
-		}
-		
-		# Remove NA rows
-		AoRs <- AoRs[!is.na(AoRs[,1]), ]
-		CoRs <- CoRs[!is.na(CoRs[,1]), ]
-		rads <- rads[!is.na(rads)]
-
-		# Find single CoR and AoR
-		if(nrow(AoRs) == 1){
-			CoR <- CoRs
-			AoR <- AoRs
-		}else{
-
-			# Flip AoRs that are in opposite direction from first
-			for(i in 2:nrow(AoRs)) if(avec(AoRs[1, ], AoRs[i, ]) > pi/2) AoRs[i, ] <- -AoRs[i, ]
-
-			# Find average CoR and AoR, weighting each iteration by circle radius
-			CoR <- colSums(CoRs*rads, na.rm=TRUE) / sum(rads, na.rm=TRUE)
-			AoR <- uvector(colSums(AoRs*rads, na.rm=TRUE) / sum(rads, na.rm=TRUE))
-		}
-
-		# Set joint constraints
-		joint_cons <- c(CoR, AoR)
-	
-	}else if(type == 'L'){
+	if(type %in% c('L', 'P')){
 	
 		# Vectors
 		vecs <- matrix(NA, dim(coor_s)[1], 3)
 
 		# Fit a 3D line to the position of each body point over time
 		for(i in 1:dim(coor_s)[1]){
-			fit_vector <- fitShape(t(coor_s[i, , ]), 'vector')
+
+			if(type == 'L'){
+				fit_vector <- fitShape(t(coor_s[i, , ]), 'vector')$V
+			}else if(type == 'P'){
+				fit_vector <- fitShape(t(coor_s[i, , ]), 'plane')$N
+			}
+
 			if(is.null(fit_vector)) next
 			vecs[i, ] <- fit_vector
 		}
@@ -83,7 +42,7 @@ fitJointConstraint <- function(coor, type, max.iter.use = 30, ref.iter = 1, opti
 		# Remove NA rows
 		vecs <- vecs[!is.na(vecs[,1]), ]
 
-		# Find single CoR and AoR
+		# Find single vector
 		if(nrow(vecs) == 1){
 			vec <- vecs
 		}else{
@@ -93,11 +52,99 @@ fitJointConstraint <- function(coor, type, max.iter.use = 30, ref.iter = 1, opti
 			# Find average vector
 			vec <- uvector(colMeans(vecs, na.rm=TRUE))
 		}
-
+		
 		# Set joint constraint
-		joint_cons <- vec
+		if(type == 'L'){
+			joint_cons <- vec
+		}else if(type == 'P'){
+			vec_o <- vorthogonal(vec)
+			joint_cons <- c(vec_o, cprod(vec_o, vec))
+		}
+		
+	}else if(type %in% c('R', 'U')){
+
+		# Find centroid size of each point over time (for weights)
+		Csizes <- apply(coor_s, 1, 'centroidSize', transpose=TRUE)
+
+		# Parameters
+		CoRs <- matrix(NA, dim(coor_s)[1], 3)
+		rads <- rep(NA, dim(coor_s)[1])
+		if(type == 'R') AoRs <- matrix(NA, dim(coor_s)[1], 3)
+
+		# Fit circle/sphere to the set of positions of each body point over time
+		for(i in 1:dim(coor_s)[1]){
+
+			if(type == 'R'){
+
+				# Align points by centroid
+				centroid_align <- t(coor_s[i, , ]) - matrix(colMeans(t(coor_s[i, , ])), dim(coor_s)[3], dim(coor_s)[2], byrow=TRUE)
+
+				# Fit circles to each point across iterations
+				fit_shape <- fitShape(t(coor_s[i, , ]), 'circle', centroid.align=centroid_align)
+
+			}else if (type == 'U'){
+
+				# Fit spheres to each point across iterations
+				fit_shape <- fitShape(t(coor_s[i, , ]), 'sphere')
+			}
+
+			# If NULL, skip
+			if(is.null(fit_shape)) next
+
+			# Save center, axis of rotation and radius
+			CoRs[i, ] <- fit_shape$C
+			rads[i] <- fit_shape$R
+			if(type == 'R') AoRs[i, ] <- fit_shape$N
+		}
+		
+		# Remove NA rows
+		CoRs <- CoRs[!is.na(CoRs[,1]), ]
+		rads <- rads[!is.na(rads)]
+		if(type == 'R') AoRs <- AoRs[!is.na(AoRs[,1]), ]
+
+		# Find single CoR and AoR
+		if(nrow(CoRs) == 1){
+			CoR <- CoRs
+			if(type == 'R') AoR <- AoRs
+		}else{
+
+			# Flip AoRs that are in opposite direction from first
+			if(type == 'R') for(i in 2:nrow(AoRs)) if(avec(AoRs[1, ], AoRs[i, ]) > pi/2) AoRs[i, ] <- -AoRs[i, ]
+
+			# Find average CoR and AoR, weighting each iteration by centroid size of points
+			# Using centroid size is better than radius because noisy points in straight line over small range can lead to false large radius
+			CoR <- colSums(CoRs*Csizes, na.rm=TRUE) / sum(Csizes, na.rm=TRUE)
+			if(type == 'R') AoR <- uvector(colSums(AoRs*Csizes, na.rm=TRUE) / sum(Csizes, na.rm=TRUE))
+		}
+		
+		if(type == 'U'){
+
+			# 
+		}
+
+		# Set joint constraints
+		if(type == 'R') joint_cons <- c(CoR, AoR)
+		if(type == 'U') joint_cons <- c(CoR)
+
+		svg.new(file='Test.html')
+
+		svg.pointsC(t(coor_s[i, , ]), col.fill='none', cex=1)
+
+		svg.points(fit_shape$C, cex=3, col='orange')
+		
+		for(x in -5:5){
+			for(y in -5:5){
+				for(z in -5:5){
+					svg.points(fit_shape$C + fit_shape$R*uvector(c(x,y,z)), cex=1, col='orange')
+				}
+			}
+		}
+
+		svg.close()
 	}
 
+
+return(1)
 	#################### Optimize initial pose and input parameters ######################
 
 	# Align coordinates across all time points using generalized procrustes analysis to 
@@ -106,9 +153,6 @@ fitJointConstraint <- function(coor, type, max.iter.use = 30, ref.iter = 1, opti
 
 	# Align consensus to reference time point
 	pose_init <- findBestAlignment(coor[, , ref.iter], ccoor$mean.scaled)$mat
-
-	# Create matrix to hold optimized input parameters
-	optim_param <- matrix(NA, dim(coor)[3], ncol=1)
 
 	# Find full range of coordinates
 	coor_range <- apply(coor, 2, 'range')
@@ -131,9 +175,15 @@ fitJointConstraint <- function(coor, type, max.iter.use = 30, ref.iter = 1, opti
 	}else{
 		t_input <- t_lower <- t_upper <- NULL
 	}
+	
+	# Set starting values for optimizing parameters
+	optim_param_values <- cbind(r_input, t_input)
+
+	# Create matrix to hold optimized input parameters
+	optim_param <- matrix(NA, dim(coor)[3], ncol=ncol(optim_param_values))
 
 	# Fill in matrix for optimize subset
-	optim_param[use_idx, 1] <- cbind(r_input, t_input)
+	optim_param[use_idx, ] <- optim_param_values
 	
 	# Set input parameters to 0 for reference (initial) iteration
 	optim_param[ref.iter, ] <- 0
@@ -175,8 +225,8 @@ fitJointConstraint <- function(coor, type, max.iter.use = 30, ref.iter = 1, opti
 						lower=input_lower, upper=input_upper, type=type, cons=joint_cons, coor=pose_init, 
 						coor.compare=coor[, , use_idx[i]]) 
 				},
-				error=function(cond) return(NULL),
-				warning=function(cond) return(NULL)
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
 			)
 
 			# Save results
