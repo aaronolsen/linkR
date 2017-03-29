@@ -4,7 +4,7 @@ fitShape <- function(mat, shape, centroid.align = NULL){
 
 	# Align coor by centroid, if not input
 	if(shape %in% c('circle', 'plane')){
-		if(is.null(centroid.align)) centroid.align <- alignByCentroid(mat)
+		if(is.null(centroid.align)) centroid.align <- mat  - matrix(colMeans(mat, na.rm=TRUE), nrow(mat), ncol(mat), byrow=TRUE)
 	}
 	
 	if(shape == 'vector'){
@@ -12,7 +12,16 @@ fitShape <- function(mat, shape, centroid.align = NULL){
 		# Fit line to 3D points
 		fit_line <- fitLine3D(mat)
 		
-		return(fit_line$v)
+		shape_obj <- list('V'=fit_line$v)
+		class(shape_obj) <- 'vector'
+		return(shape_obj)
+	}
+
+	if(shape == 'sphere'){
+
+		fit_sphere <- fitSphere(mat)
+		
+		return(fit_sphere)
 	}
 
 	if(shape == 'circle'){
@@ -53,7 +62,7 @@ fitShape <- function(mat, shape, centroid.align = NULL){
 	}
 
 	if(shape == 'plane'){
-		
+
 		# Check for differences in point position
 		if(mean(apply(centroid.align, 2, 'sd')) < 1e-10) return(NULL)
 
