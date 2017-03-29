@@ -37,5 +37,5 @@ fitCircle2D <- function(mat){
 	alpha <- sol[1]^2 + sol[2]^2 + (Suu + Svv)/N
 	r <- sqrt(alpha)
 
-	list(C = c(sol[1] + xb, sol[2] + yb), R = r)
+	list('C' = c(sol[1] + xb, sol[2] + yb), 'R' = r)
 }
