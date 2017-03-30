@@ -101,10 +101,8 @@ linkR_examples <- function(name, fdir=NULL){
 		return(list('xyz'=solve_linkage))
 	}
 
-	#
+	# Read and return motion data
 	if(paste0(name, '.txt') %in% kinematic_data_list){
-
-		# Read and return motion data
 		return(readMotionData(paste0(fdir, 'kinematic_data/', name, '.txt')))
 	}
 
