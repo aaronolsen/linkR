@@ -4,13 +4,19 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 	## In-progress function for simulating single joint kinematics. Will eventually be 
 	## 	folded into animateLinkage.
 
-	if(print.progress) cat('animate_joint\n')
+	if(print.progress){
+		cat('animate_joint\n')
+		cat(paste0('\tJoint type: ', type, '\n'))
+	}
 
 	# Standardize input parameter to matrix, each row is an iteration
 	if(is.vector(param)) param <- matrix(param, nrow=length(param), ncol=1)
 
 	# Get number of iterations
 	n_iter <- nrow(param)
+
+	# Get rotational and translational DoFs
+	dof <- joint_types()$dof[type, ]
 
 	# Standardize contraint into matrix, each row is an iteration
 	if(is.vector(cons)) cons <- matrix(cons, nrow=n_iter, ncol=length(cons), byrow=TRUE)
@@ -34,6 +40,16 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 			}
 		}
 	}
+	
+	if(print.progress){
+		cat(paste0('\tJoint constraints:\n'))
+		if(dof[1] > 0){
+			cat(paste0('\t\tCoR: {', paste0(round(cons[1, 1:3], 3), collapse=', '), '}\n'))
+			for(i in 1:dof[1]){
+				cat(paste0('\t\tAoR ', i, ': {', paste0(round(uvector(cons[1, (i*3+1):(i*3+3)]), 3), collapse=', '), '}\n'))
+			}
+		}
+	}
 
 	# Standardize coordinates into matrix
 	if(is.vector(coor)) coor <- matrix(coor, nrow=1, ncol=3)
@@ -49,9 +65,6 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 	tarr <- array(diag(4), dim=c(4,4,n_iter))
 	translations <- matrix(0, n_iter, 3)
 
-	# Get rotational and translational DoFs
-	dof <- joint_types()$dof[type, ]
-
 	if(print.progress) cat('\tCreating transformation matrices\n')
 
 	# Animate body
@@ -64,8 +77,10 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 		if(dof[1] == 0){rdof_skip <- 0}else{rdof_skip <- (dof[1]+1)*3}
 
 		# Apply translations
-		if(dof[2] > 0) for(i in 1:dof[2]){
-			tmat[1:3, 4] <- tmat[1:3, 4] + param[iter, dof[1]+i]*uvector(cons[iter, (rdof_skip+i*3+1-3):(rdof_skip+i*3)])
+		if(dof[2] > 0){
+			for(i in 1:dof[2]){
+				tmat[1:3, 4] <- tmat[1:3, 4] + param[iter, dof[1]+i]*uvector(cons[iter, (rdof_skip+i*3+1-3):(rdof_skip+i*3)])
+			}
 		}
 		
 		# Save translations
