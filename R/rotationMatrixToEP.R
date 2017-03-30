@@ -23,9 +23,7 @@ rotationMatrixToEP <- function(R){
 		o2 <- atan2(R[2, 1]/cos(t2), R[1, 1]/cos(t2))
 	}
 
-	angles <- list()
-	angles[[1]] <- c(o1, t1, p1)
-	angles[[2]] <- c(o2, t2, p2)
-
-	angles
+	# z,y,x
+	#list(c(o1, t1, p1), c(o2, t2, p2))
+	c(o1, t1, p1)
 }
