@@ -1,5 +1,7 @@
 random_trajectory <- function(n, start = 0, mean = 0, sd = 1, seed = NULL, 
-	smooth = TRUE, span = NULL){
+	smooth = TRUE, span = NULL, cumulative = FALSE){
+
+#	if(!cumulative) n <- n + 1
 
 	# Set span based on number of points
 	if(is.null(span)) span <- 50 / n
@@ -15,7 +17,11 @@ random_trajectory <- function(n, start = 0, mean = 0, sd = 1, seed = NULL,
 	rt_mat <- matrix(NA, nrow=n, ncol=length(mean))
 
 	# Run Brownian motion (cumulative sum of normally distributed random variable)
-	for(i in 1:length(mean)) rt_mat[, i] <- cumsum(rnorm(n, mean=mean[i], sd=sd[i]))
+	if(cumulative){
+		for(i in 1:length(mean)) rt_mat[, i] <- cumsum(rnorm(n, mean=mean[i], sd=sd[i]))
+	}else{
+		for(i in 1:length(mean)) rt_mat[, i] <- rnorm(n, mean=mean[i], sd=sd[i])
+	}
 
 	# Smooth
 	if(smooth){
