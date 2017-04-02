@@ -1,6 +1,6 @@
 draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'green', 'blue'), 
 	cons.col.r=c('purple', 'MediumPurple', 'Magenta'), cons.col.t=c('blue', 'teal', 'aqua'), 
-	cex=c(3,7), lwd=1, draw.lcs = TRUE, 
+	cex=c(7,3), lwd=1, draw.lcs = TRUE, 
 	animate = TRUE, arrow.len=1, head.len='auto', animate.duration=4, window.title='draw_joint', 
 	animate.reverse = TRUE){
 
@@ -15,10 +15,10 @@ draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'gree
 	svg.new(file, animate.reverse=animate.reverse, animate.duration=animate.duration, window.title=window.title)
 
 	# Draw fixed body
-	svg.pointsC(fixed, close=TRUE, col.fill=col, col.stroke='none', cex=cex[1])
+	svg.pointsC(fixed, close=TRUE, col.fill=col, col.stroke='none', cex=cex[2])
 
 	# Draw fixed body center
-	svg.pointsC(colMeans(fixed), cex=cex[1])
+	svg.pointsC(colMeans(fixed), cex=cex[2])
 
 	# Draw fixed body coordinate system
 	if(draw.lcs) draw_lcs(fixed.lcs, arrow.len=arrow.len, head.len=head.len)
@@ -32,8 +32,9 @@ draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'gree
 		if(is.null(animate.joint[[i]])) next
 
 		# Set draw properties
-		if(n_animate > 1 && i == 1) {opacity <- 0.5; stroke_col <- 'black'; col_fill <- 'none'; col_fill_center <- 'none'; cexi <- cex[2]}
-		if((n_animate > 1 && i == 2) || n_animate == 1) {opacity <- 1; stroke_col <- 'orange'; col_fill <- col; col_fill_center <- 'black'; cexi <- cex[1]}
+		if(n_animate > 1 && i == 1) {opacity <- 0.5; stroke_col <- 'black'; col_fill_center <- 'black'; col_fill <- col; cexi <- cex[2]}
+		if((n_animate > 1 && i == 2)) {opacity <- 1; stroke_col <- 'orange'; col_fill <- 'none'; col_fill_center <- 'none'; cexi <- cex[1]}
+		if(n_animate == 1) {opacity <- 1; stroke_col <- 'black'; col_fill <- 'none'; col_fill_center <- 'none'; cexi <- cex[1]}
 
 		jt_cons <- animate.joint[[i]]$cons
 		mobile <- animate.joint[[i]]$coor
@@ -104,7 +105,7 @@ draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'gree
 			}
 
 			# Draw point at center of rotation			
-			svg.pointsC(array(t(jt_cons[, 1:3]), dim=c(1,3,nrow(jt_cons))), cex=cex[1], col=cons.col.r[1])
+			svg.pointsC(array(t(jt_cons[, 1:3]), dim=c(1,3,nrow(jt_cons))), cex=cex[2], col=cons.col.r[1])
 
 			# Draw path of center of rotation
 			svg.lines(jt_cons[, 1:3], lwd=lwd, col=cons.col.r[1])
