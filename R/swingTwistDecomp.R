@@ -1,5 +1,10 @@
 swingTwistDecomp <- function(q, v){
 
+	## http://www.euclideanspace.com/maths/geometry/rotations/for/decomposition/
+	## This isn't yet written to return two orthogonal axes and the rotations about each
+	## It seems the twist and swing axes are axes about which the new direction is 
+	## rotated. It should be possible to calculate the orthogonal vector pair from this.
+
 	# Make sure v is unit vector
 	v <- uvector(v)
 
