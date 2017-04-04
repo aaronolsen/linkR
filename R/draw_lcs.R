@@ -1,4 +1,5 @@
-draw_lcs <- function(lcs, file = NULL, arrow.len = 1, head.len = "auto", col = c('red', 'green', 'blue'), lwd = 1){
+draw_lcs <- function(lcs, file = NULL, arrow.len = 1, head.len = "auto", col = c('red', 'green', 'blue'), 
+	lwd = 1, animate = TRUE){
 
 	# If file is null, set current connection
 	if(is.null(file)){
@@ -16,10 +17,16 @@ draw_lcs <- function(lcs, file = NULL, arrow.len = 1, head.len = "auto", col = c
 			svg.arrows(slcs, lwd=lwd, col=col[arrow], len=head.len)
 		}
 	}else if(length(dim(lcs)) == 3){
-		for(arrow in 1:3){
-			slcs <- lcs[c(1,arrow+1), , ]
-			for(j in 1:dim(lcs)[3]) slcs[, , j] <- rbind(slcs[1, , j], slcs[1, , j]+arrow.len*uvector(slcs[2, , j]-slcs[1, , j]))
-			svg.arrows(slcs, lwd=lwd, col=col[arrow], len=head.len)
+		if(animate){
+			for(arrow in 1:3){
+				slcs <- lcs[c(1,arrow+1), , ]
+				for(j in 1:dim(lcs)[3]) slcs[, , j] <- rbind(slcs[1, , j], slcs[1, , j]+arrow.len*uvector(slcs[2, , j]-slcs[1, , j]))
+				svg.arrows(slcs, lwd=lwd, col=col[arrow], len=head.len)
+			}
+		}else{
+			for(arrow in 1:3){
+				for(j in 1:dim(lcs)[3]) svg.arrows(rbind(lcs[1, , j], lcs[1, , j]+arrow.len*uvector(lcs[arrow+1, , j]-lcs[1, , j])), lwd=lwd, col=col[arrow], len=head.len)
+			}
 		}
 	}
 }
