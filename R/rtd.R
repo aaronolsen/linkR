@@ -1,4 +1,4 @@
-rtDecomp <- function(m1, m2, tvec = NULL, na.rm = FALSE, positive.only = TRUE){
+rtd <- function(m1, m2, tvec = NULL, na.rm = FALSE, positive.only = TRUE){
 
 	# Decomposes rotation and translation. If tvec is NULL translation is along AoR. If 
 	# tvec is specified, translation is parallel to tvec
