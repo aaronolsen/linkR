@@ -1,7 +1,21 @@
 readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
 
+	# Detect format
+	if(grepl('[.]csv$', file[1])){
+		file_format <- 'csv'
+	}else if(grepl('[.]txt$', file[1])){
+		file_format <- 'txt'
+	}
+
 	# Get number of frames from first file
-	tmta <- time_mat_to_arr(as.matrix(read.table(file[1])))
+	if(file_format == 'txt'){
+		tmta <- time_mat_to_arr(as.matrix(read.table(file[1])))
+	}else{
+		read_matrix <- as.matrix(read.csv(file[1]))
+		if(colnames(read_matrix)[1] == 'X') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
+		tmta <- time_mat_to_arr(read_matrix)
+	}
+	
 	lm_array_ex <- tmta$arr
 
 	# Set number of iterations
@@ -36,7 +50,14 @@ readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
 	for(i in 1:length(file)){
 
 		# Read coordinates
-		tmta <- time_mat_to_arr(as.matrix(read.table(file[i])))
+		if(file_format == 'txt'){
+			tmta <- time_mat_to_arr(as.matrix(read.table(file[i])))
+		}else{
+			read_matrix <- as.matrix(read.csv(file[i]))
+			if(colnames(read_matrix)[1] == 'X') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
+			tmta <- time_mat_to_arr(read_matrix)
+		}
+
 		lm_array <- tmta$arr
 
 		# Add to array/list
