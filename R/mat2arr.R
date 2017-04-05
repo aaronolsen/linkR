@@ -1,4 +1,4 @@
-mat2arr_linkr <- function(mat, pattern = '[.](x|y|z)$', ignore.case = TRUE){
+mat2arr <- function(mat, pattern = '[.](x|y|z)$', ignore.case = TRUE){
 
 	# Create array
 	arr <- array(NA, dim=c(ncol(mat)/3,3,nrow(mat)), 
