@@ -1,10 +1,167 @@
-fitJointConstraint <- function(coor, type, print.progress = FALSE){
+fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress = FALSE){
 
 	# Set number of coordinates
 	n_coor <- dim(coor)[1]
 
 	# Set number of iterations
 	n_iter <- dim(coor)[3]
+
+	# Try optimizing translation vector such that CoRs are collinear and form a line parallel
+	# to the translation vector (3 parameter optimization)
+	if(type %in% c('RL')){
+
+		# Get point ranges
+		coor_range <- apply(coor, 2, 'range')
+
+		# Find maximum distance for point range
+		max_dist <- sqrt(sum((coor_range[2,]-coor_range[1,])^2))
+
+		# Set starting vector orientations - may need to add more
+		start <- list(c(1,0,0), c(0,1,0), c(0,0,1))
+		
+		#error <- linear_cor_trajectory_error(start, coor=coor, max.dist=max_dist*1)
+
+		# Solve for CoRs that form a linear trajectory parallel to translation vector
+		objectives <- rep(10, length(start))
+		cor_solve <- list()
+		for(i in 1:length(start)){
+			cor_solve[[i]] <- tryCatch(
+				expr={
+					nlminb(start=start[[i]], objective=linear_cor_trajectory_error, 
+						lower=c(-1,-1,-1), upper=c(1,1,1), coor=coor, max.dist=max_dist*1)
+				},
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
+			)
+			objectives[i] <- cor_solve[[i]]$objective
+			if(cor_solve[[i]]$objective < 1e-4) break
+		}
+		
+		# Save minimum solution
+		cor_solve <- cor_solve[[which.min(objectives)]]
+		#print(cor_solve)
+
+		if(print.progress) cat(paste0('\t\tError after translation vector estimation: ', round(cor_solve$objective, 7), '\n'))
+
+		# Set translation vector
+		tvec <- uvector(cor_solve$par)
+		
+		# Create matrices for AoR, CoRs
+		inst_aor <- matrix(NA, nrow=n_iter-1, ncol=3)
+		inst_cor <- matrix(NA, nrow=n_iter-1, ncol=3)
+		angles <- rep(NA, n_iter-1)
+
+		# Find instantaneous AoRs and CoRs given translation vector
+		for(iter in 2:n_iter){
+			
+			# Decompose rotation and translation given translation vector
+			rtdr <- rtd(coor[, , iter-1], coor[, , iter], tvec=tvec)
+			inst_aor[iter-1, ] <- rtdr$aor
+			inst_cor[iter-1, ] <- rtdr$cor
+			angles[iter-1] <- rtdr$angle
+			
+			# Flip axes when more than 90 degrees apart or exactly opposite
+			if(iter > 2){
+				if(abs(avec(inst_aor[1,], inst_aor[iter-1,])) > pi/2) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+				if(sum(inst_aor[1,]+inst_aor[iter-1,]) < 1e-8) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+			}
+		}
+
+		# Find average AoR weighted by rotation angle
+		abs_angles <- abs(angles)
+		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
+
+		# Fit line to CoRs
+		fit_line <- fitLine3D(inst_cor)
+
+		# Find point on line closest to first CoR point
+		cor_init <- pointNormalOnLine(inst_cor[1, ], fit_line$p1, fit_line$p2)
+		
+		# Set joint constraints
+		joint_cons <- c(cor_init, avg_aor, tvec)
+		
+		#
+		if(FALSE){
+			svg.new('Test.html')
+			svg.frame(coor)
+			cols <- c('red', 'green', 'blue')
+			for(i in 1:dim(coor)[1]) svg.pointsC(t(coor[i, , ]), col.stroke.C=cols[i])
+			svg.lines(inst_cor, col='blue')
+			#svg.lines(rbind(fit_line$p1, fit_line$p2), col='blue')
+			svg.points(inst_cor, col='blue', cex=0.5)
+		
+			svg.lines(rbind(colMeans(coor_range), colMeans(coor_range)+tvec), col='purple')
+
+			#for(i in 1:nrow(inst_aor)) svg.arrows(rbind(centroid[i, ], centroid[i, ] + 0.5*inst_aor[i, ]), col='purple', opacity=0.4)
+
+			svg.close()
+		}
+	}
+
+	if(type %in% c('RL2')){
+	
+		# Find centroid over time
+		centroid <- t(apply(coor, 3, 'colMeans'))
+
+		# Fit cylinder to centroid of points across iterations
+		fit_ecylinder <- fitEllipticCylinder(centroid, select.axis=select.t.axis)
+		
+		# Set central axis of cylinder as translation vector
+		tvec <- uvector(fit_ecylinder$N)
+
+		# Create matrices for AoR, CoRs
+		inst_aor <- matrix(NA, nrow=n_iter-1, ncol=3)
+		inst_cor <- matrix(NA, nrow=n_iter-1, ncol=3)
+		angles <- rep(NA, n_iter-1)
+
+		# Find instantaneous AoRs and CoRs given translation vector
+		for(iter in 2:n_iter){
+			
+			# Decompose rotation and translation given translation vector
+			rtdr <- rtd(coor[, , iter-1], coor[, , iter], tvec=tvec)
+			inst_aor[iter-1, ] <- rtdr$aor
+			inst_cor[iter-1, ] <- rtdr$cor
+			angles[iter-1] <- rtdr$angle
+			
+			# Flip axes when more than 90 degrees apart or exactly opposite
+			if(iter > 2){
+				if(abs(avec(inst_aor[1,], inst_aor[iter-1,])) > pi/2) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+				if(abs(sum(inst_aor[1,]+inst_aor[iter-1,])) < 1e-8) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+			}
+		}
+
+		# Find average AoR weighted by rotation angle
+		abs_angles <- abs(angles)
+		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
+
+		# Fit line to CoRs
+		fit_line <- fitLine3D(inst_cor)
+		
+		# Find point on line closest to first CoR point
+		cor_init <- pointNormalOnLine(inst_cor[1, ], fit_line$p1, fit_line$p2)
+
+		# Set joint constraints
+		joint_cons <- c(cor_init, avg_aor, tvec)
+
+		if(FALSE){
+			svg.new('Test.html')
+			svg.frame(coor)
+
+			cols <- c('red', 'green', 'blue')
+			for(i in 1:dim(coor)[1]) svg.pointsC(t(coor[i, , ]), col.stroke.C=cols[i])
+			svg.points(centroid)
+			svg.lines(inst_cor, col='blue')
+			#svg.lines(rbind(fit_line$p1, fit_line$p2), col='blue')
+			svg.points(c(0.3,0.5,0.4), col='brown')
+
+			svg.points(joint_cons[1:3], col='blue', cex=3)
+			svg.arrows(rbind(joint_cons[1:3], joint_cons[1:3]+tvec), col='blue')
+
+			for(i in 1:nrow(inst_aor)) svg.arrows(rbind(centroid[i, ], centroid[i, ] + 0.5*inst_aor[i, ]), col='purple', opacity=0.4)
+
+			svg.close()
+		}
+	}
 
 	# Fit single rotational axis constraint
 	if(type %in% c('L', 'P')){
@@ -47,32 +204,80 @@ fitJointConstraint <- function(coor, type, print.progress = FALSE){
 			joint_cons <- c(vec_o, cprod(vec_o, vec))
 		}
 		
-	}else if(type %in% c('R', 'U')){
+	}else if(type == 'R'){
 
-		# Find centroid size of each point over time (for weights)
+		# Find centroid size of each point "position cloud" over time (for weights)
 		Csizes <- apply(coor, 1, 'centroidSize', transpose=TRUE)
 
 		# Parameters
 		CoRs <- matrix(NA, n_coor, 3)
 		rads <- rep(NA, n_coor)
-		if(type == 'R') AoRs <- matrix(NA, n_coor, 3)
+		AoRs <- matrix(NA, n_coor, 3)
 
-		# Fit circle/sphere to the set of positions of each body point over time
+		# Use 50% most dispersed points, in order of dispersion
+		sub_max <- round(0.5*dim(coor)[3])
+		max_disp <- whichMaxDisperse(t(coor[which.max(Csizes), , ]), n=sub_max)
+	
+		# Set as subset
+		coor_s <- coor[, , max_disp]
+		n_iter_s <- length(max_disp)
+
+		# Find instantaneous AoRs and CoRs angle between each iteration
+		inst_aor <- matrix(NA, nrow=n_iter_s-1, ncol=3)
+		inst_cor <- matrix(NA, nrow=n_iter_s-1, ncol=3)
+		angles <- rep(NA, n_iter_s-1)
+		for(iter in 2:n_iter_s){
+
+			inst_rotate <- instRotate(coor_s[, , iter-1], coor_s[, , iter])
+			inst_aor[iter-1, ] <- inst_rotate$AoR
+			inst_cor[iter-1, ] <- inst_rotate$CoR
+			angles[iter-1] <- inst_rotate$angle
+
+			# Flip axes when more than 90 degrees apart or exactly opposite
+			if(iter > 2){
+				if(abs(avec(inst_aor[1,], inst_aor[iter-1,])) > pi/2) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+				if(sum(inst_aor[1,]+inst_aor[iter-1,]) < 1e-8) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+			}
+		}
+		
+		# Find average AoR weighted by rotation angle
+		abs_angles <- abs(angles)
+		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
+
+		# Find average CoR weighted by rotation angle
+		avg_cor <- colSums(inst_cor*abs_angles) / sum(abs_angles)
+		
+		CoR <- avg_cor
+		AoR <- avg_aor
+		
+		if(FALSE){
+			svg.new('Test.html')
+			svg.frame(coor)
+			cols <- c('red', 'green', 'blue')
+			for(i in 1:dim(coor)[1]) svg.points(t(coor[i, , ]), col.stroke=cols[i], opacity.fill=0.2, opacity.stroke=0.2)
+			for(i in 1:dim(coor_s)[1]) svg.pointsC(t(coor_s[i, , ]), col.stroke.C=cols[i])
+			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(inst_cor[i, ], inst_cor[i, ]+100*abs(angles[i])*uvector(inst_aor[i, ])), col='purple')
+			#for(i in 1:nrow(inst_cor)) svg.arrows(rbind(avg_cor, avg_cor+100*abs(angles[i])*uvector(inst_aor[i, ])), col='purple')
+			svg.arrows(rbind(avg_cor, avg_cor+10*uvector(avg_aor)), col='blue')
+			svg.close()
+		}
+
+		joint_cons <- c(CoR, AoR)
+
+	}else if(type %in% c('U', 'S')){
+
+		# Find centroid size of each point "position cloud" over time (for weights)
+		Csizes <- apply(coor, 1, 'centroidSize', transpose=TRUE)
+
+		# Parameters
+		CoRs <- matrix(NA, n_coor, 3)
+		rads <- rep(NA, n_coor)
+
+		# Fit sphere to the set of positions of each body point over time
 		for(i in 1:n_coor){
 
-			if(type == 'R'){
-
-				# Align points by centroid
-				centroid_align <- t(coor[i, , ]) - matrix(colMeans(t(coor[i, , ])), n_iter, dim(coor)[2], byrow=TRUE)
-
-				# Fit circles to each point across iterations
-				fit_shape <- fitShape(t(coor[i, , ]), 'circle', centroid.align=centroid_align)
-
-			}else if (type == 'U'){
-
-				# Fit spheres to each point across iterations
-				fit_shape <- fitShape(t(coor[i, , ]), 'sphere')
-			}
+			# Fit spheres to each point across iterations
+			fit_shape <- fitShape(t(coor[i, , ]), 'sphere')
 
 			# If NULL, skip
 			if(is.null(fit_shape)) next
@@ -80,29 +285,35 @@ fitJointConstraint <- function(coor, type, print.progress = FALSE){
 			# Save center, axis of rotation and radius
 			CoRs[i, ] <- fit_shape$C
 			rads[i] <- fit_shape$R
-			if(type == 'R') AoRs[i, ] <- fit_shape$N
 		}
+
+		if(FALSE){
+			svg.new('Test.html')
+			svg.frame(coor)
+
+			cols <- c('red', 'green', 'blue')
+			for(i in 1:dim(coor)[1]) svg.pointsC(t(coor[i, , ]), col.stroke.C=cols[i])
 		
+			for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+10*uvector(AoRs[i, ])), col='purple')
+			for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+rads[i]*uvector(vorthogonal(AoRs[i, ]))), col='blue')
+		
+			svg.close()
+		}
+
 		# Remove NA rows
 		CoRs <- CoRs[!is.na(CoRs[,1]), ]
 		rads <- rads[!is.na(rads)]
-		if(type == 'R') AoRs <- AoRs[!is.na(AoRs[,1]), ]
 
 		# Find single CoR and AoR
 		if(nrow(CoRs) == 1){
 			CoR <- CoRs
-			if(type == 'R') AoR <- AoRs
 		}else{
-
-			# Flip AoRs that are in opposite direction from first
-			if(type == 'R') for(i in 2:nrow(AoRs)) if(avec(AoRs[1, ], AoRs[i, ]) > pi/2) AoRs[i, ] <- -AoRs[i, ]
 
 			# Find average CoR and AoR, weighting each iteration by centroid size of points
 			# Using centroid size is better than radius because noisy points in straight line over small range can lead to false large radius
 			CoR <- colSums(CoRs*Csizes, na.rm=TRUE) / sum(Csizes, na.rm=TRUE)
-			if(type == 'R') AoR <- uvector(colSums(AoRs*Csizes, na.rm=TRUE) / sum(Csizes, na.rm=TRUE))
 		}
-		
+
 		if(type == 'U'){
 
 			if(print.progress) cat(paste0('\tEstimating U-joint axis orientations\n'))
@@ -218,8 +429,13 @@ fitJointConstraint <- function(coor, type, print.progress = FALSE){
 		}
 
 		# Set joint constraints
-		if(type == 'R') joint_cons <- c(CoR, AoR)
 		if(type == 'U') joint_cons <- c(CoR, uvector(aor_fo), uvector(aor_ro))
+		if(type == 'S') joint_cons <- c(CoR, c(1,0,0), c(0,1,0), c(0,0,1))
+
+	}else if(type == 'T'){
+
+		# Set to any set of three mutually orthogonal vectors
+		joint_cons <- c(c(1,0,0), c(0,1,0), c(0,0,1))
 	}
 
 	return(list(
