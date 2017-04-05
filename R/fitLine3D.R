@@ -2,17 +2,12 @@ fitLine3D <- function(X){
 
 	# Source: http://r.789695.n4.nabble.com/Fit-a-3-Dimensional-Line-to-Data-Points-td863596.html
 
-	if(ncol(X) == 2) X <- cbind(X, rep(0, nrow(X)))
-
-	N <- nrow(X) 
+	#if(ncol(X) == 2) X <- cbind(X, rep(0, nrow(X)))
 
 	meanX <- apply(X, 2, mean) 
-	Xpca   <- princomp(X) 
-	dirVector <- Xpca$loadings[, 1] 
-
-	Xfit1 <- matrix(rep(meanX, each=N), ncol=3) + Xpca$score[, 1] %*% t(dirVector) 
-	t <- c(min(Xpca$score[, 1])-.2, max(Xpca$score[, 1])+.2) 
-	endpts <- rbind(meanX + t[1]*dirVector, meanX + t[2]*dirVector)
+	pca <- prcomp(X)
+	t <- c(min(pca$x[, 1])-.2, max(pca$x[, 1])+.2) 
+	endpts <- rbind(meanX + t[1]*pca$rotation[, 1], meanX + t[2]*pca$rotation[, 1])
 	
 	list(
 		'v'=uvector(endpts[2,]-endpts[1,]),
