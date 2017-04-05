@@ -85,7 +85,7 @@ draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'gree
 		svg.lines(t(mobile[1, , ]), lwd=lwd, opacity=opacity, col=stroke_col)
 
 		# Draw mobile body coordinate systems
-		if(draw.lcs) draw_lcs(mobile_lcs, arrow.len=arrow.len, head.len=head.len)
+		if(draw.lcs) draw_lcs(mobile_lcs, arrow.len=arrow.len, head.len=head.len, animate=animate)
 	
 		# Draw rotational constraints
 		arrow_arr <- array(NA, dim=c(2,3,n_iter))
@@ -104,8 +104,12 @@ draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'gree
 				}
 			}
 
-			# Draw point at center of rotation			
-			svg.pointsC(array(t(jt_cons[, 1:3]), dim=c(1,3,nrow(jt_cons))), cex=cex[2], col=cons.col.r[1])
+			# Draw point at center of rotation
+			if(animate){
+				svg.points(array(t(jt_cons[, 1:3]), dim=c(1,3,nrow(jt_cons))), cex=cex[2], col=cons.col.r[1])
+			}else{
+				svg.points(jt_cons[, 1:3], cex=cex[2], col=cons.col.r[1])
+			}
 
 			# Draw path of center of rotation
 			svg.lines(jt_cons[, 1:3], lwd=lwd, col=cons.col.r[1])
@@ -114,9 +118,18 @@ draw_joint <- function(file, animate.joint, fixed, fixed.lcs, col=c('red', 'gree
 		# Draw translational constraints
 		if(dof[2] > 0){
 			if(dof[1] == 0){j_add <- 0}else{j_add <- (dof[1]+1)*3}
-			for(j in 1:dof[2]){
-				for(iter in 1:n_iter) arrow_arr[, , iter] <- rbind(mobile_lcs[1, , iter], mobile_lcs[1, , iter]+0.75*arrow.len*uvector(jt_cons[iter, ((j-1)*3+1+j_add):((j-1)*3+3+j_add)]))
-				svg.arrows(arrow_arr, lwd=1, col=cons.col.t[j], len=head.len, opacity=opacity)
+			if(animate){
+				for(j in 1:dof[2]){
+					for(iter in 1:n_iter) arrow_arr[, , iter] <- rbind(mobile_lcs[1, , iter], mobile_lcs[1, , iter]+0.75*arrow.len*uvector(jt_cons[iter, ((j-1)*3+1+j_add):((j-1)*3+3+j_add)]))
+					svg.arrows(arrow_arr, lwd=1, col=cons.col.t[j], len=head.len, opacity=opacity)
+				}
+			}else{
+				for(j in 1:dof[2]){
+					for(iter in 1:n_iter){
+						arrow <- rbind(mobile_lcs[1, , iter], mobile_lcs[1, , iter]+0.75*arrow.len*uvector(jt_cons[iter, ((j-1)*3+1+j_add):((j-1)*3+3+j_add)]))
+						svg.arrows(arrow, lwd=1, col=cons.col.t[j], len=head.len, opacity=opacity)
+					}
+				}
 			}
 		}
 	}
