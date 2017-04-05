@@ -1,8 +1,8 @@
-animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons = TRUE, 
-	print.progress = FALSE){
+animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'initial', 
+	check.joint.cons = TRUE, print.progress = FALSE){
 
 	## In-progress function for simulating single joint kinematics. Will eventually be 
-	## 	folded into animateLinkage.
+	## folded into animateLinkage.
 
 	if(print.progress){
 		cat('animate_joint\n')
@@ -12,11 +12,10 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 	# Standardize input parameter to matrix, each row is an iteration
 	if(is.vector(param)) param <- matrix(param, nrow=length(param), ncol=1)
 
-	# Get number of iterations
-	n_iter <- nrow(param)
-
-	# Get rotational and translational DoFs
-	dof <- joint_types()$dof[type, ]
+	n_iter <- nrow(param)+1												# Get number of iterations, add additional iteration for initial position
+	dof <- joint_types()$dof[type, ]									# Get rotational and translational DoFs
+	has_u <- ifelse(grepl('u', type, ignore.case=TRUE), TRUE, FALSE)	# Has U-joint component (first axis remains fixed, second axis rotates when applying first axis rotation)
+	has_x <- ifelse(grepl('x', type, ignore.case=TRUE), TRUE, FALSE)	# Has X-joint component (both axes remain fixed)
 
 	# Standardize contraint into matrix, each row is an iteration
 	if(is.vector(cons)) cons <- matrix(cons, nrow=n_iter, ncol=length(cons), byrow=TRUE)
@@ -41,6 +40,9 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 		}
 	}
 	
+	# Set rotation dof skip
+	if(dof[1] == 0){rdof_skip <- 0}else{rdof_skip <- (dof[1]+1)*3}
+
 	if(print.progress){
 		cat(paste0('\tJoint constraints:\n'))
 		if(dof[1] > 0){
@@ -49,11 +51,19 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 				cat(paste0('\t\tAoR ', i, ': {', paste0(round(uvector(cons[1, (i*3+1):(i*3+3)]), 3), collapse=', '), '}\n'))
 			}
 		}
+		if(dof[2] > 0){
+			for(i in 1:dof[2]){
+				cat(paste0('\t\tTranslation Axis ', i, ': {', paste0(round(uvector(cons[1, (rdof_skip+i*3+1-3):(rdof_skip+i*3)]), 3), collapse=', '), '}\n'))
+			}
+		}
 	}
 
 	# Standardize coordinates into matrix
 	if(is.vector(coor)) coor <- matrix(coor, nrow=1, ncol=3)
 	
+	# Set number of coordinates
+	n_coor <- dim(coor)[1]
+
 	# Create local coordinate system
 	if(length(lcs) == 1){ # lcs == TRUE
 		center <- colMeans(coor, na.rm=TRUE)
@@ -61,36 +71,41 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 	}
 	
 	# Create single array for all points
-	if(!is.null(lcs)){pmat <- rbind(coor, lcs)}else{pmat <- coor}
-	tarr <- array(diag(4), dim=c(4,4,n_iter))
-	translations <- matrix(0, n_iter, 3)
+	if(!is.null(lcs)){pmat <- rbind(coor, lcs); n_coor <- nrow(pmat)}else{pmat <- coor}
 
-	if(print.progress) cat('\tCreating transformation matrices\n')
+	# Create array for transformed coordinates
+	tcoor <- array(NA, dim=c(dim(pmat), n_iter))
+	tcoor[, , 1] <- pmat
+
+	if(print.progress) cat('\tAnimating body\n')
 
 	# Animate body
-	for(iter in 1:n_iter){
+	for(iter in 2:n_iter){
 
-		# Set null transformation matrix
-		tmat <- diag(4)
-		
-		# Set rotation dof skip
-		if(dof[1] == 0){rdof_skip <- 0}else{rdof_skip <- (dof[1]+1)*3}
-
-		# Apply translations
-		if(dof[2] > 0){
-			for(i in 1:dof[2]){
-				tmat[1:3, 4] <- tmat[1:3, 4] + param[iter, dof[1]+i]*uvector(cons[iter, (rdof_skip+i*3+1-3):(rdof_skip+i*3)])
-			}
+		# Get reference coordinates
+		if(input.ref == 'previous'){
+			tcoor_mat <- tcoor[, , iter-1]
+			cons_vec <- cons[iter-1, ]
+		}else{
+			tcoor_mat <- tcoor[, , 1]
+			cons_vec <- cons[1, ]
 		}
 		
-		# Save translations
-		translations[iter, ] <- tmat[1:3, 4]
-		
+		# Add translations to previous transformation matrix
+		translations <- c(0,0,0)
+		if(dof[2] > 0){
+			for(i in 1:dof[2]) translations <- translations + param[iter-1, dof[1]+i]*uvector(cons_vec[(rdof_skip+i*3+1-3):(rdof_skip+i*3)])
+		}
+		tcoor_mat <- tcoor_mat + matrix(translations, n_coor, 3, byrow=TRUE)
+
+		# Apply translation to CoR
+		if(dof[1] > 0) cons_vec[1:3] <- cons_vec[1:3] + translations
+
 		# Apply rotations
 		if(dof[1] > 0){
-			
-			# Move points back
-			tmat <- tmat %*% cbind(rbind(diag(3), rep(0,3)), c(cons[iter, 1:3], 1))
+
+			# Move points to CoR
+			tcoor_mat <- tcoor_mat - matrix(cons_vec[1:3], n_coor, 3, byrow=TRUE)
 
 			# Apply rotations
 			# 	The negative sign is needed to ensure rotation matrix follows the right-hand 
@@ -98,24 +113,43 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, check.joint.cons 
 			#	matrix that precedes the point matrix in the matrix multiplication. If the 
 			#	EP rotation matrix came after the point matrix in the matrix multiplication, 
 			#	the input angle would need to be positive
-			for(i in dof[1]:1){
-				tmat <- tmat %*% cbind(rbind(tMatrixEP(v=cons[iter, (i*3+1):(i*3+3)], a=-param[iter, i]), rep(0,3)), c(0,0,0,1))
+			if(has_u){
+				
+				# For a U-joint the order of rotations doesn't matter because the second rotational axis moves with the body
+				# So unlike Euler angles, rotations do not change the relationship between the body and its rotational axis
+				# Find rotation about AoR1
+				RM1 <- tMatrixEP(v=cons_vec[4:6], a=param[iter-1, 1])
+				
+				# Apply rotation to coordinates
+				tcoor_mat <- tcoor_mat %*% RM1
+				
+				# For U-joint, rotation must also be applied to AoR2
+				cons_vec[7:9] <- cons_vec[7:9] %*% RM1
+				
+				# Apply second rotation (about rotated AoR2) to coordinates
+				tcoor_mat <- tcoor_mat %*% tMatrixEP(v=cons_vec[7:9], a=param[iter-1, 2])
 			}
+			if(!has_u){
+				for(i in dof[1]:1){
+					tcoor_mat <- tcoor_mat %*% tMatrixEP(v=cons_vec[(i*3+1):(i*3+3)], a=param[iter-1, i])
+				}
+			}
+			#print(tMatrixEP(v=cons[iter, 4:6], a=-param[iter-1, 1]) %*% tMatrixEP(v=cons[iter, 7:9], a=-param[iter-1, 2]))
+			#tcoor_mat <- tcoor_mat %*% tMatrixEP(v=cons[iter, 4:6], a=-param[iter-1, 1]) %*% tMatrixEP(v=cons[iter, 7:9], a=-param[iter-1, 2])
 
-			# Make rotation point origin
-			tmat <- tmat %*% cbind(rbind(diag(3), rep(0,3)), c(-cons[iter, 1:3], 1))
+			# Move points back from CoR
+			tcoor_mat <- tcoor_mat + matrix(cons_vec[1:3], n_coor, 3, byrow=TRUE)
 		}
-		
-		tarr[, , iter] <- tmat
+
+		# Save transformation
+		tcoor[, , iter] <- tcoor_mat
+		cons[iter, ] <- cons_vec
 	}
 
-	if(print.progress) cat('\tApplying transformation matrices\n')
-
-	# Apply transformations
-	tcoor <- applyTransform(pmat, tarr)
-
-	# Apply translations to constraint vector
-	if(dof[1] > 0 && dof[2] > 0) cons[, 1:3] <- cons[, 1:3] + translations
+	# Remove first iteration (was only present to make easy looping)
+	tcoor <- tcoor[, , 2:n_iter]
+	cons <- cons[2:n_iter, ]
+	n_iter <- n_iter - 1
 
 	# Check that joint constraints hold
 	if(check.joint.cons && dim(tcoor)[3] > 1){
