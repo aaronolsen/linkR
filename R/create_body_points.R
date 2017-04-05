@@ -1,4 +1,4 @@
-create_body_points <- function(center, shape=c('triangle'), nvector, with.center = TRUE, size = 1){
+create_body_points <- function(center, shape=c('triangle'), nvector, with.center = FALSE, size = 1){
 
 	# Find second vector normal to normal vector
 	v1 <- uvector(vorthogonal(nvector))
