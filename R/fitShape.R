@@ -17,12 +17,13 @@ fitShape <- function(mat, shape, centroid.align = NULL){
 		return(shape_obj)
 	}
 
-	if(shape == 'sphere'){
+	if(shape == 'sphere') return(fitSphere(mat))
 
-		fit_sphere <- fitSphere(mat)
-		
-		return(fit_sphere)
-	}
+	if(shape == 'elliptic cylinder') return(fitEllipticCylinder(mat))
+
+	if(shape == 'cylinder') return(fitCylinder(mat))
+
+	if(shape == 'cylinders') return(fitCylinders(mat))
 
 	if(shape == 'circle'){
 		
