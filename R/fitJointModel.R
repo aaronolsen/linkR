@@ -1,4 +1,4 @@
-fitJointModel <- function(coor, type, max.iter.use = 20, optim.to.prop = 0.00001, 
+fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.00001, 
 	print.progress = FALSE){
 
 	if(print.progress) cat(paste0('\nfitJointModel\n'))
@@ -8,6 +8,11 @@ fitJointModel <- function(coor, type, max.iter.use = 20, optim.to.prop = 0.00001
 
 	# Get DoF of joint type
 	dof <- joint_types()$dof[type, ]
+
+	# Estimate joint constraints
+	if(print.progress) cat(paste0('\tEstimating joint constraints\n'))
+	fit_joint <- fitJointConstraint(coor, type, print.progress=print.progress)
+	joint_cons <- fit_joint$cons
 
 	# If number of iterations exceeds max.iter.use, limit to evenly spaced subset
 	use_idx <- 1:dim(coor)[3]
@@ -23,14 +28,23 @@ fitJointModel <- function(coor, type, max.iter.use = 20, optim.to.prop = 0.00001
 	# Get subset
 	coor_s <- coor[, , use_idx]
 
-	# Estimate joint constraints
-	fit_joint <- fitJointConstraint(coor_s, type, print.progress=print.progress)
+	# Set rotation dof skip
+	if(dof[1] == 0){rdof_skip <- 0}else{rdof_skip <- (dof[1]+1)*3}
 
-#return(1)
-	fit_joint_cons <<- fit_joint$cons
-	joint_cons <- fit_joint_cons
-
-
+	if(print.progress){
+		cat(paste0('\tEstimated joint constraints:\n'))
+		if(dof[1] > 0){
+			cat(paste0('\t\tCoR: {', paste0(round(joint_cons[1:3], 3), collapse=', '), '}\n'))
+			for(i in 1:dof[1]){
+				cat(paste0('\t\tAoR ', i, ': {', paste0(round(uvector(joint_cons[(i*3+1):(i*3+3)]), 3), collapse=', '), '}\n'))
+			}
+		}
+		if(dof[2] > 0){
+			for(i in 1:dof[2]){
+				cat(paste0('\t\tTranslation Axis ', i, ': {', paste0(round(uvector(joint_cons[(rdof_skip+i*3+1-3):(rdof_skip+i*3)]), 3), collapse=', '), '}\n'))
+			}
+		}
+	}
 
 	# Align coordinates across all time points using generalized procrustes analysis to 
 	# find mean (consensus) shape scaled to mean centroid size
@@ -97,12 +111,13 @@ fitJointModel <- function(coor, type, max.iter.use = 20, optim.to.prop = 0.00001
 	# Go back and forth between optimizing the input parameters and body pose until error 
 	# changes less than difference threshold between consecutive optimization steps (like 
 	# in generalized Procrustes analysis)
+	if(print.progress) cat(paste0('\tOptimizing input parameters and initial body pose\n'))
 	while(abs(diff(tail(optim_errors, 2))) > opt_to_diff && optim_iter < 5){
 
 		# Set previous pose
 		pose_prev <- pose_init
 
-		# Optimize input parameters
+		## Optimize input parameters
 		for(i in 1:length(use_idx)){
 	
 			if(use_idx[i] == ref.iter) next
@@ -144,7 +159,7 @@ fitJointModel <- function(coor, type, max.iter.use = 20, optim.to.prop = 0.00001
 		# Set transform starting parameters
 		start_transform <- c(0.1,0.1,0.1,translation_limit*0.05,translation_limit*0.05,translation_limit*0.05)
 
-		# Optimize pose
+		## Optimize pose
 		pose_fit <- tryCatch(
 			expr={
 				nlminb(start=start_transform, objective=body_pose_error, 
@@ -156,6 +171,9 @@ fitJointModel <- function(coor, type, max.iter.use = 20, optim.to.prop = 0.00001
 			warning=function(cond) return(NULL)
 		)
 		
+		## Optimize constraint parameters
+
+
 		# Save error after optimization
 		optim_errors <- c(optim_errors, pose_fit$objective)
 	
