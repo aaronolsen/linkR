@@ -1,4 +1,4 @@
-arr2mat_linkr <- function(arr){
+arr2mat <- function(arr){
 
 	# Get dimensions
 	dim_arr <- dim(arr)
