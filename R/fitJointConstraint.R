@@ -214,8 +214,8 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 		rads <- rep(NA, n_coor)
 		AoRs <- matrix(NA, n_coor, 3)
 
-		# Use 50% most dispersed points, in order of dispersion
-		sub_max <- round(0.5*dim(coor)[3])
+		# Use 20% most dispersed points, in order of dispersion
+		sub_max <- round(0.2*dim(coor)[3])
 		max_disp <- whichMaxDisperse(t(coor[which.max(Csizes), , ]), n=sub_max)
 	
 		# Set as subset
