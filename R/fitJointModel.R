@@ -1,50 +1,54 @@
-fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.00001, 
-	print.progress = FALSE){
-
-	if(print.progress) cat(paste0('\nfitJointModel\n'))
+fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5, optim.cons = TRUE, 
+	optim.to.prop = 0.00001, print.progress = FALSE){
 
 	# Set reference iteration
 	ref.iter <- 1
+
+	# If number of iterations exceeds optim.frame.max, limit to evenly spaced subset
+	optim_use <- 1:dim(coor)[3]
+	if(dim(coor)[3] > optim.frame.max){
+
+		# Get evenly spaced subset
+		optim_use <- floor(seq(1, dim(coor)[3], length=optim.frame.max))
+		
+		# Make sure subset includes ref.iter
+		if(!ref.iter %in% optim_use) optim_use <- sort(c(ref.iter, floor(seq(1, dim(coor)[3], length=optim.frame.max-1))))
+	}
+
+	if(print.progress){
+		cat(paste0('\nfitJointModel\n'))
+		cat(paste0('\tTotal time points: ', dim(coor)[3], '\n'))
+		cat(paste0('\tNumber of time points used in optimization: ', length(optim_use), '\n'))
+	}
 
 	# Get DoF of joint type
 	dof <- joint_types()$dof[type, ]
 
 	# Estimate joint constraints
-	if(print.progress) cat(paste0('\tEstimating joint constraints\n'))
+	if(print.progress) cat(paste0('\tEstimating joint constraints...\n'))
 	fit_joint <- fitJointConstraint(coor, type, print.progress=print.progress)
 	joint_cons <- fit_joint$cons
 
-	# If number of iterations exceeds max.iter.use, limit to evenly spaced subset
-	use_idx <- 1:dim(coor)[3]
-	if(dim(coor)[3] > max.iter.use){
-
-		# Get evenly spaced subset
-		use_idx <- floor(seq(1, dim(coor)[3], length=max.iter.use))
-		
-		# Make sure subset includes ref.iter
-		if(!ref.iter %in% use_idx) use_idx <- sort(c(ref.iter, floor(seq(1, dim(coor)[3], length=max.iter.use-1))))
-	}
-
-	# Get subset
-	coor_s <- coor[, , use_idx]
-
 	# Set rotation dof skip
-	if(dof[1] == 0){rdof_skip <- 0}else{rdof_skip <- (dof[1]+1)*3}
+	if(dof['R'] == 0){rdof_skip <- 0}else{rdof_skip <- (dof['R']+1)*3}
 
 	if(print.progress){
 		cat(paste0('\tEstimated joint constraints:\n'))
-		if(dof[1] > 0){
+		if(dof['R'] > 0){
 			cat(paste0('\t\tCoR: {', paste0(round(joint_cons[1:3], 3), collapse=', '), '}\n'))
-			for(i in 1:dof[1]){
+			for(i in 1:dof['R']){
 				cat(paste0('\t\tAoR ', i, ': {', paste0(round(uvector(joint_cons[(i*3+1):(i*3+3)]), 3), collapse=', '), '}\n'))
 			}
 		}
-		if(dof[2] > 0){
-			for(i in 1:dof[2]){
+		if(dof['T'] > 0){
+			for(i in 1:dof['T']){
 				cat(paste0('\t\tTranslation Axis ', i, ': {', paste0(round(uvector(joint_cons[(rdof_skip+i*3+1-3):(rdof_skip+i*3)]), 3), collapse=', '), '}\n'))
 			}
 		}
 	}
+
+	# Get subset
+	coor_s <- coor[, , optim_use]
 
 	# Align coordinates across all time points using generalized procrustes analysis to 
 	# find mean (consensus) shape scaled to mean centroid size
@@ -61,14 +65,14 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 
 	# Set starting guess for input parameter values
 	if(dof['R'] > 0){
-		r_input <- matrix(0.1, length(use_idx), dof['R'])
+		r_input <- matrix(0.1, length(optim_use), dof['R'])
 		r_lower <- rep(-6*pi, length=dof['R'])
 		r_upper <- rep(6*pi, length=dof['R'])
 	}else{
 		r_input <- r_lower <- r_upper <- NULL
 	}
 	if(dof['T'] > 0){
-		t_input <- matrix(translation_limit*0.05, length(use_idx), dof['T'])
+		t_input <- matrix(translation_limit*0.05, length(optim_use), dof['T'])
 		t_lower <- rep(-translation_limit, length=dof['T'])
 		t_upper <- rep(translation_limit, length=dof['T'])
 	}else{
@@ -82,16 +86,10 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 	optim_param <- matrix(NA, dim(coor)[3], ncol=ncol(optim_param_values))
 
 	# Fill in matrix for optimize subset
-	optim_param[use_idx, ] <- optim_param_values
+	optim_param[optim_use, ] <- optim_param_values
 	
 	# Set input parameters to 0 for reference iteration
 	optim_param[ref.iter, ] <- 0
-
-	# Create vector for errors (RMSD)
-	objectives <- rep(NA, length(use_idx))
-	
-	# Find error of consensus at reference time point
-	objectives[ref.iter] <- sqrt(mean((pose_init - coor[, , ref.iter])^2))
 
 	# Set difference threshold at which optimization will stop, as proportion of mean centroid size
 	opt_to_diff <- optim.to.prop*mean(ccoor$Csize)
@@ -107,34 +105,61 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 	# Set pose limits
 	pose_lower <- c(rep(-pi,3), rep(-translation_limit,3))
 	pose_upper <- c(rep(pi,3), rep(translation_limit,3))
+	
+	# Set joint constraint limits
+	cons_lower <- c()
+	cons_upper <- c()
+	cor_limit <- 0.2*translation_limit
+	if(dof['R'] > 0){
+		cons_lower <- c(cons_lower, joint_cons[1:3] - cor_limit)
+		cons_upper <- c(cons_upper, joint_cons[1:3] + cor_limit)
+		for(i in 1:dof['R']){
+			cons_lower <- c(cons_lower, c(-1,-1,-1))
+			cons_upper <- c(cons_upper, c(1,1,1))
+		}
+	}
+	if(dof['T'] > 0){
+		for(i in 1:dof['T']){
+			cons_lower <- c(cons_lower, c(-1,-1,-1))
+			cons_upper <- c(cons_upper, c(-1,-1,-1))
+		}
+	}
+
+	if(print.progress){
+		if(optim.cons){
+			cat(paste0('\tOptimizing input parameters, initial body pose, and constraint parameters...\n'))
+		}else{
+			cat(paste0('\tOptimizing input parameters and initial body pose...\n'))
+		}
+	}
 
 	# Go back and forth between optimizing the input parameters and body pose until error 
 	# changes less than difference threshold between consecutive optimization steps (like 
 	# in generalized Procrustes analysis)
-	if(print.progress) cat(paste0('\tOptimizing input parameters and initial body pose\n'))
-	while(abs(diff(tail(optim_errors, 2))) > opt_to_diff && optim_iter < 5){
+	while(abs(diff(tail(optim_errors, 2))) > opt_to_diff && optim_iter < optim.iter.max){
+
+		#if(print.progress) cat('', optim_iter+1)
 
 		# Set previous pose
 		pose_prev <- pose_init
 
 		## Optimize input parameters
-		for(i in 1:length(use_idx)){
+		for(i in 1:length(optim_use)){
 	
-			if(use_idx[i] == ref.iter) next
+			if(optim_use[i] == ref.iter) next
 
 			input_fit <- tryCatch(
 				expr={
-					nlminb(start=optim_param[use_idx[i],], objective=animate_joint_error, 
+					nlminb(start=optim_param[optim_use[i],], objective=animate_joint_error, 
 						lower=input_lower, upper=input_upper, type=type, cons=joint_cons, coor=pose_prev, 
-						coor.compare=coor[, , use_idx[i]]) 
+						coor.compare=coor[, , optim_use[i]]) 
 				},
 				error=function(cond) {print(cond);return(NULL)},
 				warning=function(cond) {print(cond);return(NULL)}
 			)
 
 			# Save results
-			optim_param[use_idx[i], ] <- input_fit$par
-			objectives[i] <- input_fit$objective
+			optim_param[optim_use[i], ] <- input_fit$par
 			
 			# Use parameter to run iteration of model
 			#pose_prev <- animate_joint(type=type, cons=joint_cons, 
@@ -153,7 +178,7 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 			}
 			
 			# Set next input parameter based on current
-			if(i+1 <= length(use_idx) && use_idx[i+1] != ref.iter) optim_param[use_idx[i+1], ] <- next_iter_param
+			if(i+1 <= length(optim_use) && optim_use[i+1] != ref.iter) optim_param[optim_use[i+1], ] <- next_iter_param
 		}
 
 		# Set transform starting parameters
@@ -163,16 +188,38 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 		pose_fit <- tryCatch(
 			expr={
 				nlminb(start=start_transform, objective=body_pose_error, 
-					lower=pose_lower, upper=pose_upper, 
-					type=type, cons=joint_cons, coor=pose_init, 
-					coor.compare=coor_s, param=optim_param[use_idx, ])
+					lower=pose_lower, upper=pose_upper, type=type, cons=joint_cons, 
+					coor=pose_init, coor.compare=coor_s, param=optim_param[optim_use, ])
 			},
-			error=function(cond) return(NULL),
-			warning=function(cond) return(NULL)
+			error=function(cond) {print(cond);return(NULL)},
+			warning=function(cond) {print(cond);return(NULL)}
 		)
 		
 		## Optimize constraint parameters
+		if(optim.cons){
 
+			# Optimize constraint parameters
+			constraint_fit <- tryCatch(
+				expr={
+					nlminb(start=joint_cons, objective=constraint_error, 
+						lower=cons_lower, upper=cons_upper, type=type, coor=pose_init, 
+						coor.compare=coor_s, param=optim_param[optim_use, ])
+				},
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
+			)
+
+			#print(constraint_fit$par)
+			#print(rbind(cons_lower, cons_upper))
+			#print(pose_fit$objective)
+			#print(constraint_fit$objective)
+			
+			# Save new joint constraints and error (if lower than previous)
+			if(!is.null(constraint_fit) && constraint_fit$objective < pose_fit$objective){
+				joint_cons <- constraint_fit$par
+				pose_fit$objective <- constraint_fit$objective
+			}
+		}
 
 		# Save error after optimization
 		optim_errors <- c(optim_errors, pose_fit$objective)
@@ -208,10 +255,10 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 	optim_coor[, , ref.iter] <- pose_init
 
 	# Get indices not previously used
-	not_use_idx <- (1:dim(coor)[3])[!(1:dim(coor)[3]) %in% use_idx]
+	not_optim_use <- (1:dim(coor)[3])[!(1:dim(coor)[3]) %in% optim_use]
 
 	# Fill in all input parameters with optimized parameter
-	for(i in not_use_idx){
+	for(i in not_optim_use){
 
 		input_fit <- tryCatch(
 			expr={
@@ -235,10 +282,28 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 	}
 
 	# Compare final simulated coordinates to actual
-	rmse <- sqrt(mean((optim_coor - coor)^2))
+	rmse <- sqrt(apply((optim_coor - coor)^2, 3, 'rowSums'))
+	rmse_mean <- mean(rmse)
 
-	# Print errors
-	if(print.progress) cat(paste0('\tRMS error for model across all iterations: ', round(rmse, 5), '\n'))
+	if(print.progress){
+		if(optim.cons){
+			cat(paste0('\tFinal estimated joint constraints:\n'))
+			if(dof['R'] > 0){
+				cat(paste0('\t\tCoR: {', paste0(round(joint_cons[1:3], 3), collapse=', '), '}\n'))
+				for(i in 1:dof['R']){
+					cat(paste0('\t\tAoR ', i, ': {', paste0(round(uvector(joint_cons[(i*3+1):(i*3+3)]), 3), collapse=', '), '}\n'))
+				}
+			}
+			if(dof['T'] > 0){
+				for(i in 1:dof['T']){
+					cat(paste0('\t\tTranslation Axis ', i, ': {', paste0(round(uvector(joint_cons[(rdof_skip+i*3+1-3):(rdof_skip+i*3)]), 3), collapse=', '), '}\n'))
+				}
+			}
+		}
+		
+		# Print errors
+		cat(paste0('\tRMS error for model across all iterations: ', round(rmse_mean, 7), '\n'))
+	}
 
 	# Create return list
 	rlist <- list(
@@ -246,6 +311,7 @@ fitJointModel <- function(coor, type, max.iter.use = 100, optim.to.prop = 0.0000
 		'cons'=joint_cons,
 		'param'=optim_param,
 		'pose.init'=pose_init,
+		'rmse.mean'=rmse_mean,
 		'rmse'=rmse
 	)
 
