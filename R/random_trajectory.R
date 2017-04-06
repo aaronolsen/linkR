@@ -18,9 +18,6 @@ random_trajectory <- function(n, start = 0, mean = 0, sd = 1, seed = NULL,
 
 	# Run Brownian motion (cumulative sum of normally distributed random variable)
 	for(i in 1:length(mean)) rt_mat[, i] <- cumsum(rnorm(n, mean=mean[i], sd=sd[i]))
-	
-	# Set start
-	if(!is.null(start)) rt_mat <- rt_mat - matrix((rt_mat[1, ]-start), nrow=nrow(rt_mat), ncol=ncol(rt_mat), byrow=TRUE)
 
 	# Find difference between iterations for non-cumulative output
 	if(!cumulative) rt_mat <- apply(rbind(rep(0,ncol(rt_mat)), rt_mat), 2, 'diff')
@@ -42,6 +39,9 @@ random_trajectory <- function(n, start = 0, mean = 0, sd = 1, seed = NULL,
 			rt_mat[, i] <- predict(lowpass.loess, data_frame)
 		}
 	}
+
+	# Set start
+	if(!is.null(start)) rt_mat <- rt_mat - matrix((rt_mat[1, ]-start), nrow=nrow(rt_mat), ncol=ncol(rt_mat), byrow=TRUE)
 
 	rt_mat
 }
