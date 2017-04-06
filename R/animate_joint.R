@@ -201,6 +201,9 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 		rcoor <- tcoor
 		rlcs <- NULL
 	}
+	
+	# Add rownames
+	dimnames(rcoor)[[1]] <- rownames(coor)
 
 	list(
 		'coor'=rcoor,
