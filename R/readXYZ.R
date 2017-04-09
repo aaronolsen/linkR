@@ -10,6 +10,9 @@ readXYZ <- function(file, source='xmalab'){
 		# Read in 3D marker coordinates
 		read_csv <- as.matrix(read.csv(file=file))
 
+		# Remove columns with all NA values
+		read_csv <- read_csv[, colSums(!is.na(read_csv)) > 0]
+
 		# Remove first column if frame number
 		if(colnames(read_csv)[1] == 'Frame') read_csv <- read_csv[, 2:ncol(read_csv)]
 
