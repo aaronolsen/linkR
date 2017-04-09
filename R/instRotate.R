@@ -92,7 +92,7 @@ instRotate <- function(m1, m2, na.rm = FALSE, positive.only = TRUE, aor.only = F
 	# If angle is negative, change angle and AoR sign
 	if(positive.only && angle < 0){angle <- -angle; AoR <- -AoR}
 
-	# Slide CoR along AoR to closest point on AoR from m1 centroid
+	# Slide CoR along AoR to closest point on AoR from m1 centroid - already appears to be at this position
 	#rcen <- pointNormalOnLine(pt=m1_centroid, l1=rcen, l2=rcen + AoR)
 
 	# Find error as mean distance between points
