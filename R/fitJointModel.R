@@ -1,24 +1,46 @@
 fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5, optim.cons = TRUE, 
 	optim.to.prop = 0.00001, print.progress = FALSE){
 
+	control <- list(
+		'subsample.method'='Evenly spaced',		# or 'Maximum dispersion'
+		'max.disp.prop.R'=0.2,					# Proportion of time points used in max dispersion sampling
+		'max.disp.prop.U'=0.2					#
+	)
+
 	# Set reference iteration
 	ref.iter <- 1
 
-	# If number of iterations exceeds optim.frame.max, limit to evenly spaced subset
+	# If number of iterations exceeds optim.frame.max, limit to optim.frame.max
 	optim_use <- 1:dim(coor)[3]
 	if(dim(coor)[3] > optim.frame.max){
 
-		# Get evenly spaced subset
-		optim_use <- floor(seq(1, dim(coor)[3], length=optim.frame.max))
-		
-		# Make sure subset includes ref.iter
-		if(!ref.iter %in% optim_use) optim_use <- sort(c(ref.iter, floor(seq(1, dim(coor)[3], length=optim.frame.max-1))))
+		if(control$subsample.method == 'Maximum dispersion'){		# Try sorting to see if that changes error - shouldn't
+
+			# Find centroid size of each point "position cloud" over time (for weights)
+			Csizes_time <- apply(coor, 1, 'centroidSize', transpose=TRUE)
+
+			# Find maximally disperse points among input
+			optim_use <- whichMaxDisperse(t(coor[which.max(Csizes_time), , ]), n=optim.frame.max)
+			
+			# Make sure subset includes ref.iter
+			if(!ref.iter %in% optim_use) optim_use <- c(1, optim_use[1:(length(optim_use)-1)])
+
+		}else if(control$subsample.method == 'Evenly spaced'){
+
+			# Get evenly spaced subset
+			optim_use <- floor(seq(1, dim(coor)[3], length=optim.frame.max))
+
+			# Make sure subset includes ref.iter
+			if(!ref.iter %in% optim_use) optim_use <- sort(c(ref.iter, floor(seq(1, dim(coor)[3], length=optim.frame.max-1))))
+		}
 	}
 
 	if(print.progress){
 		cat(paste0('\nfitJointModel\n'))
+		cat(paste0('\tType of joint model fit: ', type, '\n'))
 		cat(paste0('\tTotal time points: ', dim(coor)[3], '\n'))
 		cat(paste0('\tNumber of time points used in optimization: ', length(optim_use), '\n'))
+		cat(paste0('\t\tMethod of sub-sampling: ', control$subsample.method, '\n'))
 	}
 
 	# Get DoF of joint type
@@ -26,8 +48,8 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 
 	# Estimate joint constraints
 	if(print.progress) cat(paste0('\tEstimating joint constraints...\n'))
-	fit_joint <- fitJointConstraint(coor, type, print.progress=print.progress)
-	joint_cons <- fit_joint$cons
+	fit_joint_cons <- fitJointConstraint(coor, type, control=control, print.progress=print.progress)
+	joint_cons <- fit_joint_cons$cons
 
 	# Set rotation dof skip
 	if(dof['R'] == 0){rdof_skip <- 0}else{rdof_skip <- (dof['R']+1)*3}
@@ -111,17 +133,38 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 	cons_upper <- c()
 	cor_limit <- 0.2*translation_limit
 	if(dof['R'] > 0){
+		
+		# Center of rotation limits
 		cons_lower <- c(cons_lower, joint_cons[1:3] - cor_limit)
 		cons_upper <- c(cons_upper, joint_cons[1:3] + cor_limit)
-		for(i in 1:dof['R']){
-			cons_lower <- c(cons_lower, c(-1,-1,-1))
-			cons_upper <- c(cons_upper, c(1,1,1))
+
+		# Euler angle limits for first axis
+		cons_lower <- c(cons_lower, c(-pi,-pi,-pi))
+		cons_upper <- c(cons_upper, c(pi,pi,pi))
+
+		# Euler angle limit for second axis since this stays orthogonal to the first (rotation about first axis)
+		for(i in 2:dof['R']){
+			cons_lower <- c(cons_lower, -pi)
+			cons_upper <- c(cons_upper, pi)
 		}
 	}
+	
+	# But for S-joint, no need to optimize axes, only center of rotation
+	if(dof['R'] == 3){
+		cons_lower <- cons_lower[1:3]
+		cons_upper <- cons_upper[1:3]
+	}
+	
 	if(dof['T'] > 0){
-		for(i in 1:dof['T']){
-			cons_lower <- c(cons_lower, c(-1,-1,-1))
-			cons_upper <- c(cons_upper, c(-1,-1,-1))
+
+		# Euler angle limits for first axis
+		cons_lower <- c(cons_lower, c(-pi,-pi,-pi))
+		cons_upper <- c(cons_upper, c(pi,pi,pi))
+
+		# Euler angle limit for second axis since this stays orthogonal to the first (rotation about first axis)
+		for(i in 2:dof['T']){
+			cons_lower <- c(cons_lower, -pi)
+			cons_upper <- c(cons_upper, pi)
 		}
 	}
 
@@ -139,11 +182,13 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 	while(abs(diff(tail(optim_errors, 2))) > opt_to_diff && optim_iter < optim.iter.max){
 
 		#if(print.progress) cat('', optim_iter+1)
+		if(print.progress) cat('\t\t')
 
 		# Set previous pose
 		pose_prev <- pose_init
 
 		## Optimize input parameters
+		input_fit_errors <- rep(NA, length(optim_use))
 		for(i in 1:length(optim_use)){
 	
 			if(optim_use[i] == ref.iter) next
@@ -160,7 +205,8 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 
 			# Save results
 			optim_param[optim_use[i], ] <- input_fit$par
-			
+			input_fit_errors[i] <- input_fit$objective
+
 			# Use parameter to run iteration of model
 			#pose_prev <- animate_joint(type=type, cons=joint_cons, 
 			#	param=rbind(rep(0, length(input_fit$par)), input_fit$par), coor=pose_prev, 
@@ -181,6 +227,8 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 			if(i+1 <= length(optim_use) && optim_use[i+1] != ref.iter) optim_param[optim_use[i+1], ] <- next_iter_param
 		}
 
+		if(print.progress) cat(paste0('', round(mean(input_fit_errors, na.rm=TRUE), 5)))
+
 		# Set transform starting parameters
 		start_transform <- c(0.1,0.1,0.1,translation_limit*0.05,translation_limit*0.05,translation_limit*0.05)
 
@@ -194,50 +242,68 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 			error=function(cond) {print(cond);return(NULL)},
 			warning=function(cond) {print(cond);return(NULL)}
 		)
-		
-		## Optimize constraint parameters
-		if(optim.cons){
 
-			# Optimize constraint parameters
-			constraint_fit <- tryCatch(
-				expr={
-					nlminb(start=joint_cons, objective=constraint_error, 
-						lower=cons_lower, upper=cons_upper, type=type, coor=pose_init, 
-						coor.compare=coor_s, param=optim_param[optim_use, ])
-				},
-				error=function(cond) {print(cond);return(NULL)},
-				warning=function(cond) {print(cond);return(NULL)}
-			)
-
-			#print(constraint_fit$par)
-			#print(rbind(cons_lower, cons_upper))
-			#print(pose_fit$objective)
-			#print(constraint_fit$objective)
-			
-			# Save new joint constraints and error (if lower than previous)
-			if(!is.null(constraint_fit) && constraint_fit$objective < pose_fit$objective){
-				joint_cons <- constraint_fit$par
-				pose_fit$objective <- constraint_fit$objective
-			}
-		}
-
-		# Save error after optimization
-		optim_errors <- c(optim_errors, pose_fit$objective)
-	
 		# Apply optimized transformation to initial pose
 		centroid_mat <- matrix(colMeans(pose_init), nrow(pose_init), ncol(pose_init), byrow=TRUE)
 		pose_init <- ((pose_init - centroid_mat) %*% rotationMatrixZYX(pose_fit$par[1:3])) + centroid_mat
 		pose_init <- pose_init + matrix(pose_fit$par[4:6], nrow(coor), ncol(coor), byrow=TRUE)
+		
+		if(print.progress) cat(paste0(', ', round(pose_fit$objective, 5)))
 
+		## Optimize constraint parameters
+		if(optim.cons && type != 'T'){
+		
+			# Set starting parameters (Euler angles to rotate vectors, initially same as input)
+			start_cons_param <- rep(0, length(cons_lower))
+			
+			# But keep CoR as regular vector
+			if(dof['R'] > 0) start_cons_param[1:3] <- joint_cons[1:3]
+
+			# Optimize constraint parameters
+			constraint_fit <- tryCatch(
+				expr={
+					nlminb(start=start_cons_param, objective=constraint_error, 
+						lower=cons_lower, upper=cons_upper, type=type, coor=pose_init, 
+						coor.compare=coor_s, param=optim_param[optim_use, ], 
+						joint.cons.init=joint_cons, dof=dof)
+				},
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
+			)
+			
+			# Apply optimized transformations to constraint parameters
+			new_cons <- apply_cons_optim_transforms(constraint_fit$par, joint_cons, type, dof)
+
+			#print(pose_fit$objective)
+			#print(constraint_fit)
+			#print(rbind(cons_lower, cons_upper))
+			#print(constraint_fit$objective)
+			if(print.progress) cat(paste0(', ', round(constraint_fit$objective, 5)))
+			
+			# Save new joint constraints and error (if lower than previous)
+			if(!is.null(constraint_fit) && constraint_fit$objective < pose_fit$objective){
+				joint_cons <- new_cons
+				pose_fit$objective <- constraint_fit$objective
+			}
+		}
+
+		if(print.progress) cat('\n')
+		
+		# Save error after optimization
+		optim_errors <- c(optim_errors, pose_fit$objective)
+	
 		# Advance iteration tracker
 		optim_iter <- optim_iter + 1
+
+		# If near perfect fit stop - for perfect input testing
+		if(pose_fit$objective < 1e-7) break
 	}
 
 	# Remove first two errors (only used to make for easy looping)
 	optim_errors <- optim_errors[3:length(optim_errors)]
 
 	# Check that sequence of errors decreases
-	if(print.progress) cat(paste0('\tInput parameter and pose optimization error sequence:\n\t\t', paste0(round(optim_errors, 7), collapse='\n\t\t'), '\n'))
+	#if(print.progress) cat(paste0('\tInput parameter and pose optimization error sequence:\n\t\t', paste0(round(optim_errors, 7), collapse='\n\t\t'), '\n'))
 
 	# Fill in missing guesses for starting parameters with preceding parameter (could use 
 	# interpolation if necessary but this seems to work pretty well)
