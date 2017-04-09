@@ -1,10 +1,13 @@
-fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress = FALSE){
+fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.progress = FALSE){
 
 	# Set number of coordinates
 	n_coor <- dim(coor)[1]
 
 	# Set number of iterations
 	n_iter <- dim(coor)[3]
+
+	# Find centroid size of each point "position cloud" over time (for weights)
+	if(type %in% c('R', 'U', 'S')) Csizes_time <- apply(coor, 1, 'centroidSize', transpose=TRUE)
 
 	# Try optimizing translation vector such that CoRs are collinear and form a line parallel
 	# to the translation vector (3 parameter optimization)
@@ -96,9 +99,7 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 
 			svg.close()
 		}
-	}
-
-	if(type %in% c('RL2')){
+	} else if(type %in% c('RL2')){
 	
 		# Find centroid over time
 		centroid <- t(apply(coor, 3, 'colMeans'))
@@ -161,10 +162,7 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 
 			svg.close()
 		}
-	}
-
-	# Fit single rotational axis constraint
-	if(type %in% c('L', 'P')){
+	} else if(type %in% c('L', 'P')){
 	
 		# Vectors
 		vecs <- matrix(NA, n_coor, 3)
@@ -204,19 +202,20 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 			joint_cons <- c(vec_o, cprod(vec_o, vec))
 		}
 		
-	}else if(type == 'R'){
-
-		# Find centroid size of each point "position cloud" over time (for weights)
-		Csizes <- apply(coor, 1, 'centroidSize', transpose=TRUE)
+	}else if(type %in% c('R', 'U')){
 
 		# Parameters
 		CoRs <- matrix(NA, n_coor, 3)
 		rads <- rep(NA, n_coor)
 		AoRs <- matrix(NA, n_coor, 3)
+		
+		#
+		if(type == 'R') max_disp_prop <- control$max.disp.prop.R
+		if(type == 'U') max_disp_prop <- control$max.disp.prop.U
 
-		# Use 20% most dispersed points, in order of dispersion
-		sub_max <- round(0.2*dim(coor)[3])
-		max_disp <- whichMaxDisperse(t(coor[which.max(Csizes), , ]), n=sub_max)
+		# Use n% most dispersed points, in order of dispersion
+		sub_max <- round(max_disp_prop*dim(coor)[3])
+		max_disp <- whichMaxDisperse(t(coor[which.max(Csizes_time), , ]), n=sub_max)
 	
 		# Set as subset
 		coor_s <- coor[, , max_disp]
@@ -244,30 +243,172 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 		abs_angles <- abs(angles)
 		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
 
+		# Find CoR
+		# CoR can be any point on AoR so find average CoR by finding a point in space at minimum distance from all AoRs
+		# If all the AoRs intersect, this will be the intersection point of all the AoRs
+		min_cor <- pointMinDistLines(inst_cor, inst_cor+inst_aor)$p
+		
 		# Find average CoR weighted by rotation angle
-		avg_cor <- colSums(inst_cor*abs_angles) / sum(abs_angles)
+		#avg_cor <- colSums(inst_cor*abs_angles) / sum(abs_angles)
 		
-		CoR <- avg_cor
+		CoR <- min_cor
 		AoR <- avg_aor
-		
+
 		if(FALSE){
-			svg.new('Test.html')
+			svg.new('Test2.html')
 			svg.frame(coor)
 			cols <- c('red', 'green', 'blue')
 			for(i in 1:dim(coor)[1]) svg.points(t(coor[i, , ]), col.stroke=cols[i], opacity.fill=0.2, opacity.stroke=0.2)
 			for(i in 1:dim(coor_s)[1]) svg.pointsC(t(coor_s[i, , ]), col.stroke.C=cols[i])
-			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(inst_cor[i, ], inst_cor[i, ]+100*abs(angles[i])*uvector(inst_aor[i, ])), col='purple')
-			#for(i in 1:nrow(inst_cor)) svg.arrows(rbind(avg_cor, avg_cor+100*abs(angles[i])*uvector(inst_aor[i, ])), col='purple')
-			svg.arrows(rbind(avg_cor, avg_cor+10*uvector(avg_aor)), col='blue')
+			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(inst_cor[i, ]-uvector(inst_aor[i, ]), inst_cor[i, ]+1*uvector(inst_aor[i, ])), col='purple')
+			#for(i in 1:nrow(inst_cor)) svg.arrows(rbind(CoR, CoR+100*abs(angles[i])*uvector(inst_aor[i, ])), col='purple')
+			svg.arrows(rbind(CoR, CoR+uvector(avg_aor)), col='blue')
+			svg.points(min_cor, col='blue', cex=5)
+			#svg.points(c(0.3, 0.5, 0.4), col='green', cex=5)
 			svg.close()
 		}
 
-		joint_cons <- c(CoR, AoR)
+		if(type == 'R') return(list('cons'=c(CoR, AoR)))
 
-	}else if(type %in% c('U', 'S')){
+		if(type == 'U'){
 
-		# Find centroid size of each point "position cloud" over time (for weights)
-		Csizes <- apply(coor, 1, 'centroidSize', transpose=TRUE)
+			if(print.progress) cat(paste0('\tEstimating U-joint axis orientations\n'))
+
+			# Change iAoR matrix format
+			inst_aor <- cbind(inst_aor, angles)
+
+			# Find cross product between consecutive aors
+			c_prod <- matrix(NA, nrow(inst_aor)-1, 3)
+			for(i in 2:nrow(inst_aor)) c_prod[i-1, ] <- cprod(inst_aor[i-1, 1:3], inst_aor[i, 1:3])
+
+			# Flip axes when more than 90 degrees apart (opposite)
+			for(i in 2:nrow(c_prod)) if(abs(avec(c_prod[1,], c_prod[i,])) > pi/2) c_prod[i,] <- -c_prod[i,]
+
+			# Get angle weights (for one of cross product pair)
+			angle_wts <- 1/abs(inst_aor[2:nrow(inst_aor), 4])
+			angle_wts <- (angle_wts - min(angle_wts)) / diff(range(angle_wts))
+
+			# Find average cross product vector, inversely weighted by angle magnitude
+			# Should be close to the plane orthogonal to the fixed (first) AoR
+			fao_plane <- uvector(colSums(c_prod*angle_wts) / sum(angle_wts))
+			#fao_plane <- uvector(colMeans(c_prod))
+			
+			#print((pi/2-avec(c(1,0,0), fao_plane))*(180/pi))
+			
+			# Starting guess for fixed AoR - perpendicular to fao plane
+			aor_f <- vorthogonal(fao_plane)
+			
+			# Starting guess for mobile AoR - perpendicular to aor f
+			aor_r <- cprod(aor_f, fao_plane)
+
+			# Find quaternion equivalent for each instantaneous rotation
+			qua <- matrix(NA, nrow(inst_aor), 4)
+			for(i in 1:nrow(inst_aor)) qua[i, ] <- axisAngle2Quat(inst_aor[i, 1:3], inst_aor[i, 4])
+
+			if(FALSE){
+
+				svg.new('Test1.html')
+				svg.frame(coor)
+				for(i in 1:length(max_disp)) svg.pointsC(coor[, , max_disp[i]], col.stroke=c('red', 'green', 'blue'), close=TRUE, opacity.stroke.C=0.25)
+				svg.arrows(rbind(CoR, CoR+aor_f), col='orange', lwd=2)
+				svg.arrows(rbind(CoR, CoR+aor_r), col='brown', lwd=2)
+				svg.arrows(rbind(CoR, CoR+fao_plane), col='red', lwd=2)
+				svg.arrows(rbind(CoR, CoR+AoR), col='blue', lwd=2)
+
+				for(i in 1:nrow(c_prod)) svg.arrows(rbind(CoR, CoR+c_prod[i, 1:3]), col='purple', opacity=0.4)
+				#for(i in 1:nrow(inst_aor)) svg.arrows(rbind(CoR, CoR+inst_aor[i, 4]*1*inst_aor[i, 1:3]), col='purple', opacity=0.4)
+				#for(i in 1:nrow(c_prod)) svg.arrows(rbind(CoR, CoR+10*c_prod[i, 1:3]), col='purple', opacity=0.4)
+
+				svg.close()
+			}
+
+#return(1)
+			## Simple search for best 2 starting parameters
+			## Could rewrite as 2-parameter optimization
+			# Create error matrix
+			ni <- nj <- 20
+			error_mat <- matrix(NA, ni, nj)
+			ij_seq <- seq(0,pi,length=ni)
+			q_seq <- 1:min(nrow(qua), 25)
+			for(i in 1:ni) for(j in 1:nj) error_mat[i,j] <- solve_u_joint_params_quat_error(c(ij_seq[i], ij_seq[j]), 
+				qua[q_seq, ], aor_f, aor_r, vo=fao_plane, mat=coor_s[1:3, , 1])
+
+			# Create matrix to look up parameters corresponding to lowest error			
+			error_at <- cbind(c(matrix(ij_seq,ni,nj,byrow=TRUE)), c(matrix(ij_seq,ni,nj,byrow=FALSE)), c(t(error_mat)))
+
+			# Find minimum
+			which_min <- which.min(error_at[, 3])
+
+			# Set as starting parameters for optimization
+			start_p <- error_at[which_min, 1:2]
+		
+			# Create diagnostic plot
+			#error_mat_n <- (error_mat - min(error_mat)) / max(error_mat - min(error_mat))
+			#error_vec_n <- c(t(error_mat_n))
+			#plot(error_at[,1:2], col=gray(1-error_vec_n))
+			#points(start_p[1], start_p[2], cex=2, col='blue')
+			
+			# Save minimum 2-parameter error
+			min_2p_error <- error_at[which_min, 3]
+
+			if(print.progress) cat(paste0('\t\tError after sampling 2-parameter space: ', round(error_at[which_min, 3], 7), '\n'))
+
+			# Get axes orientations
+			aor_u <- rbind(aor_f, aor_r)
+			aor_ur <- aor_u %*% tMatrixEP(fao_plane, start_p[1])
+			aor_ur <- aor_ur %*% tMatrixEP(aor_ur[1, ], start_p[2])
+			aor_f <- aor_ur[1,]
+			aor_r <- aor_ur[2,]
+			
+			if(FALSE){
+
+				svg.new('Test2.html')
+				svg.frame(coor)
+				for(i in 1:length(max_disp)) svg.pointsC(coor[, , max_disp[i]], col.stroke=c('red', 'green', 'blue'), close=TRUE, opacity.stroke.C=0.25)
+			#	for(i in 1:dim(coor)[3]) svg.pointsC(coor[, , i], col.stroke=c('red', 'green', 'blue'), close=TRUE, opacity.stroke.C=0.25)
+			#	svg.pointsC(coor, col.stroke=c('red', 'green', 'blue'), close=TRUE, opacity.stroke.C=0.25)
+			#	svg.arrows(rbind(CoR, CoR+0.5*c(1,0,0)), col='orange')
+				svg.arrows(rbind(CoR, CoR+20*aor_f), col='orange', lwd=2)
+			#	svg.arrows(rbind(CoR, CoR+1.5*aor_fo), col='orange', lwd=2)
+			#	svg.arrows(rbind(CoR, CoR+0.5*c(0,0,1)), col='brown')
+				svg.arrows(rbind(CoR, CoR+20*aor_r), col='brown', lwd=2)
+			#	svg.arrows(rbind(c(0,0,0), 1.5*aor_ro), col='brown', lwd=2)
+				svg.arrows(rbind(CoR, CoR+20*fao_plane), col='red', lwd=2)
+
+				for(i in 1:nrow(c_prod)) svg.arrows(rbind(CoR, CoR+10*c_prod[i, 1:3]), col='purple', opacity=0.4)
+			#	for(i in 1:nrow(c_prod)) svg.arrows(rbind(c(0,0,0), 2*inst_aor[i, 1:3]), col='purple', opacity=0.4)
+
+				svg.close()
+			}
+
+			if(FALSE){	# Increased final error in two cases using in vivo data
+
+				q_seq <- 1:min(nrow(qua), 50)
+
+				u_joint_solve <- tryCatch(
+					expr={
+						nlminb(start=c(0,0,0), objective=solve_u_joint_params_quat_error, 
+							lower=c(-pi,-pi,-pi), upper=c(pi,pi,pi), q=qua[q_seq, ], f.axis=aor_f,
+							r.axis=aor_r, mat=coor_s[1:3, , 1])
+					},
+					error=function(cond) {print(cond);return(NULL)},
+					warning=function(cond) {print(cond);return(NULL)}
+				)
+
+				# If error is lower, save new axes
+				message <- ' (2-parameter values used)'
+				if(u_joint_solve$objective < min_2p_error){
+					aor_f <- aor_f %*% rotationMatrixZYX(u_joint_solve$par)
+					aor_r <- aor_r %*% rotationMatrixZYX(u_joint_solve$par)
+				}
+
+				if(print.progress) cat(paste0('\t\tError after optimizing 3-parameter space: ', round(u_joint_solve$objective, 7), '\n'))
+			}
+
+			return(list('cons'=c(CoR, uvector(aor_f), uvector(aor_r))))
+		}
+
+	}else if(type %in% c('S')){
 
 		# Parameters
 		CoRs <- matrix(NA, n_coor, 3)
@@ -287,19 +428,6 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 			rads[i] <- fit_shape$R
 		}
 
-		if(FALSE){
-			svg.new('Test.html')
-			svg.frame(coor)
-
-			cols <- c('red', 'green', 'blue')
-			for(i in 1:dim(coor)[1]) svg.pointsC(t(coor[i, , ]), col.stroke.C=cols[i])
-		
-			for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+10*uvector(AoRs[i, ])), col='purple')
-			for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+rads[i]*uvector(vorthogonal(AoRs[i, ]))), col='blue')
-		
-			svg.close()
-		}
-
 		# Remove NA rows
 		CoRs <- CoRs[!is.na(CoRs[,1]), ]
 		rads <- rads[!is.na(rads)]
@@ -311,131 +439,31 @@ fitJointConstraint <- function(coor, type, select.t.axis='min', print.progress =
 
 			# Find average CoR and AoR, weighting each iteration by centroid size of points
 			# Using centroid size is better than radius because noisy points in straight line over small range can lead to false large radius
-			CoR <- colSums(CoRs*Csizes, na.rm=TRUE) / sum(Csizes, na.rm=TRUE)
+			CoR <- colSums(CoRs*Csizes_time, na.rm=TRUE) / sum(Csizes_time, na.rm=TRUE)
 		}
 
-		if(type == 'U'){
+		if(FALSE){
+			svg.new('Test.html')
+			svg.frame(coor)
 
-			if(print.progress) cat(paste0('\tEstimating U-joint axis orientations\n'))
-
-			# Find instantaneous AoR and angle between each iteration
-			inst_aor <- matrix(NA, nrow=n_iter-1, ncol=4)
-			for(iter in 2:n_iter){
-				inst_aor[iter-1, ] <- unlist(instRotate(coor[, , iter-1], coor[, , iter], CoR=CoR))[c(1:3,7)]
-			}
-
-			# Find cross product between consecutive aors
-			c_prod <- matrix(NA, nrow(inst_aor)-1, 3)
-			for(i in 2:(n_iter-1)) c_prod[i-1, ] <- cprod(inst_aor[i-1, 1:3], inst_aor[i, 1:3])
-
-			# Flip axes when more than 90 degrees apart (opposite)
-			for(i in 2:(n_iter-2)) if(abs(avec(c_prod[1,], c_prod[i,])) > pi/2) c_prod[i,] <- -c_prod[i,]
-
-			# Get angle weights (for one of cross product pair)
-			angle_wts <- 1/abs(inst_aor[2:nrow(inst_aor), 4])
-			angle_wts <- (angle_wts - min(angle_wts)) / diff(range(angle_wts))
-
-			# Find average cross product vector, inversely weighted by angle magnitude
-			# Should be close to the plane orthogonal to the fixed (first) AoR
-			fao_plane <- uvector(colSums(c_prod*angle_wts) / sum(angle_wts))
-			#print((pi/2-avec(c(1,0,0), fao_plane))*(180/pi))
-			
-			# Starting guess for fixed AoR - perpendicular to fao plane
-			aor_f <- vorthogonal(fao_plane)
-			
-			# Starting guess for mobile AoR - perpendicular to aor f
-			aor_r <- cprod(aor_f, fao_plane)
-
-			# Find quaternion equivalent for each instantaneous rotation
-			qua <- matrix(NA, n_iter-1, 4)
-			for(i in 1:nrow(inst_aor)) qua[i, ] <- axisAngle2Quat(inst_aor[i, 1:3], inst_aor[i, 4])
-
-#return(1)
-			if(TRUE){
-
-				start_p <- c(0,0)
-
-				# Find starting parameter
-				ni <- nj <- 20
-				error_mat <- matrix(NA, ni, nj)
-				ij_seq <- seq(0,pi,length=ni)
-				q_seq <- 1:min(nrow(qua), 25) # needs to be consecutive because rotating AoR is updated after each iteration
-				for(i in 1:ni) for(j in 1:nj) error_mat[i,j] <- solve_u_joint_params_quat_error(c(ij_seq[i], ij_seq[j]), qua[q_seq, ], aor_f, aor_r, vo=fao_plane)
-
-				# Create matrix to look up parameters corresponding to lowest error			
-				error_at <- cbind(c(matrix(ij_seq,ni,nj,byrow=TRUE)), c(matrix(ij_seq,ni,nj,byrow=FALSE)), c(t(error_mat)))
-
-				# Find minimum
-				which_min <- which.min(error_at[, 3])
-
-				# Set as starting parameters for optimization
-				start_p <- error_at[which_min, 1:2]
-			
-				# Create diagnostic plot
-				#error_mat_n <- (error_mat - min(error_mat)) / max(error_mat - min(error_mat))
-				#error_vec_n <- c(t(error_mat_n))
-				#plot(error_at[,1:2], col=gray(1-error_vec_n))
-				#points(start_p[1], start_p[2], cex=2, col='blue')
-
-				if(print.progress) cat(paste0('\t\tError after sampling 2-parameter space: ', round(error_at[which_min, 3], 7), '\n'))
-
-				# Get axes orientations
-				aor_u <- rbind(aor_f, aor_r)
-				aor_ur <- aor_u %*% tMatrixEP(fao_plane, start_p[1])
-				aor_ur <- aor_ur %*% tMatrixEP(aor_ur[1, ], start_p[2])
-				aor_f <- aor_ur[1,]
-				aor_r <- aor_ur[2,]
-			}
-			
-			if(TRUE){
-
-				q_seq <- 1:min(nrow(qua), 50) # needs to be consecutive within fitJointConstraint because rotating AoR is updated after each iteration
-
-				u_joint_solve <- tryCatch(
-					expr={
-						nlminb(start=c(0,0,0), objective=solve_u_joint_params_quat_error, 
-							lower=c(-pi,-pi,-pi), upper=c(pi,pi,pi), q=qua[q_seq, ], f.axis=aor_f,
-							r.axis=aor_r)
-					},
-					error=function(cond) {print(cond);return(NULL)},
-					warning=function(cond) {print(cond);return(NULL)}
-				)
-
-				if(print.progress) cat(paste0('\t\tError after optimizing 3-parameter space: ', round(u_joint_solve$objective, 7), '\n'))
-
-				aor_fo <- aor_f %*% rotationMatrixZYX(u_joint_solve$par)
-				aor_ro <- aor_r %*% rotationMatrixZYX(u_joint_solve$par)
-			}
-
-			if(FALSE){
-
-				svg.new('Test.html')
-				svg.frame(coor)
-			#	for(i in 1:dim(coor)[3]) svg.pointsC(coor[, , i], col.stroke=c('red', 'green', 'blue'), close=TRUE, opacity.stroke.C=0.25)
-			#	svg.pointsC(coor, col.stroke=c('red', 'green', 'blue'), close=TRUE, opacity.stroke.C=0.25)
-				svg.arrows(rbind(c(0,0,0), 0.5*c(1,0,0)), col='orange')
-				svg.arrows(rbind(c(0,0,0), aor_f), col='orange', lwd=2)
-				svg.arrows(rbind(c(0,0,0), 1.5*aor_fo), col='orange', lwd=2)
-				svg.arrows(rbind(c(0,0,0), 0.5*c(0,0,1)), col='brown')
-				svg.arrows(rbind(c(0,0,0), aor_r), col='brown', lwd=2)
-				svg.arrows(rbind(c(0,0,0), 1.5*aor_ro), col='brown', lwd=2)
-				svg.arrows(rbind(CoR, CoR+0.5*fao_plane), col='red', lwd=2)
-
-				for(i in 1:nrow(c_prod)) svg.arrows(rbind(c(0,0,0), 2*c_prod[i, 1:3]), col='purple', opacity=0.4)
-		#		for(i in 1:nrow(c_prod)) svg.arrows(rbind(c(0,0,0), 2*inst_aor[i, 1:3]), col='purple', opacity=0.4)
-
-				svg.close()
-			}
+			cols <- c('red', 'green', 'blue')
+			for(i in 1:dim(coor)[1]) svg.pointsC(t(coor[i, , ]), col.stroke.C=cols[i])
+		
+			for(i in 1:nrow(CoRs)) svg.points(CoRs[i, ], col=cols[i])
+			svg.points(CoR, col='purple', cex=4)
+			#for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+10*uvector(AoRs[i, ])), col='purple')
+			#for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+rads[i]*uvector(vorthogonal(AoRs[i, ]))), col='blue')
+		
+			svg.close()
 		}
 
 		# Set joint constraints
-		if(type == 'U') joint_cons <- c(CoR, uvector(aor_fo), uvector(aor_ro))
-		if(type == 'S') joint_cons <- c(CoR, c(1,0,0), c(0,1,0), c(0,0,1))
+		if(type == 'S') return(list('cons'=c(CoR, c(1,0,0), c(0,1,0), c(0,0,1))))
 
 	}else if(type == 'T'){
 
 		# Set to any set of three mutually orthogonal vectors
-		joint_cons <- c(c(1,0,0), c(0,1,0), c(0,0,1))
+		return(list('cons'=c(c(1,0,0), c(0,1,0), c(0,0,1))))
 	}
 
 	return(list(
