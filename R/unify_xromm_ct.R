@@ -14,7 +14,7 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 	body_names_vm[grepl('-', body_names)] <- gsub('[A-Za-z]+-', '', body_names[grepl('-', body_names)])
 	body_names <- gsub('-[A-Za-z]+', '', body_names)
 	names(body_names_vm) <- body_names
-	
+
 	# Set body associations
 	body_assoc <- body_names
 
@@ -81,10 +81,10 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 		m1 <- xr_arr[rownames(ct_mat)[rownames(ct_mat) %in% dimnames(xr_arr)[[1]]], , iter]
 		m2 <- ct_mat
 		m3 <- apply(cs_ini, 2, as.matrix)
-		align <- findBestAlignment(m1, m2, m3=m3, sign=1)
-		ct_mat_align <- align$mat
+		align_ct_xr <- findBestAlignment(m1, m2, m3=m3, sign=1)
+		ct_mat_align <- align_ct_xr$mat
 		cs_ini_align <- cs_ini
-		for(rowi in seq(1, nrow(m3), by=4)) cs_ini_align[, , ((rowi-1) / 4) + 1] <- align$mc[rowi:(rowi+3), ]
+		for(rowi in seq(1, nrow(m3), by=4)) cs_ini_align[, , ((rowi-1) / 4) + 1] <- align_ct_xr$mc[rowi:(rowi+3), ]
 		
 		# Unify markers
 		for(body_name in names(body_order)){
@@ -113,22 +113,21 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 			# Remove NA values
 			xr_mat_sub <- matrix(xr_mat_sub[!is.na(xr_mat_sub[, 1]), ], nrow=sum(!is.na(xr_mat_sub[, 1])), ncol=ncol(xr_mat_sub), 
 				dimnames=list(rownames(xr_mat_sub)[!is.na(xr_mat_sub[, 1])], NULL))
-
+			
 			# Translate bodies with single marker in common
 			if(nrow(xr_mat_sub) == 1){
 
-				# Translate CT markers based on common point with X-ray markers
+				# Find translation from CT coordinates to X-ray coordinates
+				tmat <- align_ct_xr$tmat
+				#tmat <- diag(4)
 				common_marker <- rownames(xr_mat_sub)
-				tmat <- matrix(xr_mat_sub[common_marker, ] - ct_mat_align[common_marker, ], nrow=nrow(ct_mat_sub), ncol=ncol(ct_mat_sub), byrow=TRUE)
-				ct_mat_sub_t <- ct_mat_align[rownames(ct_mat_sub), ] + tmat
-				align <- NULL
-				
-				# Save transformation matrix from previous to current iteration
-				if(iter > 1){
-					tmat <- diag(4)
-					tmat[1:3, 4] <- ct_mat_sub_t[common_marker, ] - ct_arr[common_marker, , iter-1]
-					tm_arr[, , body_name, iter] <- tmat
-				}
+				tmat[1:3, 4] <- tmat[1:3, 4] + (xr_mat_sub[common_marker, ] - ct_mat_align[common_marker, ])
+
+				# Translate CT markers based on common point with X-ray markers
+				ct_mat_sub_t <- ct_mat_align[rownames(ct_mat_sub), ] + matrix(xr_mat_sub[common_marker, ] - ct_mat_align[common_marker, ], nrow=nrow(ct_mat_sub), ncol=ncol(ct_mat_sub), byrow=TRUE)
+
+				# Save transformation matrix
+				tm_arr[, , body_name, iter] <- tmat
 
 			}else if(nrow(xr_mat_sub) == 2){
 
@@ -141,11 +140,9 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 				# Transform CT markers to correspond with XROMM markers
 				align <- findBestAlignment(xr_mat_sub, ct_mat_sub, m3=cs_ini[, , body_name], sign=1)
 				ct_mat_sub_t <- align$mat
-				
-				# Save transformation matrix from previous to current iteration
-				if(iter > 1){
-					tm_arr[, , body_name, iter] <- findBestAlignment(ct_mat_sub_t, ct_arr[rownames(ct_mat_sub_t), , iter-1], sign=1)$tmat
-				}
+
+				# Save transformation matrix
+				tm_arr[, , body_name, iter] <- align$tmat
 			}
 
 			if(print.progress && !is.null(align)){
@@ -158,14 +155,14 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 				
 				# Virtual markers in subset
 				virtual_markers_sub <- rownames(ct_mat_sub)[rownames(ct_mat_sub) %in% virtual_markers]
-				
+
 				# Remove virtual markers that are non-NA in xr_arr (previously positioned with first body)
 				virtual_markers_sub <- virtual_markers_sub[is.na(xr_arr_n[virtual_markers_sub, 1, iter])]
 				
 				# Add new virtual markers
 				if(length(virtual_markers_sub) > 0) xr_arr_n[virtual_markers_sub, , iter] <- ct_mat_sub_t[rownames(ct_mat_sub) %in% virtual_markers, ]
 			}
-		
+
 			ct_arr[rownames(ct_mat_sub_t), , iter] <- ct_mat_sub_t
 
 			#print(xr_mat_sub);print(ct_mat_sub_t)
