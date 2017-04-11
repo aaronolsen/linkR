@@ -1,5 +1,5 @@
-fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5, optim.cons = TRUE, 
-	optim.to.prop = 0.00001, print.progress = FALSE){
+fitJointModel <- function(coor, type, cons = NULL, pose.init = NULL, optim.frame.max = 100, 
+	optim.iter.max = 5, optim.pose = TRUE, optim.cons = TRUE, optim.to.prop = 0.00001, print.progress = FALSE){
 
 	control <- list(
 		'subsample.method'='Evenly spaced',		# or 'Maximum dispersion'
@@ -47,9 +47,13 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 	dof <- joint_types()$dof[type, ]
 
 	# Estimate joint constraints
-	if(print.progress) cat(paste0('\tEstimating joint constraints...\n'))
-	fit_joint_cons <- fitJointConstraint(coor, type, control=control, print.progress=print.progress)
-	joint_cons <- fit_joint_cons$cons
+	if(is.null(cons)){
+		if(print.progress) cat(paste0('\tEstimating joint constraints...\n'))
+		fit_joint_cons <- fitJointConstraint(coor, type, control=control, print.progress=print.progress)
+		joint_cons <- fit_joint_cons$cons
+	}else{
+		joint_cons <- cons
+	}
 
 	# Set rotation dof skip
 	if(dof['R'] == 0){rdof_skip <- 0}else{rdof_skip <- (dof['R']+1)*3}
@@ -77,7 +81,11 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 	ccoor <- procAlign(coor_s)
 
 	# Align consensus to reference time point
-	pose_init <- findBestAlignment(coor[, , ref.iter], ccoor$mean.scaled)$mat
+	if(is.null(pose.init)){
+		pose_init <- findBestAlignment(coor[, , ref.iter], ccoor$mean.scaled)$mat
+	}else{
+		pose_init <- pose.init
+	}
 
 	# Find full range of coordinates
 	coor_range <- apply(coor, 2, 'range')
@@ -110,7 +118,7 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 	# Fill in matrix for optimize subset
 	optim_param[optim_use, ] <- optim_param_values
 	
-	# Set input parameters to 0 for reference iteration
+	# Set initial value for reference iteration to 0 - this will also be optimized
 	optim_param[ref.iter, ] <- 0
 
 	# Set difference threshold at which optimization will stop, as proportion of mean centroid size
@@ -169,10 +177,14 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 	}
 
 	if(print.progress){
-		if(optim.cons){
+		if(optim.cons && optim.pose){
 			cat(paste0('\tOptimizing input parameters, initial body pose, and constraint parameters...\n'))
-		}else{
-			cat(paste0('\tOptimizing input parameters and initial body pose...\n'))
+		}else if(optim.cons && !optim.pose){
+			cat(paste0('\tOptimizing input parameters and constraint parameters...\n'))
+		}else if(!optim.cons && optim.pose){
+			cat(paste0('\tOptimizing initial body pose...\n'))
+		}else if(!optim.cons && !optim.pose){
+			cat(paste0('\tOptimizing input parameters...\n'))
 		}
 	}
 
@@ -190,8 +202,6 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 		## Optimize input parameters
 		input_fit_errors <- rep(NA, length(optim_use))
 		for(i in 1:length(optim_use)){
-	
-			if(optim_use[i] == ref.iter) next
 
 			input_fit <- tryCatch(
 				expr={
@@ -233,22 +243,27 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 		start_transform <- c(0.1,0.1,0.1,translation_limit*0.05,translation_limit*0.05,translation_limit*0.05)
 
 		## Optimize pose
-		pose_fit <- tryCatch(
-			expr={
-				nlminb(start=start_transform, objective=body_pose_error, 
-					lower=pose_lower, upper=pose_upper, type=type, cons=joint_cons, 
-					coor=pose_init, coor.compare=coor_s, param=optim_param[optim_use, ])
-			},
-			error=function(cond) {print(cond);return(NULL)},
-			warning=function(cond) {print(cond);return(NULL)}
-		)
+		if(optim.pose){
+			pose_fit <- tryCatch(
+				expr={
+					nlminb(start=start_transform, objective=body_pose_error, 
+						lower=pose_lower, upper=pose_upper, type=type, cons=joint_cons, 
+						coor=pose_init, coor.compare=coor_s, param=optim_param[optim_use, ])
+				},
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
+			)
 
-		# Apply optimized transformation to initial pose
-		centroid_mat <- matrix(colMeans(pose_init), nrow(pose_init), ncol(pose_init), byrow=TRUE)
-		pose_init <- ((pose_init - centroid_mat) %*% rotationMatrixZYX(pose_fit$par[1:3])) + centroid_mat
-		pose_init <- pose_init + matrix(pose_fit$par[4:6], nrow(coor), ncol(coor), byrow=TRUE)
-		
-		if(print.progress) cat(paste0(', ', round(pose_fit$objective, 5)))
+			# Apply optimized transformation to initial pose
+			centroid_mat <- matrix(colMeans(pose_init), nrow(pose_init), ncol(pose_init), byrow=TRUE)
+			pose_init <- ((pose_init - centroid_mat) %*% rotationMatrixZYX(pose_fit$par[1:3])) + centroid_mat
+			pose_init <- pose_init + matrix(pose_fit$par[4:6], nrow(coor), ncol(coor), byrow=TRUE)
+
+			if(print.progress) cat(paste0(', ', round(pose_fit$objective, 5)))
+		}else{
+			pose_fit <- list()
+			pose_fit$objective <- mean(input_fit_errors, na.rm=TRUE)
+		}
 
 		## Optimize constraint parameters
 		if(optim.cons && type != 'T'){
@@ -297,6 +312,9 @@ fitJointModel <- function(coor, type, optim.frame.max = 100, optim.iter.max = 5,
 
 		# If near perfect fit stop - for perfect input testing
 		if(pose_fit$objective < 1e-7) break
+		
+		# If only input parameters are optimized nothing changes with loop so only one iteration needed
+		if(!optim.cons && !optim.pose) break
 	}
 
 	# Remove first two errors (only used to make for easy looping)
