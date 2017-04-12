@@ -1,7 +1,19 @@
 applyTransform <- function(pmat, tarr, assoc = NULL){
 
-	if(length(dim(tarr)) == 3){
-		
+	if(length(dim(tarr)) == 2){
+
+		# Get point coordinates as matrix for transformation - coerce to matrix if single point
+		pcoor <- rbind(matrix(t(pmat), ncol=nrow(pmat)), rep(1, nrow(pmat)))
+		colnames(pcoor) <- rownames(pmat)
+
+		# Apply transformation
+		parr <- tarr %*% pcoor
+	
+		# Remove 1s row and transpose
+		parr <- t(parr[1:3, ])
+
+	}else if(length(dim(tarr)) == 3){
+	
 		## Single body
 		# Create array for transformed points
 		parr <- array(NA, dim=c(nrow(pmat), 3, dim(tarr)[3]), dimnames=list(rownames(pmat), NULL, NULL))
@@ -26,20 +38,20 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 
 		# Multiple bodies - apply transformations for each body
 		for(body in 1:dim(tarr)[3]){
-		
+	
 			# Get body name
 			body_name <- dimnames(tarr)[[3]][body]
 
 			# Find points associated with body
 			body_assoc <- which(assoc == body_name)
-		
+	
 			# Skip if no points associated with body
 			if(length(body_assoc) == 0) next
 
 			# Get point coordinates as matrix for transformation - coerce to matrix if single point
 			pcoor <- rbind(matrix(t(pmat[body_assoc, ]), ncol=length(body_assoc)), rep(1, length(body_assoc)))
 			colnames(pcoor) <- rownames(pmat)[body_assoc]
-		
+	
 			# Apply transformation
 			tcoor <- apply(tarr[, , body, ], 3, '%*%', pcoor)
 
