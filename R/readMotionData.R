@@ -1,5 +1,9 @@
 readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
 
+	## Reads in matrix of coordinates over time, with or without time column, or 
+	## transformation matrices. File type is detected based on whether first column name 
+	## ends in R11
+
 	# Detect format
 	if(grepl('[.]csv$', file[1])){
 		file_format <- 'csv'
@@ -12,8 +16,20 @@ readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
 		tmta <- time_mat_to_arr(as.matrix(read.table(file[1])))
 	}else{
 		read_matrix <- as.matrix(read.csv(file[1]))
-		if(colnames(read_matrix)[1] == 'X') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
-		tmta <- time_mat_to_arr(read_matrix)
+		
+		if(grepl('_R11$', colnames(read_matrix)[1])){
+			
+			# Transformation matrix
+			tmat <- matrix(suppressWarnings(as.numeric(read_matrix)), nrow(read_matrix), ncol(read_matrix), 
+				dimnames=dimnames(read_matrix))
+			
+			# Convert transformation matrix into array
+			return(tmmat2arr(tmat))
+			
+		}else{
+			if(colnames(read_matrix)[1] == 'X') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
+			tmta <- time_mat_to_arr(read_matrix)
+		}
 	}
 	
 	lm_array_ex <- tmta$arr
