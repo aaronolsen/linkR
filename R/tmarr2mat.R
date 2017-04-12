@@ -1,9 +1,12 @@
-tmarr2mat <- function(arr){
+tmarr2mat <- function(arr, body.name = NULL){
 
 	## Converts array of transformation matrices to single matrix
 
+	# If 3-d array, convert to 4-d with one body
+	if(length(dim(arr)) == 3) arr <- array(arr, dim=c(4,4,1,dim(arr)[3]), dimnames=list(NULL, NULL, body.name, NULL))
+
 	# Set add-on tags
-	add_end <- c('R11','R12','R13','01','R21','R22','R23','02','R31','R32','R33','03','TX','TY','TY','1')
+	add_end <- c('R11','R12','R13','01','R21','R22','R23','02','R31','R32','R33','03','TX','TY','TZ','1')
 
 	# Repeat body names
 	body_names_rep <- c(t(matrix(dimnames(arr)[[3]], nrow=dim(arr)[3], ncol=length(add_end))))
