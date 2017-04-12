@@ -76,12 +76,15 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 	# Create array for transformed coordinates
 	tcoor <- array(NA, dim=c(dim(pmat), n_iter))
 	tcoor[, , 1] <- pmat
+	
+	# Create array for transformation matrices for body
+	tmarr <- array(diag(4), dim=c(4, 4, n_iter))
 
 	if(print.progress) cat('\tAnimating body\n')
 
 	# Animate body
 	for(iter in 2:n_iter){
-
+	
 		# Get reference coordinates
 		if(input.ref == 'previous'){
 			tcoor_mat <- tcoor[, , iter-1]
@@ -91,12 +94,15 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 			cons_vec <- cons[1, ]
 		}
 		
-		# Add translations to previous transformation matrix
+		# Add translations
 		translations <- c(0,0,0)
 		if(dof[2] > 0){
 			for(i in 1:dof[2]) translations <- translations + param[iter-1, dof[1]+i]*uvector(cons_vec[(rdof_skip+i*3+1-3):(rdof_skip+i*3)])
 		}
 		tcoor_mat <- tcoor_mat + matrix(translations, n_coor, 3, byrow=TRUE)
+
+		# Add translation to transformation matrix
+		tmarr[1:3, 4, iter] <- tmarr[1:3, 4, iter] + translations
 
 		# Apply translation to CoR
 		if(dof[1] > 0) cons_vec[1:3] <- cons_vec[1:3] + translations
@@ -106,6 +112,9 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 
 			# Move points to CoR
 			tcoor_mat <- tcoor_mat - matrix(cons_vec[1:3], n_coor, 3, byrow=TRUE)
+
+			# Add translation to transformation matrix
+			tmarr[, , iter] <- tmarr[, , iter] %*% cbind(rbind(diag(3), rep(0,3)), c(cons[iter, 1:3], 1))
 
 			# Apply rotations
 			# 	The negative sign is needed to ensure rotation matrix follows the right-hand 
@@ -123,15 +132,24 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 				# Apply rotation to coordinates
 				tcoor_mat <- tcoor_mat %*% RM1
 				
+				# Apply rotation to transformation matrix
+				tmarr[, , iter] <- tmarr[, , iter] %*% cbind(rbind(tMatrixEP(v=cons_vec[4:6], a=-param[iter-1, 1]), rep(0,3)), c(0,0,0,1))
+
 				# For U-joint, rotation must also be applied to AoR2
 				cons_vec[7:9] <- cons_vec[7:9] %*% RM1
 				
 				# Apply second rotation (about rotated AoR2) to coordinates
 				tcoor_mat <- tcoor_mat %*% tMatrixEP(v=cons_vec[7:9], a=param[iter-1, 2])
+
+				# Apply rotation to transformation matrix
+				tmarr[, , iter] <- tmarr[, , iter] %*% cbind(rbind(tMatrixEP(v=cons_vec[7:9], a=-param[iter-1, 2]), rep(0,3)), c(0,0,0,1))
 			}
 			if(!has_u){
 				for(i in dof[1]:1){
 					tcoor_mat <- tcoor_mat %*% tMatrixEP(v=cons_vec[(i*3+1):(i*3+3)], a=param[iter-1, i])
+
+					# Apply rotation to transformation matrix
+					tmarr[, , iter] <- tmarr[, , iter] %*% cbind(rbind(tMatrixEP(v=cons_vec[(i*3+1):(i*3+3)], a=-param[iter-1, i]), rep(0,3)), c(0,0,0,1))
 				}
 			}
 			#print(tMatrixEP(v=cons[iter, 4:6], a=-param[iter-1, 1]) %*% tMatrixEP(v=cons[iter, 7:9], a=-param[iter-1, 2]))
@@ -139,9 +157,12 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 
 			# Move points back from CoR
 			tcoor_mat <- tcoor_mat + matrix(cons_vec[1:3], n_coor, 3, byrow=TRUE)
+
+			# Add translation to transformation matrix
+			tmarr[, , iter] <- tmarr[, , iter] %*% cbind(rbind(diag(3), rep(0,3)), c(-cons[iter, 1:3], 1))
 		}
 
-		# Save transformation
+		# Save transformed coordinates
 		tcoor[, , iter] <- tcoor_mat
 		cons[iter, ] <- cons_vec
 	}
@@ -149,6 +170,7 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 	# Remove first iteration (was only present to make easy looping)
 	tcoor <- tcoor[, , 2:n_iter]
 	cons <- cons[2:n_iter, ]
+	tmarr <- tmarr[, , 2:n_iter]
 	n_iter <- n_iter - 1
 
 	# Check that joint constraints hold
@@ -202,6 +224,10 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 		rlcs <- NULL
 	}
 	
+	# Check that transformation matrices returns the same result
+	#tcoor_tm <- applyTransform(coor, tmarr)
+	#print(sum(abs(tcoor_tm - rcoor)))
+
 	# Add rownames
 	dimnames(rcoor)[[1]] <- rownames(coor)
 
@@ -209,6 +235,7 @@ animate_joint <- function(type, cons, param, coor, lcs = TRUE, input.ref = 'init
 		'coor'=rcoor,
 		'lcs'=rlcs,
 		'cons'=cons,
-		'dof'=dof
+		'dof'=dof,
+		'tmarr'=tmarr
 	)
 }
