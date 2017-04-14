@@ -202,7 +202,7 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 			joint_cons <- c(vec_o, cprod(vec_o, vec))
 		}
 		
-	}else if(type %in% c('R', 'U')){
+	}else if(type %in% c('R', 'U', 'S')){
 
 		# Parameters
 		CoRs <- matrix(NA, n_coor, 3)
@@ -210,6 +210,7 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 		AoRs <- matrix(NA, n_coor, 3)
 		
 		#
+		if(type == 'S') max_disp_prop <- control$max.disp.prop.S
 		if(type == 'R') max_disp_prop <- control$max.disp.prop.R
 		if(type == 'U') max_disp_prop <- control$max.disp.prop.U
 
@@ -266,6 +267,8 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 		}
 
 		if(type == 'R') return(list('cons'=c(CoR, AoR)))
+
+		if(type == 'S') return(list('cons'=c(CoR, c(1,0,0), c(0,1,0), c(0,0,1))))
 
 		if(type == 'U'){
 
@@ -404,58 +407,6 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 
 			return(list('cons'=c(CoR, uvector(aor_f), uvector(aor_r))))
 		}
-
-	}else if(type %in% c('S')){
-
-		# Parameters
-		CoRs <- matrix(NA, n_coor, 3)
-		rads <- rep(NA, n_coor)
-
-		# Fit sphere to the set of positions of each body point over time
-		for(i in 1:n_coor){
-
-			# Fit spheres to each point across iterations
-			fit_shape <- fitShape(t(coor[i, , ]), 'sphere')
-
-			# If NULL, skip
-			if(is.null(fit_shape)) next
-
-			# Save center, axis of rotation and radius
-			CoRs[i, ] <- fit_shape$C
-			rads[i] <- fit_shape$R
-		}
-
-		# Remove NA rows
-		CoRs <- CoRs[!is.na(CoRs[,1]), ]
-		rads <- rads[!is.na(rads)]
-
-		# Find single CoR and AoR
-		if(nrow(CoRs) == 1){
-			CoR <- CoRs
-		}else{
-
-			# Find average CoR and AoR, weighting each iteration by centroid size of points
-			# Using centroid size is better than radius because noisy points in straight line over small range can lead to false large radius
-			CoR <- colSums(CoRs*Csizes_time, na.rm=TRUE) / sum(Csizes_time, na.rm=TRUE)
-		}
-
-		if(FALSE){
-			svg.new('Test.html')
-			svg.frame(coor)
-
-			cols <- c('red', 'green', 'blue')
-			for(i in 1:dim(coor)[1]) svg.pointsC(t(coor[i, , ]), col.stroke.C=cols[i])
-		
-			for(i in 1:nrow(CoRs)) svg.points(CoRs[i, ], col=cols[i])
-			svg.points(CoR, col='purple', cex=4)
-			#for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+10*uvector(AoRs[i, ])), col='purple')
-			#for(i in 1:nrow(CoRs)) svg.arrows(rbind(CoRs[i, ], CoRs[i, ]+rads[i]*uvector(vorthogonal(AoRs[i, ]))), col='blue')
-		
-			svg.close()
-		}
-
-		# Set joint constraints
-		if(type == 'S') return(list('cons'=c(CoR, c(1,0,0), c(0,1,0), c(0,0,1))))
 
 	}else if(type == 'T'){
 
