@@ -70,9 +70,9 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 			}
 		}
 
-		# Find average AoR weighted by rotation angle
-		abs_angles <- abs(angles)
-		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
+		# Find major AoR by pca
+		pca <- prcomp(angles*inst_aor)
+		avg_aor <- pca$rotation[, 1]
 
 		# Fit line to CoRs
 		fit_line <- fitLine3D(inst_cor)
@@ -131,9 +131,9 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 			}
 		}
 
-		# Find average AoR weighted by rotation angle
-		abs_angles <- abs(angles)
-		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
+		# Find major AoR by pca
+		pca <- prcomp(angles*inst_aor)
+		avg_aor <- pca$rotation[, 1]
 
 		# Fit line to CoRs
 		fit_line <- fitLine3D(inst_cor)
@@ -234,22 +234,19 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 
 			# Flip axes when more than 90 degrees apart or exactly opposite
 			if(iter > 2){
-				if(abs(avec(inst_aor[1,], inst_aor[iter-1,])) > pi/2) inst_aor[iter-1,] <- -inst_aor[iter-1,]
-				if(sum(inst_aor[1,]+inst_aor[iter-1,]) < 1e-8) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+				#if(abs(avec(inst_aor[1,], inst_aor[iter-1,])) > pi/2) inst_aor[iter-1,] <- -inst_aor[iter-1,]
+				#if(sum(inst_aor[1,]+inst_aor[iter-1,]) < 1e-8) inst_aor[iter-1,] <- -inst_aor[iter-1,]
 			}
 		}
-		
-		# Find average AoR weighted by rotation angle
-		abs_angles <- abs(angles)
-		avg_aor <- uvector(colSums(inst_aor*abs_angles) / sum(abs_angles))
+
+		# Find major AoR by pca
+		pca <- prcomp(angles*inst_aor)
+		avg_aor <- pca$rotation[, 1]
 
 		# Find CoR
 		# CoR can be any point on AoR so find average CoR by finding a point in space at minimum distance from all AoRs
 		# If all the AoRs intersect, this will be the intersection point of all the AoRs
 		min_cor <- pointMinDistLines(inst_cor, inst_cor+inst_aor)$p
-		
-		# Find average CoR weighted by rotation angle
-		#avg_cor <- colSums(inst_cor*abs_angles) / sum(abs_angles)
 		
 		CoR <- min_cor
 		AoR <- avg_aor
@@ -261,8 +258,8 @@ fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.p
 			for(i in 1:dim(coor)[1]) svg.points(t(coor[i, , ]), col.stroke=cols[i], opacity.fill=0.2, opacity.stroke=0.2)
 			for(i in 1:dim(coor_s)[1]) svg.pointsC(t(coor_s[i, , ]), col.stroke.C=cols[i])
 			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(inst_cor[i, ]-uvector(inst_aor[i, ]), inst_cor[i, ]+1*uvector(inst_aor[i, ])), col='purple')
-			#for(i in 1:nrow(inst_cor)) svg.arrows(rbind(CoR, CoR+100*abs(angles[i])*uvector(inst_aor[i, ])), col='purple')
-			svg.arrows(rbind(CoR, CoR+uvector(avg_aor)), col='blue')
+			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(CoR, CoR+100*angles[i]*uvector(inst_aor[i, ])), col='purple')
+			svg.arrows(rbind(CoR, CoR+10*avg_aor), col='blue')
 			svg.points(min_cor, col='blue', cex=5)
 			#svg.points(c(0.3, 0.5, 0.4), col='green', cex=5)
 			svg.close()
