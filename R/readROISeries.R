@@ -14,13 +14,13 @@ readROISeries <- function(file, name.min.char = 4){
 		330,332,334,341,344,346,350,352:354,357,360:361,366:367,372:373,375:377),width=3,flag='0'))
 	#cc_print <- paste0('c(\'', paste0(cc, collapse='\',\''), '\')');cat(cc_print); cat('\n')
 
-	repl_char <- c('\001','\002','\003','\004','\005','\006','\007','\016','\017','\018','\019','\020','\021','\022','\023','\024','\025','\026','\027','\028','\029','\030','\031','\032','\033','\034','\035','\036','\037','\038','\039','\040','\041','\042','\043','\044','\045','\046','\047','\048','\049','\177','\201','\202','\203','\204','\205','\206','\210','\212','\216','\220','\222','\223','\224','\225','\226','\231','\234','\235','\236','\237','\241','\243','\246','\251','\253','\254','\255','\270','\271','\273','\277','\301','\302','\304','\305','\306','\307','\314','\316','\317','\320','\321','\323','\325','\330','\332','\334','\341','\344','\346','\350','\352','\353','\354','\357','\360','\361','\366','\367','\372','\373','\375','\376','\377')
+	repl_char <- c('\001','\002','\003','\004','\005','\006','\007','\016','\017','\018','\019','\020','\021','\022','\023','\024','\025','\026','\027','\028','\029','\030','\031','\032','\033','\034','\035','\036','\037','\038','\039','\040','\041','\042','\043','\044','\045','\046','\047','\048','\049','\177','\201','\202','\203','\204','\205','\206','\210','\212','\216','\220','\222','\223','\224','\225','\226','\231','\234','\235','\236','\237','\241','\243','\246','\251','\253','\254','\255','\270','\271','\273','\277','\301','\302','\304','\305','\306','\307','\314','\316','\317','\320','\321','\323','\325','\330','\332','\334','\341','\344','\346','\350','\352','\353','\354','\357','\360','\361','\366','\367','\372','\373','\375','\376','\377', 'f88B')
 	repl_char <- paste0(repl_char, collapse='|')
 	#repl_char <- paste0('\b|\f|\n|\t|\v|', paste0(repl_char, collapse='|'))
 	char_sub <- gsub(repl_char, '', read_lines)
 
 	# Delete other things
-	char_sub <- gsub('E=?', '', char_sub, fixed=TRUE)
+	#char_sub <- gsub('E=?', '', char_sub, fixed=TRUE)
 
 	# Split at 2DPos for names
 	pos2d_split <- strsplit(char_sub, '2D[ ]?Pos:')[[1]]
@@ -69,16 +69,28 @@ readROISeries <- function(file, name.min.char = 4){
 		
 		#if(not_found) print(pos2d_split[i])
 	}
-	
+
 	# Get number of markers
-	num_markers <- length(gregexpr('2D[ ]?Pos:', char_sub)[[1]])
+	num_markers <- length(gregexpr('2D[ ]?Pos:', char_sub, ignore.case=TRUE)[[1]])
+
+	# Check for unnamed marker
+	if('unnamed' %in% read_names){
+		print(char_sub)
+		warning("'Unnamed' marker present.")
+	}
 
 	# Check that marker names are unique (Neurocranium_bead_cauLE)
-	#print(sort(read_names))
-	if(length(unique(read_names)) != length(read_names)) stop("Marker names are not unique")
+	if(length(unique(read_names)) != length(read_names)){
 
+		# Find duplicates
+		duplicates <- c()
+		for(i in 1:length(read_names)) if(sum(read_names[i] == read_names) > 1) duplicates <- c(duplicates, read_names[i])
+		
+		stop(paste0("Marker names are not unique, duplicates: ", paste0(duplicates, collapse=', ')))
+	}
+	
 	# Check that number of names and markers match	
-	if(length(unique(read_names)) != num_markers) stop("Number of markers does not match the number of unique names")
+	if(length(read_names) != num_markers) stop(paste0("Number of markers (", num_markers, ") does not match the number of unique names (", length(read_names), ")"))
 
 	# Split at 3D for 3D
 	pos3d_split <- strsplit(char_sub, '3D[ ]?Pos:')[[1]]
