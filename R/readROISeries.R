@@ -1,4 +1,4 @@
-readROISeries <- function(file, name.min.char = 4){
+readROISeries <- function(file, name.min.char = 5){
 
 	# Read lines
 	read_lines <- readLines(file, warn=FALSE, skipNul=TRUE)
@@ -44,13 +44,14 @@ readROISeries <- function(file, name.min.char = 4){
 			
 			# Get potential name
 			pot_name <- substr(pos2d_split[i], greg_expr[[i]][j], stop=greg_expr[[i]][j]+attr(greg_expr[[i]], "match.length")[j]-1)
-			
+
 			# Skip if only numeric
 			if(!is.na(suppressWarnings(as.numeric(pot_name)))) next
 
 			# Skip if number followed by px
 			if(grepl('^[0-9]+px', pot_name, ignore.case=TRUE)) next
 			if(grepl('^[0-9]+mm(0|1|2|x|y|z)?', pot_name, ignore.case=TRUE)) next
+			if(grepl('>[A-Za-z]{4}', pot_name, ignore.case=TRUE)) next
 
 			if(grepl('Value$', pot_name)) next
 			if(grepl('^JLN', pot_name)) next
