@@ -1,4 +1,4 @@
-immobilize <- function(coor, pts){
+immobilize <- function(coor, ref){
 
 	## Fixes motion of coor relative to pts
 	
@@ -6,10 +6,10 @@ immobilize <- function(coor, pts){
 	n_iter <- dim(coor)[3]
 	
 	# Each iteration
-	for(iter in 2:n_iter){
+	for(iter in 1:n_iter){
 
 		# Find translation and rotation to align coor to pts at point 1
-		coor[, , iter] <- findBestAlignment(coor[pts, , 1], coor[pts, , iter], coor[, , iter])$mc
+		coor[, , iter] <- findBestAlignment(ref, coor[rownames(ref), , iter], coor[, , iter])$mc
 	}
 
 	coor
