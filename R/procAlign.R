@@ -4,12 +4,20 @@ procAlign <- function(coor){
 
 	# Save coordinates
 	x <- coor
+
+	d2 <- FALSE
+	if(dim(x)[2] == 2){
+		xn <- array(0, dim=dim(x)+c(0,1,0), dimnames=list(dimnames(x)[[1]], NULL, dimnames(x)[[3]]))
+		xn[, 1:2, ] <- x
+		x <- xn
+		d2 <- TRUE
+	}
 	
 	# Get dimensions
 	k <- dim(x)[1]
 	m <- dim(x)[2]
 	n <- dim(x)[3]
-
+	
 	all_common <- rowSums(!apply(x[, 1, ], 2, is.na)) == n
 	#print(names(all_common)[all_common])
 
@@ -93,6 +101,11 @@ procAlign <- function(coor){
 	#SSEs <- rep(NA, length(n))
 	#for(i in 1:n) SSEs[i] <- sum((x[,, i] - mean_config2)^2, na.rm=TRUE)
 	#print(round(mean(SSEs), 5))
+
+	if(d2){
+		x <- x[, 1:2, ]
+		mean_config2 <- mean_config2[, 1:2]
+	}
 
 	return(list(
 		'coor'=x, 
