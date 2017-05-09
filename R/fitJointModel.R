@@ -4,6 +4,7 @@ fitJointModel <- function(coor, type, cons = NULL, pose.init = NULL, optim.frame
 	control <- list(
 		'subsample.method'='Evenly spaced',		# or 'Maximum dispersion'
 		'max.disp.prop.R'=0.2,					# Proportion of time points used in max dispersion sampling
+		'max.disp.prop.S'=0.2,					#
 		'max.disp.prop.U'=0.2					#
 	)
 
@@ -54,7 +55,7 @@ fitJointModel <- function(coor, type, cons = NULL, pose.init = NULL, optim.frame
 	}else{
 		joint_cons <- cons
 	}
-
+	
 	# Set rotation dof skip
 	if(dof['R'] == 0){rdof_skip <- 0}else{rdof_skip <- (dof['R']+1)*3}
 
