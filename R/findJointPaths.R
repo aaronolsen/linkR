@@ -1,6 +1,11 @@
 findJointPaths <- function(body.conn){
 
-	if(nrow(body.conn) == 1) return(list(1))
+	# IF A SINGLE JOINT, RETURN 0,1
+	if(nrow(body.conn) == 1) return(list(
+		'paths.closed'=NULL,
+		'paths.open'=list(c(0,1)),
+		'fixed.joints'=1
+	))
 
 	## CREATE MATRIX FOR CONNECTED JOINTS
 	joint.conn <- matrix(NA, nrow=0, ncol=3, dimnames=list(NULL, c('body.idx', 'joint1', 'joint2')))
@@ -27,14 +32,13 @@ findJointPaths <- function(body.conn){
 			}
 		}
 	}
-
+	
 	# FIND JOINTS CONNECTED TO FIXED LINK
-	fixed.joints <- unique(c(joint.conn[joint.conn[, 1] == 0, 2:3]))
+	fixed.joints <- unique(c(joint.conn[joint.conn[, 1] == 1, 2:3]))
 
 	# ADD ROWS FOR JOINTS CONNECTED TO THE FIXED LINK FOR EASIER PATH SEARCHING
-	joint.conn <- rbind(cbind(rep(0,length(fixed.joints)), rep(0,length(fixed.joints)), fixed.joints), joint.conn)
+	joint.conn <- rbind(cbind(rep(1,length(fixed.joints)), rep(0,length(fixed.joints)), fixed.joints), joint.conn)
 	colnames(joint.conn) <- c('body.idx', 'joint1', 'joint2')
-
 
 	## FIND ALL JOINT PATHS
 	# INITIAL PATHS
@@ -138,6 +142,8 @@ findJointPaths <- function(body.conn){
 	
 	# CONVERT PATHS TO STRINGS
 	paths_str <- unlist(lapply(paths, 'paste', collapse='-'))
+	
+	#print(paths_str)
 
 	for(i in 1:length(paths)){
 
@@ -148,13 +154,22 @@ findJointPaths <- function(body.conn){
 		if(paths[[i]][length(paths[[i]])] > 0){
 			
 			# FIND CONNECTED JOINTS
-			joints_conn_end <- joint.conn[rowSums(paths[[i]][length(paths[[i]])] == joint.conn[, 2:3]) > 0, 2:3]
-			
-			# REMOVE ROWS WITH 0
-			joints_conn_end <- joints_conn_end[rowSums(joints_conn_end == 0) == 0, ]
+			joints_conn_end <- unique(c(joint.conn[rowSums(paths[[i]][length(paths[[i]])] == joint.conn[, 2:3]) > 0, 2:3]))
 
+			# REMOVE FOCAL JOINT AND ZERO
+			joints_conn_end <- joints_conn_end[!joints_conn_end %in% c(0, paths[[i]][length(paths[[i]])])]
+
+			# REMOVE FIXED JOINTS
+			joints_conn_end <- joints_conn_end[!joints_conn_end %in% fixed.joints]
+
+			# IF JOINTS REMAINING, MARK AS NA
+			if(length(joints_conn_end) > 1) paths_str[i] <- NA
+
+			# COERCE TO MATRIX			
+			#if(is.vector(joints_conn_end)) joints_conn_end <- matrix(joints_conn_end, nrow=1, ncol=2)
+			#joints_conn_end <- joints_conn_end[rowSums(joints_conn_end == 0) == 0, ]
 			# IF MORE THAN ONE ROW (LENGTH > 2) MARK AS NA			
-			if(length(joints_conn_end) > 2) paths_str[i] <- NA
+			#if(length(joints_conn_end) > 2) paths_str[i] <- NA
 			
 			next
 		}
@@ -167,7 +182,7 @@ findJointPaths <- function(body.conn){
 			body_num <- joint.conn[rowSums((joint.conn[, 2:3] == paths[[i]][j])+(joint.conn[, 2:3] == paths[[i]][j+1])) == 2, 1]
 			
 			# SKIP IF 0
-			if(body_num == 0) next
+			if(body_num == 1) next
 			
 			# IF SAME BODY IS PRESENT IN PATH TWICE, MARK AS NA
 			if(body_num %in% bodies_in_path){
@@ -185,11 +200,23 @@ findJointPaths <- function(body.conn){
 
 	# REMOVE NA VALUES
 	paths_str <- paths_str[!is.na(paths_str)]
+	
+	# SORT INTO CLOSED AND OPEN PATHS
+	paths_closed_str <- paths_str[grepl('^0-', paths_str) * grepl('-0$', paths_str) == 1]
+	paths_open_str <- paths_str[!grepl('-0$', paths_str)]
 
 	# EXPLODE BACK INTO VECTOR
-	paths <- lapply(strsplit(paths_str, '-'), 'as.numeric')
+	paths_closed <- lapply(strsplit(paths_closed_str, '-'), 'as.numeric')
+	paths_open <- lapply(strsplit(paths_open_str, '-'), 'as.numeric')
 	
-	#print(paths)
+	# SET ZERO-LENGTH PATHS AS NULL
+	if(length(paths_closed) == 0) paths_closed <- NULL
+	if(length(paths_open) == 0) paths_open <- NULL
 	
-	paths
+	list(
+		'paths.closed'=paths_closed,
+		'paths.open'=paths_open,
+		'fixed.joints'=fixed.joints,
+		'joint.conn'=joint.conn
+	)
 }
