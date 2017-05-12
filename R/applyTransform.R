@@ -1,5 +1,9 @@
 applyTransform <- function(pmat, tarr, assoc = NULL){
 
+	# If single point convert to matrix
+	if(is.vector(pmat)) pmat <- matrix(pmat, nrow=1, ncol=length(pmat))
+
+	# Transformation matrix
 	if(length(dim(tarr)) == 2){
 
 		# Get point coordinates as matrix for transformation - coerce to matrix if single point
@@ -12,25 +16,42 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 		# Remove 1s row and transpose
 		parr <- t(parr[1:3, ])
 
+	# Transformation 3-d array
 	}else if(length(dim(tarr)) == 3){
 	
-		## Single body
-		# Create array for transformed points
-		parr <- array(NA, dim=c(nrow(pmat), 3, dim(tarr)[3]), dimnames=list(rownames(pmat), NULL, NULL))
+		if(length(dim(pmat)) == 2){
 
-		# Get point coordinates as matrix for transformation - coerce to matrix if single point
-		pcoor <- rbind(matrix(t(pmat), ncol=nrow(pmat)), rep(1, nrow(pmat)))
-		colnames(pcoor) <- rownames(pmat)
+			## Single body
+			# Create array for transformed points
+			parr <- array(NA, dim=c(nrow(pmat), 3, dim(tarr)[3]), dimnames=list(rownames(pmat), NULL, NULL))
 
-		# Apply transformation
-		tcoor <- apply(tarr, 3, '%*%', pcoor)
+			# Get point coordinates as matrix for transformation - coerce to matrix if single point
+			pcoor <- rbind(matrix(t(pmat), ncol=nrow(pmat)), rep(1, nrow(pmat)))
+			colnames(pcoor) <- rownames(pmat)
 
-		# Convert to array
-		tcoor_arr <- array(tcoor, dim=c(4, nrow(pmat), dim(tarr)[3]))
+			# Apply transformation
+			tcoor <- apply(tarr, 3, '%*%', pcoor)
 
-		# Swap first two dimensions (transpose each "matrix" within array) and remove 1s
-		parr <- aperm(tcoor_arr[1:3, , ], perm=c(2,1,3))
+			# Convert to array
+			tcoor_arr <- array(tcoor, dim=c(4, nrow(pmat), dim(tarr)[3]))
 
+			# Swap first two dimensions (transpose each "matrix" within array) and remove 1s
+			parr <- aperm(tcoor_arr[1:3, , ], perm=c(2,1,3))
+
+		}else if(length(dim(pmat)) == 3){
+		
+			# 
+			n_iter <- dim(tarr)[3]
+			for(iter in 1:n_iter) pmat[, , iter] <- applyTransform(pmat[, , iter], tarr[, , iter])
+			
+			return(pmat)
+
+			#tmat <- matrix(tarr, nrow=4, ncol=4*dim(tarr)[3])
+			#rmat1 <- rbind(matrix(pmat, nrow=3, ncol=dim(pmat)[1]*dim(pmat)[3]), rep(1, dim(pmat)[1]*dim(pmat)[3]))
+			#rmat2 <- matrix(rmat1, nrow=4*dim(pmat)[3], ncol=dim(pmat)[1])
+		}
+
+	# Transformation 4-d array
 	}else{
 
 		# Create array for transformed points
@@ -38,7 +59,7 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 
 		# Multiple bodies - apply transformations for each body
 		for(body in 1:dim(tarr)[3]){
-	
+
 			# Get body name
 			body_name <- dimnames(tarr)[[3]][body]
 
