@@ -94,7 +94,40 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 	# GET LIST OF ALL CLOSED LOOPS
 	find_joint_paths <- findJointPaths(body_conn_num)
-	
+
+	# FIND DISTANCES BETWEEN JOINTS IN PATHS
+	if(is.null(find_joint_paths$paths.open)){
+		paths_open_dist <- NULL
+	}else{
+		paths_open_dist <- as.list(rep(NA, length(find_joint_paths$paths.open)))
+		for(i in 1:length(paths_open_dist)){
+			joints_path <- find_joint_paths$paths.open[[i]]
+			joints_path <- joints_path[joints_path != 0]
+			if(length(joints_path) == 1){
+				paths_open_dist[[i]] <- NA
+			}else{
+				paths_open_dist[[i]] <- distPointToPoint(joint.coor[joints_path, ])
+			}
+		}
+	}
+
+	# FIND DISTANCES BETWEEN JOINTS IN PATHS
+	if(is.null(find_joint_paths$paths.open)){
+		paths_closed_dist <- NULL
+	}else{
+		paths_closed_dist <- as.list(rep(NA, length(find_joint_paths$paths.closed)))
+
+		for(i in 1:length(paths_closed_dist)){
+			joints_path <- find_joint_paths$paths.closed[[i]]
+			joints_path <- joints_path[joints_path != 0]
+			if(length(joints_path) == 1){
+				paths_closed_dist[[i]] <- NA
+			}else{
+				paths_closed_dist[[i]] <- distPointToPoint(joint.coor[joints_path, ])
+			}
+		}
+	}
+
 	if(print.progress){
 		cat('\tpaths.closed\n')
 		for(i in 1:length(find_joint_paths$paths.closed)) cat(paste0('\t\t', paste0(find_joint_paths$paths.closed[[i]], collapse=','), '\n'))
@@ -248,6 +281,8 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'joint.types' = joint.types,
 		'paths.open' = find_joint_paths$paths.open,
 		'paths.closed' = find_joint_paths$paths.closed,
+		'paths.open.dist' = paths_open_dist,
+		'paths.closed.dist' = paths_closed_dist,
 		'joint.desc.open'=joint_desc_open,
 		'joints.open' = joints_open,
 		'joint.conn' = find_joint_paths$joint.conn,
