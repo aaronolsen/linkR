@@ -123,15 +123,26 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		}
 	}
 
+	# DEFAULT
+	print_progress_iter <- FALSE
+
 	#
 	for(iter in 1:n_iter){
 	
-		if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 1), collapse=''), 'Iteration: ', iter, '\n'))
+		# SET WHETHER TO PRINT PROGRESS FOR CURRENT ITERATION
+		if(print.progress && iter %in% print.progress.iter){
+			print_progress_iter <- TRUE
+		}else{
+			print_progress_iter <- FALSE
+		}
+	
+		# PRINT ITERATION
+		if(print_progress_iter) cat(paste0(paste0(rep(indent, 1), collapse=''), 'Iteration: ', iter, '\n'))
 
 		# RESET TRANSFORM VECTORS
 		joint_trsfm <- setNames(rep(FALSE, n_joints), joint_names)
 
-		if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Input transformations\n'))
+		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Input transformations\n'))
 
 		# APPLY INPUT PARAMETERS
 		for(input_num in 1:length(input.param)){
@@ -139,7 +150,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# RESET TRANSFORMATION MATRICES
 			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 
-			if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 3), collapse=''), 'Input transformation at joint ', joint_names[input.joint[input_num]], '(', input.joint[input_num], ') (type:', mechanism$joint.types[input.joint[input_num]], ') '))
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 3), collapse=''), 'Input transformation at joint ', joint_names[input.joint[input_num]], '(', input.joint[input_num], ') (type:', mechanism$joint.types[input.joint[input_num]], ') '))
 			
 			# CREATE TRANSFORMATION MATRIX
 			if(mechanism$joint.types[input.joint[input_num]] == 'N'){
@@ -160,7 +171,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# CREATE TRANSFORMATION MATRIX
 			if(mechanism$joint.types[input.joint[input_num]] == 'R'){
 
-				if(print.progress && iter %in% print.progress.iter) cat(paste0('{CoR:', paste0(round(joint_coor[input.joint[input_num], , iter], 2), collapse=','), '; AoR:', paste0(round(joint_cons[[input.joint[input_num]]][1, , iter], 2), collapse=','), '; angle:', round(input.param[[input_num]][iter, 1], 2),'} '))
+				if(print_progress_iter) cat(paste0('{CoR:', paste0(round(joint_coor[input.joint[input_num], , iter], 2), collapse=','), '; AoR:', paste0(round(joint_cons[[input.joint[input_num]]][1, , iter], 2), collapse=','), '; angle:', round(input.param[[input_num]][iter, 1], 2),'} '))
 
 				# TRANSLATE TO CENTER OF ROTATION (JOINT)
 				tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(joint_coor[input.joint[input_num], , iter], 1))
@@ -175,9 +186,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# COMBINE TRANSFORMATION MATRICES
 			tmat <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
 
-			if(print.progress && iter %in% print.progress.iter) cat('\n')
+			if(print_progress_iter) cat('\n')
 
-			if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): ', paste0(joint_names[mechanism$joints.tform[[input.joint[input_num]]]], collapse=', '), '\n'))
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): ', paste0(joint_names[mechanism$joints.tform[[input.joint[input_num]]]], collapse=', '), '\n'))
 
 			# APPLY TO JOINTS IN SAME BODY AND IN DESCENDANT OPEN CHAIN
 			joint_coor[mechanism$joints.tform[[input.joint[input_num]]], , iter] <- applyTransform(joint_coor[mechanism$joints.tform[[input.joint[input_num]]], , iter], tmat)
@@ -185,14 +196,14 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			#
 			joint_trsfm[mechanism$joints.tform[[input.joint[input_num]]]] <- TRUE
 
-			if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(mechanism$body.names[input_body_list[[input_num]]], collapse=', '), '\n'))
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(mechanism$body.names[input_body_list[[input_num]]], collapse=', '), '\n'))
 
 			# APPLY TO EACH BODY
 			for(body_num in input_body_list[[input_num]]) tmarr[, , body_num, iter] <- tmat %*% tmarr[, , body_num, iter]
 		}
 
-		if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed by input parameters: ', paste0(names(joint_trsfm)[joint_trsfm], collapse=', '), '\n'))
-		if(print.progress && iter %in% print.progress.iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Path solving\n'))
+		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed by input parameters: ', paste0(names(joint_trsfm)[joint_trsfm], collapse=', '), '\n'))
+		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Path solving\n'))
 
 		# 
 		path_cycle <- 1
@@ -208,21 +219,15 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				# SKIP IF ALL JOINTS ARE KNOWN
 				if(sum(joint_trsfm[path]) == length(path)) next
 
-				if(print.progress && iter %in% print.progress.iter){
-					cat(paste0(paste0(rep(indent, 3), collapse=''), 'Path ', i, ': '))
-					type_wt <- c()
-					name_wt <- c()
-					for(j in 1:length(mechanism$joint.types[path])){
-						mark <- ''
-						if(!joint_trsfm[path][j]) mark <- '*'
-						type_wt <- c(type_wt, paste0(mechanism$joint.types[path][j], mark))
-						name_wt <- c(name_wt, paste0(joint_names[path][j], mark))
-					}
-					cat(paste0(paste(type_wt, collapse='-'), ' '))
-					cat(paste0('(', paste(name_wt, collapse='-'), ')'))
-					cat('\n')
-				}
-
+				# PRINT PATH DETAILS
+				if(print_progress_iter) cat(paste0(paste0(rep(indent, 3), collapse=''), 'Path ', i, ': '))
+				
+				# SET SOLVE JOINT PATH
+				solveJointPath(joint.types=mechanism$joint.types[path], 
+					joint.transform=joint_trsfm[path], joint.coor=mechanism$joint_coor[, , iter], 
+					joint.cons=joint_cons[path], joint.names=dimnames(mechanism$joint.coor)[[1]][path],
+					joint.dist=mechanism$paths.closed.dist[[i]], joint.prev=joint_coor[, , prev_iter],
+					joint.init=joint_coor[, , 1], print.progress=print_progress_iter, indent=indent)
 			}
 
 			path_cycle <- path_cycle + 1
