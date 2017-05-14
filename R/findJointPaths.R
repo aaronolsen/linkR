@@ -28,7 +28,7 @@ findJointPaths <- function(body.conn){
 		# GENERATE UNIQUE PAIRS
 		for(i in 1:(length(joints_conn)-1)){
 			for(j in (i+1):(length(joints_conn))){
-				joint.conn <- rbind(joint.conn, c(link_idx, joints_conn[i], joints_conn[j]))
+				joint.conn <- rbind(joint.conn, c(link_idx, sort(c(joints_conn[i], joints_conn[j]))))
 			}
 		}
 	}
@@ -205,10 +205,14 @@ findJointPaths <- function(body.conn){
 	paths_closed_str <- paths_str[grepl('^0-', paths_str) * grepl('-0$', paths_str) == 1]
 	paths_open_str <- paths_str[!grepl('-0$', paths_str)]
 
+	# REMOVE FIRST AND LAST ZEROES
+	paths_closed_str <- gsub('(^0-)|(-0$)', '', paths_closed_str)
+	paths_open_str <- gsub('^0-', '', paths_open_str)
+
 	# EXPLODE BACK INTO VECTOR
 	paths_closed <- lapply(strsplit(paths_closed_str, '-'), 'as.numeric')
 	paths_open <- lapply(strsplit(paths_open_str, '-'), 'as.numeric')
-	
+
 	# SET ZERO-LENGTH PATHS AS NULL
 	if(length(paths_closed) == 0) paths_closed <- NULL
 	if(length(paths_open) == 0) paths_open <- NULL
