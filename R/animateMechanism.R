@@ -148,7 +148,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		for(input_num in 1:length(input.param)){
 		
 			# RESET TRANSFORMATION MATRICES
-			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
+			tmat1 <- tmat2 <- tmat3 <- diag(4)
 
 			if(print_progress_iter) cat(paste0(paste0(rep(indent, 3), collapse=''), 'Input transformation at joint ', joint_names[input.joint[input_num]], '(', input.joint[input_num], ') (type:', mechanism$joint.types[input.joint[input_num]], ') '))
 			
@@ -162,10 +162,10 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				tmat2 <- cbind(rbind(rotationMatrixZYX(-input.param[[input_num]][iter, 4:6]), rep(0,3)), c(0,0,0,1))
 
 				# TRANSLATE BACK FROM CENTER OF ROTATION
-				tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint_coor[input.joint[input_num], , iter], 1))
+				tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint_coor[input.joint[input_num], , iter]+input.param[[input_num]][iter, 1:3], 1))
 				
 				# APPLY TRANSLATION
-				tmat4 <- cbind(rbind(diag(3), rep(0,3)), c(input.param[[input_num]][iter, 1:3], 1))
+				#tmat4 <- cbind(rbind(diag(3), rep(0,3)), c(, 1))
 			}
 
 			# CREATE TRANSFORMATION MATRIX
@@ -184,11 +184,11 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			}
 
 			# COMBINE TRANSFORMATION MATRICES
-			tmat <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
+			tmat <- tmat1 %*% tmat2 %*% tmat3
 
 			if(print_progress_iter) cat('\n')
 
-			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): ', paste0(joint_names[mechanism$joints.tform[[input.joint[input_num]]]], collapse=', '), '\n'))
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): ', paste0(sort(joint_names[mechanism$joints.tform[[input.joint[input_num]]]]), collapse=', '), '\n'))
 
 			# APPLY TO JOINTS IN SAME BODY AND IN DESCENDANT OPEN CHAIN
 			joint_coor[mechanism$joints.tform[[input.joint[input_num]]], , iter] <- applyTransform(joint_coor[mechanism$joints.tform[[input.joint[input_num]]], , iter], tmat)
@@ -196,13 +196,13 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			#
 			joint_change[mechanism$joints.tform[[input.joint[input_num]]]] <- TRUE
 
-			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(mechanism$body.names[input_body_list[[input_num]]], collapse=', '), '\n'))
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(sort(mechanism$body.names[input_body_list[[input_num]]]), collapse=', '), '\n'))
 
 			# APPLY TO EACH BODY
 			for(body_num in input_body_list[[input_num]]) tmarr[, , body_num, iter] <- tmat %*% tmarr[, , body_num, iter]
 		}
 
-		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed by input parameters: ', paste0(names(joint_change)[joint_change], collapse=', '), '\n'))
+		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed by input parameters: ', paste0(sort(names(joint_change)[joint_change]), collapse=', '), '\n'))
 		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Path solving\n'))
 
 		# 
@@ -228,16 +228,28 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint.cons=joint_cons[path], joint.names=dimnames(mechanism$joint.coor)[[1]][path],
 					joint.dist=mechanism$paths.closed.dist[[i]], joint.prev=joint_coor[path, , prev_iter],
 					joint.init=joint_coor[path, , 1], iter=iter, print.progress=print_progress_iter, indent=indent)
-				
+
 				if(is.null(solve_joint_path)) next
+				
+				if(print_progress_iter){
+					apply_to_joints <- c()
+					apply_to_bodies <- c()
+				}
 				
 				# APPLY JOINT TRANSFORMATIONS
 				for(j in 1:length(solve_joint_path$joint.tmat)){
 
 					if(length(solve_joint_path$joint.tmat[[j]]) == 1) next
 
+					if(print_progress_iter) apply_to_joints <- c(apply_to_joints, path[j])
+
 					# APPLY TO PATH JOINTS
 					joint_coor[path[j], , iter] <- applyTransform(joint_coor[path[j], , iter], solve_joint_path$joint.tmat[[j]])
+
+					# APPLY TO JOINT CONSTRAINT
+					joint_cons_point <- rbind(joint_coor[path[j], , iter], joint_coor[path[j], , iter]+joint_cons[[path[j]]][, , iter])
+					joint_cons_point <- applyTransform(joint_cons_point, solve_joint_path$joint.tmat[[j]])
+					joint_cons[[path[j]]][, , iter] <- joint_cons_point[2, ]-joint_cons_point[1, ]
 				}
 
 				# APPLY BODY TRANSFORMATIONS
@@ -248,8 +260,27 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					# APPLY TO BODY BETWEEN JOINTS IN PATH
 					tmarr[, , mechanism$paths.closed.bodies[[i]][j], iter] <- solve_joint_path$body.tmat[[j]] %*% tmarr[, , mechanism$paths.closed.bodies[[i]][j], iter]
 					
+					if(print_progress_iter) apply_to_bodies <- c(apply_to_bodies, mechanism$paths.closed.bodies[[i]][j])
+
+					# GET JOINTS ASSOCIATED WITH BODY
+					body_joints <- mechanism$body.joints[[mechanism$paths.closed.bodies[[i]][j]]]
+					
+					# REMOVE JOINTS IN PATH
+					body_joints <- body_joints[!body_joints %in% path]
+
+					if(length(body_joints) == 0) next
+
 					# APPLY TO JOINTS ASSOCIATED WITH BODY BUT NOT IN PATH
-		#			print(names(
+					joint_coor[body_joints, , iter] <- applyTransform(joint_coor[body_joints, , iter], solve_joint_path$body.tmat[[j]])
+
+					if(print_progress_iter) apply_to_joints <- c(apply_to_joints, body_joints)
+				}
+
+				if(print_progress_iter){
+					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): '))
+					cat(paste0(paste0(sort(joint_names[apply_to_joints]), collapse=', '), '\n'))
+					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: '))
+					cat(paste0(paste0(sort(mechanism$body.names[apply_to_bodies]), collapse=', '), '\n'))
 				}
 			}
 
@@ -262,6 +293,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		prev_iter <- iter
 	}
 
+#print(joint_cons[[9]])
 #print(joint_coor['J21', , ])
 #print(mechanism$points.assoc)
 #print(mechanism$body.names)
