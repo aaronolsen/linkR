@@ -155,11 +155,6 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 
 				svg.arrows(x=cons_vec[[i]][, 1:3, ], len=arrowhead_len, col=col_cons[1], 
 					lwd=2, layer='Joint constraints', z.index=1)
-
-				if(linkage$joint.types[i] %in% c('U')){
-					svg.arrows(x=cons_vec[[i]][, 4:6, ], len=arrowhead_len, col=col_cons[2], 
-						lwd=2, layer='Joint constraints', z.index=1)
-				}
 			}
 		}
 		
@@ -185,11 +180,6 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 
 					svg.arrows(x=cons_vec[[i]][, 1:3, j], len=arrowhead_len, col=col_cons[1], 
 						lwd=2, layer='Joint constraints', z.index=1)
-
-					if(linkage$joint.types[i] %in% c('U')){
-						svg.arrows(x=cons_vec[[i]][, 4:6, ], len=arrowhead_len, col=col_cons[2], 
-							lwd=2, layer='Joint constraints', z.index=1)
-					}
 				}
 			}
 		}
