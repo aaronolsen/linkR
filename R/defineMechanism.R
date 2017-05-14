@@ -2,6 +2,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 	print.progress = FALSE){
 
 	if(print.progress) cat('defineMechanism()\n')
+	indent <- '  '
 
 	# MAKE SURE JOINT COORDINATES ARE MATRIX
 	if(is.vector(joint.coor)) joint.coor <- matrix(joint.coor, nrow=1)
@@ -102,8 +103,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		paths_open_dist <- as.list(rep(NA, length(find_joint_paths$paths.open)))
 		for(i in 1:length(paths_open_dist)){
 			joints_path <- find_joint_paths$paths.open[[i]]
-			joints_path <- joints_path[joints_path != 0]
-			if(length(joints_path) == 1){
+			if(length(joints_path) == 0){
 				paths_open_dist[[i]] <- NA
 			}else{
 				paths_open_dist[[i]] <- distPointToPoint(joint.coor[joints_path, ])
@@ -111,29 +111,41 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		}
 	}
 
-	# FIND DISTANCES BETWEEN JOINTS IN PATHS
-	if(is.null(find_joint_paths$paths.open)){
+	if(is.null(find_joint_paths$paths.closed)){
 		paths_closed_dist <- NULL
 	}else{
+
 		paths_closed_dist <- as.list(rep(NA, length(find_joint_paths$paths.closed)))
+		paths_closed_bodies <- as.list(rep(NA, length(find_joint_paths$paths.closed)))
 
 		for(i in 1:length(paths_closed_dist)){
+
 			joints_path <- find_joint_paths$paths.closed[[i]]
-			joints_path <- joints_path[joints_path != 0]
-			if(length(joints_path) == 1){
+
+			if(length(joints_path) == 0){
 				paths_closed_dist[[i]] <- NA
 			}else{
+
+				# SET BODIES BETWEEN CONSECUTIVE JOINTS IN PATHS
+				body_vec <- c()
+				for(j in 2:length(joints_path)){
+					row_match <- (find_joint_paths$joint.conn[, 'joint1'] == min(joints_path[(j-1):j])) + (find_joint_paths$joint.conn[, 'joint2'] == max(joints_path[(j-1):j]))
+					body_vec <- c(body_vec, find_joint_paths$joint.conn[row_match == 2, 'body.idx'])
+				}
+				paths_closed_bodies[[i]] <- setNames(body_vec, NULL)
+			
+				# FIND DISTANCES BETWEEN JOINTS IN PATHS
 				paths_closed_dist[[i]] <- distPointToPoint(joint.coor[joints_path, ])
 			}
 		}
 	}
 
 	if(print.progress){
-		cat('\tpaths.closed\n')
-		for(i in 1:length(find_joint_paths$paths.closed)) cat(paste0('\t\t', paste0(find_joint_paths$paths.closed[[i]], collapse=','), '\n'))
-		cat('\tpaths.open\n')
-		for(i in 1:length(find_joint_paths$paths.open)) cat(paste0('\t\t', paste0(find_joint_paths$paths.open[[i]], collapse=','), '\n'))
-		cat(paste0('\tfixed.joints: ', paste0(find_joint_paths$fixed.joints, collapse=','), '\n'))
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'paths.closed\n'))
+		for(i in 1:length(find_joint_paths$paths.closed)) cat(paste0(paste0(rep(indent, 2), collapse=''), paste0(find_joint_paths$paths.closed[[i]], collapse=','), '\n'))
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'paths.open\n'))
+		for(i in 1:length(find_joint_paths$paths.open)) cat(paste0(paste0(rep(indent, 2), collapse=''), paste0(find_joint_paths$paths.open[[i]], collapse=','), '\n'))
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'fixed.joints: ', paste0(find_joint_paths$fixed.joints, collapse=','), '\n'))
 	}
 
 	# FIND "OPEN DESCENDANTS" FOR EACH JOINT
@@ -146,7 +158,6 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		
 		# GET ALL OPEN JOINTS
 		joints_open <- unique(unlist(paths_open))
-		joints_open <- joints_open[joints_open != 0]
 
 		# FILL LIST
 		for(i in 1:length(joint_desc_open)){
@@ -179,7 +190,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 	}else{
 		joint_desc_open <- NULL
 	}
-	
+
 	# FIND JOINT ASSOCIATED WITH THE SAME MOBILE BODY - MAY BE ABLE TO COMBINE WITH JOINT DESC OPEN
 	joints_cobody <- as.list(rep(NA, nrow(joint.coor)))
 
@@ -194,6 +205,22 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 		# ADD TO LIST
 		joints_cobody[[i]] <- sort(unique(joints_conn_i))
+	}
+
+	# CREATE LIST OF JOINTS ASSOCIATED WITH EACH BODY
+	body_joints <- as.list(rep(NA, num_bodies))
+
+	for(i in 1:num_bodies){
+		body_joints[[i]] <- sort(unique(c(which(body_conn_num[, 1] == i), which(body_conn_num[, 2] == i))))
+	}
+
+	if(print.progress){
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'body.joints\n'))
+		for(i in 1:length(body_joints)){
+			body_joints_names <- c()
+			for(j in 1:length(body_joints[[i]])) body_joints_names <- c(body_joints_names, paste0(rownames(joint.coor)[body_joints[[i]]][j], '(', body_joints[[i]][j], ')'))
+			cat(paste0(paste0(rep(indent, 2), collapse=''), i, ' (', body.names[i], '): ', paste(body_joints_names, collapse=', '), '\n'))
+		}
 	}
 
 	#print(joints_cobody)
@@ -224,12 +251,12 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 	}
 
 	if(print.progress){
-		cat('\tjoints.tform\n')
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'joints.tform\n'))
 		for(i in 1:length(joints_tform)){
-			if(is.na(joints_tform[[i]][1])){ cat(paste0('\t\t', i, ' (', rownames(joint.coor)[i], '): none\n')) ; next }
+			if(is.na(joints_tform[[i]][1])){ cat(paste0(paste0(rep(indent, 2), collapse=''), i, ' (', rownames(joint.coor)[i], '): none\n')) ; next }
 			joints_tform_names <- c()
 			for(j in 1:length(joints_tform[[i]])) joints_tform_names <- c(joints_tform_names, paste0(rownames(joint.coor)[joints_tform[[i]]][j], '(', joints_tform[[i]][j], ')'))
-			cat(paste0('\t\t', i, ' (', rownames(joint.coor)[i], '): ', paste(joints_tform_names, collapse=', '), '\n'))
+			cat(paste0(paste0(rep(indent, 2), collapse=''), i, ' (', rownames(joint.coor)[i], '): ', paste(joints_tform_names, collapse=', '), '\n'))
 		}
 	}
 
@@ -266,15 +293,15 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 	}
 	
 	if(print.progress){
-		cat('\tbody.transform\n')
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'body.transform\n'))
 		for(i in 1:length(body_transform)){
-			if(is.na(body_transform[[i]][1])){ cat(paste0('\t\t', i, ' (', rownames(joint.coor)[i], '): none\n')) ; next}
+			if(is.na(body_transform[[i]][1])){ cat(paste0(paste0(rep(indent, 2), collapse=''), i, ' (', rownames(joint.coor)[i], '): none\n')) ; next}
 			body_transform_names <- c()
 			for(j in 1:length(body_transform[[i]])) body_transform_names <- c(body_transform_names, paste0(body.names[body_transform[[i]]][j], '(', body_transform[[i]][j], ')'))
-			cat(paste0('\t\t', i, ' (', rownames(joint.coor)[i], '): ', paste(body_transform_names, collapse=', '), '\n'))
+			cat(paste0(paste0(rep(indent, 2), collapse=''), i, ' (', rownames(joint.coor)[i], '): ', paste(body_transform_names, collapse=', '), '\n'))
 		}
 	}
-	
+
 	mechanism <- list(
 		'joint.coor' = joint.coor,
 		'joint.cons' = joint.cons,
@@ -283,6 +310,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'paths.closed' = find_joint_paths$paths.closed,
 		'paths.open.dist' = paths_open_dist,
 		'paths.closed.dist' = paths_closed_dist,
+		'paths.closed.bodies' = paths_closed_bodies,
 		'joint.desc.open'=joint_desc_open,
 		'joints.open' = joints_open,
 		'joint.conn' = find_joint_paths$joint.conn,
