@@ -317,6 +317,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'joints.tform' = joints_tform,
 		'body.conn' = body.conn,
 		'body.conn.num' = body_conn_num,
+		'body.joints'=body_joints,
 		'joint.init' = joint.coor,
 		'body.names' = body.names,
 		'body.transform'=body_transform,
