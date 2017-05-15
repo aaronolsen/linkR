@@ -163,13 +163,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 				# TRANSLATE BACK FROM CENTER OF ROTATION
 				tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint_coor[input.joint[input_num], , iter]+input.param[[input_num]][iter, 1:3], 1))
-				
-				# APPLY TRANSLATION
-				#tmat4 <- cbind(rbind(diag(3), rep(0,3)), c(, 1))
-			}
 
-			# CREATE TRANSFORMATION MATRIX
-			if(mechanism$joint.types[input.joint[input_num]] == 'R'){
+			}else if(mechanism$joint.types[input.joint[input_num]] == 'R'){
 
 				if(print_progress_iter) cat(paste0('{CoR:', paste0(round(joint_coor[input.joint[input_num], , iter], 2), collapse=','), '; AoR:', paste0(round(joint_cons[[input.joint[input_num]]][1, , iter], 2), collapse=','), '; angle:', round(input.param[[input_num]][iter, 1], 2),'} '))
 
@@ -181,6 +176,11 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 				# TRANSLATE BACK FROM CENTER OF ROTATION
 				tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint_coor[input.joint[input_num], , iter], 1))
+
+			}else if(mechanism$joint.types[input.joint[input_num]] == 'L'){
+
+				# TRANSLATE TO CENTER OF ROTATION (JOINT)
+				tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(input.param[[input_num]][iter, 1]*joint_cons[[input.joint[input_num]]][, , iter], 1))
 			}
 
 			# COMBINE TRANSFORMATION MATRICES
@@ -232,7 +232,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				if(is.null(solve_joint_path)) next
 				
 				if(print_progress_iter){
-					apply_to_joints <- c()
+					apply_to_path_joints <- c()
 					apply_to_bodies <- c()
 				}
 				
@@ -241,8 +241,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 					if(length(solve_joint_path$joint.tmat[[j]]) == 1) next
 
-					if(print_progress_iter) apply_to_joints <- c(apply_to_joints, path[j])
-
+					if(print_progress_iter) apply_to_path_joints <- c(apply_to_path_joints, path[j])
+					
 					# APPLY TO PATH JOINTS
 					joint_coor[path[j], , iter] <- applyTransform(joint_coor[path[j], , iter], solve_joint_path$joint.tmat[[j]])
 
@@ -250,6 +250,12 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint_cons_point <- rbind(joint_coor[path[j], , iter], joint_coor[path[j], , iter]+joint_cons[[path[j]]][, , iter])
 					joint_cons_point <- applyTransform(joint_cons_point, solve_joint_path$joint.tmat[[j]])
 					joint_cons[[path[j]]][, , iter] <- joint_cons_point[2, ]-joint_cons_point[1, ]
+				}
+
+				if(print_progress_iter){
+					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to path joint(s): '))
+					cat(paste0(paste0(sort(joint_names[apply_to_path_joints]), collapse=', '), '\n'))
+					apply_to_joints <- c()
 				}
 
 				# APPLY BODY TRANSFORMATIONS
@@ -277,10 +283,10 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				}
 
 				if(print_progress_iter){
-					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): '))
-					cat(paste0(paste0(sort(joint_names[apply_to_joints]), collapse=', '), '\n'))
 					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: '))
 					cat(paste0(paste0(sort(mechanism$body.names[apply_to_bodies]), collapse=', '), '\n'))
+					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body-associated joint(s): '))
+					cat(paste0(paste0(sort(joint_names[apply_to_joints]), collapse=', '), '\n'))
 				}
 			}
 
@@ -292,11 +298,6 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		# SET PREVIOUS ITERATION
 		prev_iter <- iter
 	}
-
-#print(joint_cons[[9]])
-#print(joint_coor['J21', , ])
-#print(mechanism$points.assoc)
-#print(mechanism$body.names)
 
 	# APPLY BODY TRANSFORMATIONS TO POINTS
 	if(!is.null(mechanism$body.points)){
