@@ -1,4 +1,4 @@
-associatePoints <- function(mechanism, points, body.name, points.connect = NULL){
+associatePoints <- function(mechanism, points, body, points.connect = NULL){
 
 	# Get current number of points
 	if(is.null(mechanism$body.points)){
@@ -17,10 +17,10 @@ associatePoints <- function(mechanism, points, body.name, points.connect = NULL)
 	# Create list for points associated with each body
 	if(is.null(mechanism$points.assoc)) mechanism$points.assoc <- as.list(rep(NA, mechanism$num.bodies))
 
-	if(length(body.name) == 1){
+	if(length(body) == 1){
 
 		# Find number corresponding to body name
-		body_num <- which(body.name == mechanism$body.names)
+		body_num <- which(body == mechanism$body.names)
 
 		if(length(mechanism$points.assoc[[body_num]]) == 1 && is.na(mechanism$points.assoc[[body_num]][1])){
 
