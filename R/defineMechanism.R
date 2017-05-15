@@ -28,9 +28,12 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		# IF JOINT CONSTRAINT IS N (NO CONSTRAINT) MAKE SURE IT IS NA
 		if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
 
-		# MAKE SURE JOINT CONSTRAINTS ARE ARRAY
-		if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- array(joint.cons[[i]], dim=c(1, length(joint.cons[[i]]), 1))
-		if(is.matrix(joint.cons[[i]])) joint.cons[[i]] <- array(joint.cons[[i]], dim=c(dim(joint.cons[[i]]), 1))
+		# IF JOINT CONSTRAINT IS ALREADY AN ARRAY, MAKE SURE VECTORS ARE UNIT VECTORS
+		if(is.array(joint.cons[[i]])) for(j in 1:dim(joint.cons[[i]])) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
+
+		# MAKE SURE JOINT CONSTRAINTS ARE ARRAY AND MAKE SURE VECTORS ARE UNIT LENGTH
+		if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(1, length(joint.cons[[i]]), 1))
+		if(is.matrix(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(dim(joint.cons[[i]]), 1))
 	}
 
 	# ADD ROWNAMES TO JOINTS (NAME BASED ON JOINT TYPE AND ORDER IN INPUT SEQUENCE)
@@ -93,8 +96,11 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		for(i in 1:nrow(body_conn_num)) body_conn_num[i, ] <- body.num[body.conn[i, ]]
 	}
 
+	# SET SOLVABLE FRAGMENTS
+	solvable_paths <- c('R-U-U-U-U-R', 'R-R-L')
+
 	# GET LIST OF ALL CLOSED LOOPS
-	find_joint_paths <- findJointPaths(body_conn_num)
+	find_joint_paths <- findJointPaths(body_conn_num, joint.types, solvable_paths)
 
 	# FIND DISTANCES BETWEEN JOINTS IN PATHS
 	if(is.null(find_joint_paths$paths.open)){
@@ -142,9 +148,21 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 	if(print.progress){
 		cat(paste0(paste0(rep(indent, 1), collapse=''), 'paths.closed\n'))
-		for(i in 1:length(find_joint_paths$paths.closed)) cat(paste0(paste0(rep(indent, 2), collapse=''), paste0(find_joint_paths$paths.closed[[i]], collapse=','), '\n'))
+		for(i in 1:length(find_joint_paths$paths.closed)){
+			joints_names <- c()
+			for(j in 1:length(find_joint_paths$paths.closed[[i]])) joints_names <- c(joints_names, paste0(rownames(joint.coor)[find_joint_paths$paths.closed[[i]]][j], '(', find_joint_paths$paths.closed[[i]][j], ')'))
+			cat(paste0(paste0(rep(indent, 2), collapse=''), paste(joints_names, collapse='-'), ' '))
+			cat(paste0(' (', paste0(joint.types[find_joint_paths$paths.closed[[i]]], collapse='-'), ')\n'))
+		}
+
 		cat(paste0(paste0(rep(indent, 1), collapse=''), 'paths.open\n'))
-		for(i in 1:length(find_joint_paths$paths.open)) cat(paste0(paste0(rep(indent, 2), collapse=''), paste0(find_joint_paths$paths.open[[i]], collapse=','), '\n'))
+		for(i in 1:length(find_joint_paths$paths.open)){
+			joints_names <- c()
+			for(j in 1:length(find_joint_paths$paths.open[[i]])) joints_names <- c(joints_names, paste0(rownames(joint.coor)[find_joint_paths$paths.open[[i]]][j], '(', find_joint_paths$paths.open[[i]][j], ')'))
+			cat(paste0(paste0(rep(indent, 2), collapse=''), paste(joints_names, collapse='-'), ' '))
+			cat(paste0(' (', paste0(joint.types[find_joint_paths$paths.open[[i]]], collapse='-'), ')\n'))
+		}
+
 		cat(paste0(paste0(rep(indent, 1), collapse=''), 'fixed.joints: ', paste0(find_joint_paths$fixed.joints, collapse=','), '\n'))
 	}
 
