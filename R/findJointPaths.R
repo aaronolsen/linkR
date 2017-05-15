@@ -1,4 +1,4 @@
-findJointPaths <- function(body.conn){
+findJointPaths <- function(body.conn, joint.types, solvable.paths){
 
 	# IF A SINGLE JOINT, RETURN 0,1
 	if(nrow(body.conn) == 1) return(list(
@@ -139,11 +139,60 @@ findJointPaths <- function(body.conn){
 		
 		it <- it + 1
 	}
+
+	## BREAK UP CLOSED PATHS INTO FRAGMENTS
+	# FIND MINIMUM AND MAXIMUM FRAGMENT LENGTH TO SAVE
+	paths_nchar <- unlist(lapply(gsub('-', '', solvable.paths), 'nchar'))
+	frag_len_min <- min(paths_nchar)
+	frag_len_max <- max(paths_nchar)
+
+	# ADD REVERSE SOLVABLE PATHS
+	for(i in 1:length(solvable.paths)) solvable.paths <- c(solvable.paths, paste0(rev(strsplit(solvable.paths[i], '-')[[1]]), collapse='-'))
+	solvable.paths <- unique(solvable.paths)
+
+	path_frags <- c()
+	path_frag_list <- list()
+	for(path in paths){
+
+		# IF OPEN CHAIN SAVE BUT DO NOT BREAK INTO FRAGMENTS
+		if(path[1] == 0 && path[length(path)] != 0){
+			path_frag_list[[length(path_frag_list) + 1]] <- path
+			next
+		}
+
+		for(frag_len in frag_len_min:min(length(path), frag_len_max)){
+			for(i in 1:(length(path)-frag_len+1)){
+				
+				# SAVE PATH AS VECTOR
+				path_vec <- path[seq(i, i+frag_len-1)]
+
+				# REMOVE ZEROS
+				path_vec <- path_vec[path_vec != 0]
+				
+				# CHECK IF FRAGMENT ALREADY EXISTS
+				if(paste(path_vec, collapse='-') %in% path_frags) next
+
+				#print(path_vec)
+
+				# CHECK IF FRAGMENT TYPE SEQUENCE IS SOLVABLE
+				if(!paste0(joint.types[path_vec], collapse='-') %in% solvable.paths) next
+
+				# MAKE SEQUENCE INTO STRING FOR EASY LOOK-UP
+				path_string <- paste(path_vec, collapse='-')
+
+				# ADD PATH TO VECTOR OF FRAGMENTS
+				path_frags <- c(path_frags, path_string)
+				
+				# ADD PATH TO PATH LIST
+				path_frag_list[[length(path_frag_list) + 1]] <- c(0, path_vec, 0)
+			}
+		}
+	}
 	
+	paths <- path_frag_list
+
 	# CONVERT PATHS TO STRINGS
 	paths_str <- unlist(lapply(paths, 'paste', collapse='-'))
-	
-	#print(paths_str)
 
 	for(i in 1:length(paths)){
 
@@ -173,13 +222,16 @@ findJointPaths <- function(body.conn){
 			
 			next
 		}
-		
+
 		# REMOVE PATHS THAT DOUBLE BACK ON THE SAME LINK
 		bodies_in_path <- rep(NA, length(paths[[i]])-1)
 		for(j in 1:(length(paths[[i]])-1)){
 		
 			# FIND BODY ASSOCIATED WITH PAIR OF JOINTS
 			body_num <- joint.conn[rowSums((joint.conn[, 2:3] == paths[[i]][j])+(joint.conn[, 2:3] == paths[[i]][j+1])) == 2, 1]
+			
+			# PATH WITH ZERO AT ENDS TO INDICATE CLOSED PATH BUT ACTUALLY A FRAGMENT WITHIN CLOSED PATH
+			if(length(body_num) == 0) next
 			
 			# SKIP IF 0
 			if(body_num == 1) next
