@@ -23,7 +23,7 @@ createPointShape <- function(shape = c('triangle', 'rectangle'), center = NULL,
 		
 		connect <- list(c(1,2), c(2,3), c(1,3))
 
-	}else if(shape[1] == 'rectangle'){
+	}else if(shape[1] %in% c('rect', 'rectangle')){
 		
 		#
 		wvec <- width*uvector(cprod(ends[2,]-ends[1,], nvector))
