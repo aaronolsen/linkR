@@ -9,7 +9,7 @@ solveJointPath <- function(joint.types, joint.change, joint.coor,
 	type_str <- paste0(paste0(type_vec, trfm_vec), collapse='-')
 
 	# REVERSE INPUTS
-	if(type_str %in% c('R*-U*-U-U-U-R', 'S-S*-L*', 'S-S*-P*-R*-S')){
+	if(type_str %in% c('R*-U*-U-U-U-R', 'R*-R-L')){
 
 		joint.types <- joint.types[length(joint.types):1]
 		joint.change <- joint.change[length(joint.change):1]
@@ -23,10 +23,10 @@ solveJointPath <- function(joint.types, joint.change, joint.coor,
 			joint.coor=joint.coor, joint.cons=joint.cons, joint.names=joint.names, 
 			joint.dist=joint.dist, joint.prev=joint.prev, joint.init=joint.init, 
 			iter=iter, print.progress=print.progress, indent=indent)
-		
+
 		return(list(
-			'joint.tmat'=solve_joint_path$tmat[length(solve_joint_path$joint.tmat):1], 
-			'body.tmat'=solve_joint_path$tmat[length(solve_joint_path$body.tmat):1]
+			'joint.tmat'=solve_joint_path$joint.tmat[length(solve_joint_path$joint.tmat):1], 
+			'body.tmat'=solve_joint_path$body.tmat[length(solve_joint_path$body.tmat):1]
 			))
 	}
 
@@ -40,13 +40,70 @@ solveJointPath <- function(joint.types, joint.change, joint.coor,
 	}
 
 	# SET NULL TRANSFORMATION MATRICES
-	tmat1 <- tmat2 <- tmat3 <- diag(4)
+	tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 
 	# SET PREVIOUS ITERATION
 	if(iter == 1){prev_iter <- 1}else{prev_iter <- iter - 1}
 
-	#
-	if(type_str == 'R-U-U-U-U*-R*'){
+	# 2D COUPLED SLIDERS
+	if(type_str == 'L-R-R*'){
+	
+		## FIND INTERSECTION OF CIRCLE AND LINE
+		# DEFINE CIRCLE FOR R*-JOINT
+		R_circle <- defineCircle(center=joint.coor[3, ], nvector=joint.cons[[3]][, , iter], 
+			radius=joint.dist[2])
+
+		# FIND INTERSECTION OF CIRCLE AND LINE
+		int_cir_line <- intersectCircleLine(R_circle, joint.coor[2, ], joint.coor[2, ]+joint.cons[[1]][, , iter])
+
+		if(is.null(int_cir_line)){
+			warning(paste0("No solution for ", type_str, " path at iteration ", iter, ""))
+			return(NULL)
+		}
+
+		# SELECT BEST SOLUTION
+		if(length(int_cir_line) == 1){
+			R_joint_n <- int_cir_line$p1
+		}else{
+
+			# FIND DISTANCE FROM PREVIOUS POINT			
+			d <- c(distPointToPoint(int_cir_line$p1, joint.coor[2, ]), distPointToPoint(int_cir_line$p2, joint.coor[2, ]))
+			
+			# FIND POINT CLOSEST TO PREVIOUS POINT
+			R_joint_n <- int_cir_line[[which.min(d)]]
+		}
+		
+		# SET TRANSLATION TRANSFORMATION MATRIX
+		tmat1[1:3, 4] <- R_joint_n - joint.coor[2, ]
+		tmat_L <- tmat1
+		
+		# FIND ROTATION
+		r_transform <- avec(joint.coor[3, ] - R_joint_n, joint.init[3, ] - joint.coor[2, ])
+
+		# FIND TRANSFORMATION MATRIX
+		tmat1[1:3, 4] <- R_joint_n
+		tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[2]][, , iter], r_transform)
+		tmat3[1:3, 4] <- -R_joint_n
+		tmat4[1:3, 4] <- R_joint_n - joint.coor[2, ]
+		tmat_R <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
+
+		# ROTATE TRANSMISSION LINK-OUTPUT JOINT
+		joint_npos <- applyTransform(joint.init[3, ], tmat_R)
+		
+		# CHECK THAT ROTATION WAS IN THE RIGHT DIRECTION
+		if(sum(abs(joint_npos - joint.coor[3, ])) > 1e-10){
+			tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[2]][, , iter], -r_transform)
+			tmat_R <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
+		}
+		
+		# FIND TRANSFORMATION MATRIX FOR LINK ROTATION
+		return(list('joint.tmat'=list(tmat_L, tmat_L, NA), 'body.tmat'=list(tmat_L, tmat_R)))
+
+	# 2D 4-BAR
+	}else if(type_str == 'R-R-R*-R*'){
+
+	# 3D 4-BAR
+	}else if(type_str == 'R-U-U-U-U*-R*'){
 		
 		# OUTSIDE U-JOINT AXES MUST BE PARALLEL TO ONE ANOTHER AND PERPENDICULAR TO VECTOR BETWEEN U-JOINTS
 		# INSIDE U-JOINT AXES MUST BE PERPENDICULAR TO OUTSIDE U-JOINT AXES (AND THEREFORE ALSO PARALLEL TO ONE ANOTHER)
@@ -85,7 +142,10 @@ solveJointPath <- function(joint.types, joint.change, joint.coor,
 
 		## FIND TRANSFORMATION OF COUPLER LINK
 		# CLEAR TRANSFORMATION MATRICES
-		tmat1 <- tmat2 <- tmat3 <- tmat4 <- tmat5 <- tmat6a <- tmat6b <- tmat7 <- diag(4)
+		tmat1 <- tmat2 <- tmat3 <- diag(4)
+		
+		# CREATE NEW TMATS
+		tmat5 <- tmat6a <- tmat6b <- tmat7 <- diag(4)
 
 		# TRANSLATE COUPLER U-JOINTS
 		joint34_npos <- joint.coor[c(3,4), ] - rbind(joint.coor[3, ]-joint_npos, joint.coor[3, ]-joint_npos)
