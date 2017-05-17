@@ -1,15 +1,20 @@
-fitLinkageToJoints <- function(ref.coor, joint.types, fixed.link, input.joint, model, 
+fit4barToJoints <- function(ref.coor, joint.types, fixed.link, input.joint, model, 
 	shift.input = TRUE){
 
 	# Re-parameterize marker coordinates as linkage
-	linkage <- reparameterizeLinkage(joint.coor=ref.coor, joint.types=joint.types, 
+	linkage <- reparameterizeLinkage2(joint.coor=ref.coor, joint.types=joint.types, 
 		fixed.link=fixed.link, input.joint=input.joint)
+
+#print(linkage)
+return(1)
 
 	# Reduce linkage parameters (currently just means and weighted means)
 	red_params <- reduceLinkageParameters(linkage)
 
 	# Set mean value vectors
 	mean_axes <- red_params[c(paste0('RA1', letters[24:26]), paste0('RA2', letters[24:26]))]
+	RA1_axis <- red_params[paste0('RA1', letters[24:26])]
+	RA2_axis <- red_params[paste0('RA2', letters[24:26])]
 	mean_lengths <- red_params[paste0('LL', 1:4)]
 	RI_vector <- red_params[paste0('RI1', letters[24:26])]
 	AJ_vector <- red_params[paste0('AJ1', letters[24:26])]
@@ -24,9 +29,18 @@ fitLinkageToJoints <- function(ref.coor, joint.types, fixed.link, input.joint, m
 		NA.penalty <- 0
 	}
 
+	if(model_tl %in% c('constant ljaw axis')){
+		start <- c(RA2_axis, RI_vector)
+		NA.penalty <- 0.01
+	}
+
+	if(model_tl %in% c('constant susp axis')){
+		start <- c(RA1_axis, RI_vector)
+		NA.penalty <- 0.01
+	}
+
 	if(model_tl %in% c('constant axes', 'constant axis')){
-		start <- c(mean_axes, RI_vector)
-		#start <- mean_axes
+		start <- c(RA1_axis, RA2_axis, RI_vector)
 		NA.penalty <- 0.01
 	}
 
@@ -37,19 +51,19 @@ fitLinkageToJoints <- function(ref.coor, joint.types, fixed.link, input.joint, m
 	}
 
 	if(model_tl %in% c('constant 3d')){
-		start <- c(mean_axes, mean_lengths, RI_vector)
+		start <- c(RA1_axis, RA2_axis, mean_lengths, RI_vector)
 		NA.penalty <- 0.005
 	}
 
 	if(model_tl %in% c('constant parallel')){
-		start <- c(mean_axes, mean_vectors)
-		start[names(mean_axes)] <- NA
+		start <- c(RA1_axis, RA2_axis, mean_vectors)
+		start[names(RA1_axis,RA2_axis)] <- NA
 		NA.penalty <- 0
 	}
 
 	if(model_tl %in% c('constant 2d')){
-		start <- c(mean_axes, mean_lengths, mean_vectors)
-		start[names(mean_axes)] <- NA
+		start <- c(RA1_axis, RA2_axis, mean_lengths, mean_vectors)
+		start[names(RA1_axis,RA2_axis)] <- NA
 		NA.penalty <- 0
 	}
 	
