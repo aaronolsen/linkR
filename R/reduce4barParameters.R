@@ -1,10 +1,10 @@
-reduceLinkageParameters <- function(linkage, min.input.step=0.04){
+reduce4barParameters <- function(linkage, min.input.step=0.04){
 
 	if(is.null(names(linkage))){
 
 		for(ii in 1:length(linkage)){
 
-			red_params <- reduceLinkageParameters(linkage=linkage[[ii]], min.input.step=min.input.step)
+			red_params <- reduce4barParameters(linkage=linkage[[ii]], min.input.step=min.input.step)
 			if(ii == 1) red_param_mat <- matrix(NA, nrow=length(linkage), ncol=length(red_params), 
 				dimnames=list(NULL, names(red_params)))
 			red_param_mat[ii, ] <- red_params
@@ -19,7 +19,7 @@ reduceLinkageParameters <- function(linkage, min.input.step=0.04){
 	# Reduce parameters by finding means or weighted means
 	for(input in names(linkage)){
 	
-		if(input == 'RD') next
+		if(input %in% c('RD', 'UD', 'UA')) next
 	
 		i <- 1
 	
