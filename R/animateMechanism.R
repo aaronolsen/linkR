@@ -57,44 +57,64 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# CHECK THAT INPUT.PARAM LENGTH MATCHES INPUT.JOINT LENGTH
 	if(length(input.param) != length(input.joint)) stop(paste0("The length of input.param (", length(input.param), ") must match the number of input.joint (", length(input.joint), ")."))
 
-	# IF INPUT BODY IS NULL
-	if(is.null(input.body)){
+	## FIND DEFAULT INPUT BODIES
+	# CHECK WHETHER THERE ARE OPEN CHAIN JOINTS
+	if(!is.null(mechanism$joints.open)){
+	
+		# FIND JOINTS IN OPEN CHAIN
+		joints_open_in <- input.joint[input.joint %in% mechanism$joints.open]
 
-		# CHECK WHETHER THERE ARE OPEN CHAIN JOINTS
-		if(!is.null(mechanism$joints.open)){
-		
-			# FIND JOINTS IN OPEN CHAIN
-			joints_open_in <- input.joint[input.joint %in% mechanism$joints.open]
+		# REMAINING JOINTS
+		joints_remaining <- input.joint[!input.joint %in% joints_open_in]
 
-			# REMAINING JOINTS
-			joints_remaining <- input.joint[!input.joint %in% joints_open_in]
-
-			if(length(joints_remaining) > 0){
-				if(sum(!joints_remaining %in% mechanism$fixed.joints) > 0) stop("If 'input.body' is NULL all joints in 'input.joint' must be either connected to the fixed body or be in an open joint chain.")
-			}
-
-		}else{
-
-			# CHECK THAT ALL INPUT JOINTS ARE CONNECTED TO FIXED BODY
-			if(sum(!input.joint %in% mechanism$fixed.joints) > 0) stop("If 'input.body' is NULL all joints in 'input.joint' must be connected to the fixed body so that the input.body can be designated as the corresponding mobile body.")
-		}
-
-		# FIND MOBILE LINK ATTACHED TO JOINT
-		input.body <- rep(NA, length(input.joint))
-		for(i in 1:length(input.joint)) input.body[i] <- max(mechanism$body.conn.num[input.joint[i], ])
+		#if(length(joints_remaining) > 0){
+		#	if(sum(!joints_remaining %in% mechanism$fixed.joints) > 0) stop("If 'input.body' is NULL all joints in 'input.joint' must be either connected to the fixed body or be in an open joint chain.")
+		#}
 
 	}else{
 
-		if(!is.numeric(input.body[1])){
-			
-			# MAKE SURE THAT ALL BODY NAMES ARE FOUND
-			if(sum(!input.body %in% mechanism$body.names) > 0) stop("Names in 'input.body' do not match body names.")
-			
-			# FIND NUMBER CORRESPONDING TO BODY
-			for(i in 1:length(input.body)) input.body[i] <- which(input.body[i] == mechanism$body.names)
-			input.body <- as.numeric(input.body)
+		# CHECK THAT ALL INPUT JOINTS ARE CONNECTED TO FIXED BODY
+		#if(sum(!input.joint %in% mechanism$fixed.joints) > 0) stop("If 'input.body' is NULL all joints in 'input.joint' must be connected to the fixed body so that the input.body can be designated as the corresponding mobile body.")
+	}
+
+	# FIND MOBILE LINK ATTACHED TO JOINT
+	input_body <- rep(NA, length(input.joint))
+	for(i in 1:length(input.joint)){
+	
+		if(1 %in% mechanism$body.conn.num[input.joint[i], ]){
+		
+			# LINK OTHER THAN 1 (FIXED)
+			input_body[i] <- max(mechanism$body.conn.num[input.joint[i], ])
+		}else{
+
+			# CHOOSE MAX FOR NOW - PERHAPS NOT NECESSARY IN MOST CASES SINCE INPUT AT JOINT 
+			# WITHIN CLOSED LOOP LIKELY USED FOR SPECIFIC PATH FRAGMENTS IN SOLVING PATH
+			input_body[i] <- max(mechanism$body.conn.num[input.joint[i], ])
 		}
 	}
+
+	## REPLACE WITH INPUTS IF NON-NA
+	# IF INPUT BODY IS NULL
+	if(!is.null(input.body)){
+
+		if(!is.numeric(input.body[1])){
+
+			# GET NON-NA VALUES
+			input_body_nna <- input.body[!is.na(input.body)]
+			
+			# MAKE SURE THAT ALL BODY NAMES ARE FOUND
+			if(sum(!input_body_nna %in% mechanism$body.names) > 0) stop("Names in 'input.body' do not match body names.")
+			
+			# FIND NUMBER CORRESPONDING TO BODY
+			for(i in 1:length(input.body)){
+				if(is.na(input.body[i])) next
+				input_body[i] <- which(input.body[i] == mechanism$body.names)
+			}
+		}
+	}
+
+	# MAKE SURE INPUT BODY IS NUMERIC
+	input.body <- as.numeric(input_body)
 
 	# SET DEFAULT LINKAGE SIZE
 	linkage_size <- 1
@@ -148,21 +168,41 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		for(input_num in 1:length(input.param)){
 		
 			# RESET TRANSFORMATION MATRICES
-			tmat1 <- tmat2 <- tmat3 <- diag(4)
+			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 
 			if(print_progress_iter) cat(paste0(paste0(rep(indent, 3), collapse=''), 'Input transformation at joint ', joint_names[input.joint[input_num]], '(', input.joint[input_num], ') (type:', mechanism$joint.types[input.joint[input_num]], ') '))
 			
 			# CREATE TRANSFORMATION MATRIX
-			if(mechanism$joint.types[input.joint[input_num]] == 'N'){
+			if(mechanism$joint.types[input.joint[input_num]] %in% c('N', 'S')){
 
 				# TRANSLATE TO CENTER OF ROTATION (JOINT)
 				tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(joint_coor[input.joint[input_num], , iter], 1))
 
-				# APPLY ROTATION TO TRANSFORMATION MATRIX
-				tmat2 <- cbind(rbind(rotationMatrixZYX(-input.param[[input_num]][iter, 4:6]), rep(0,3)), c(0,0,0,1))
-
 				# TRANSLATE BACK FROM CENTER OF ROTATION
-				tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint_coor[input.joint[input_num], , iter]+input.param[[input_num]][iter, 1:3], 1))
+				tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint_coor[input.joint[input_num], , iter], 1))
+
+				if(mechanism$joint.types[input.joint[input_num]] == 'N'){
+
+					# APPLY ROTATION TO TRANSFORMATION MATRIX
+					tmat2[1:3, 1:3] <- rotationMatrixZYX(-input.param[[input_num]][iter, 4:6])
+
+					# APPLY TRANSLATION
+					tmat4 <- cbind(rbind(diag(3), rep(0,3)), c(input.param[[input_num]][iter, 1:3], 1))
+
+				}else if(mechanism$joint.types[input.joint[input_num]] == 'S'){
+				
+					# CHECK WHETHER INPUT AT S JOINT IS TO RESOLVE INTER-CHAIN JOINT ORIENTATION
+					if(ncol(input.param[[input_num]]) < 3){
+						if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Input will be used to resolve multiple solutions during solving.\n'))
+						next
+					}
+
+					# APPLY ROTATION TO TRANSFORMATION MATRIX - ZYX
+					tmat2[1:3, 1:3] <- 
+						tMatrixEP(joint_cons[[input.joint[input_num]]][1, , iter], -input.param[[input_num]][iter, 1]) %*%
+						tMatrixEP(joint_cons[[input.joint[input_num]]][2, , iter], -input.param[[input_num]][iter, 2]) %*%
+						tMatrixEP(joint_cons[[input.joint[input_num]]][3, , iter], -input.param[[input_num]][iter, 3])
+				}
 
 			}else if(mechanism$joint.types[input.joint[input_num]] == 'R'){
 
@@ -184,7 +224,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			}
 
 			# COMBINE TRANSFORMATION MATRICES
-			tmat <- tmat1 %*% tmat2 %*% tmat3
+			tmat <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
 
 			if(print_progress_iter) cat('\n')
 
@@ -245,6 +285,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					
 					# APPLY TO PATH JOINTS
 					joint_coor[path[j], , iter] <- applyTransform(joint_coor[path[j], , iter], solve_joint_path$joint.tmat[[j]])
+
+					# CHECK THAT JOINT CONSTRAINT IS NOT NULL
+					if(is.null(joint_cons[[path[j]]])) next
 
 					# APPLY TO JOINT CONSTRAINT
 					joint_cons_point <- rbind(joint_coor[path[j], , iter], joint_coor[path[j], , iter]+joint_cons[[path[j]]][, , iter])
