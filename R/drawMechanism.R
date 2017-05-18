@@ -119,10 +119,10 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 		
 		# INITIAL PATH INDEX
 		index.add <- num_points
-		
+
 		# CREATE JOINT CONSTRAINTS
 		cons_vec <- list()
-		for(i in 1:dim(joints)[1]){
+		for(i in 1:length(linkage$joint.cons)){
 		
 			if(is.null(linkage$joint.cons[[i]])) next
 
@@ -131,13 +131,18 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 				next
 			}
 			
-			# CREATE EMPTY ARRAY
-			cons_vec[[i]] <- array(NA, dim=c(2, 3, num_iter))
+			# SET NUMBER OF CONSTRAINT VECTORS
+			n_vectors <- dim(linkage$joint.cons[[i]])[1]
 
+			# CREATE EMPTY ARRAY
+			cons_vec[[i]] <- array(NA, dim=c(n_vectors*2, 3, num_iter))
+			
 			# FILL ARRAY
 			for(j in 1:num_iter){
-				cons_vec[[i]][1, , j] <- joints[i, , j]
-				cons_vec[[i]][2, 1:3, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons[[i]][1, , j])
+				for(k in seq(1, n_vectors*2, by=2)){
+					cons_vec[[i]][k, , j] <- joints[i, , j]
+					cons_vec[[i]][k+1, 1:3, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons[[i]][(k+1)/2, , j])
+				}
 			}
 		}
 
@@ -152,9 +157,14 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 			for(i in 1:length(cons_vec)){
 
 				if(is.null(cons_vec[[i]])) next
+				
+				# GET NUMBER OF VECTORS TO DRAW
+				n_vectors <- dim(cons_vec[[i]])[1]
 
-				svg.arrows(x=cons_vec[[i]][, 1:3, ], len=arrowhead_len, col=col_cons[1], 
-					lwd=2, layer='Joint constraints', z.index=1)
+				for(k in seq(1, n_vectors, by=2)){
+					svg.arrows(x=cons_vec[[i]][k:(k+1), 1:3, ], len=arrowhead_len, col=col_cons[1], 
+						lwd=2, layer='Joint constraints', z.index=1)
+				}
 			}
 		}
 		
