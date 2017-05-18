@@ -2,14 +2,11 @@ fit4barToJoints <- function(ref.coor, joint.types, fixed.link, input.joint, mode
 	shift.input = TRUE){
 
 	# Re-parameterize marker coordinates as linkage
-	linkage <- reparameterizeLinkage2(joint.coor=ref.coor, joint.types=joint.types, 
+	linkage <- reparameterize4bar(joint.coor=ref.coor, joint.types=joint.types, 
 		fixed.link=fixed.link, input.joint=input.joint)
 
-#print(linkage)
-return(1)
-
 	# Reduce linkage parameters (currently just means and weighted means)
-	red_params <- reduceLinkageParameters(linkage)
+	red_params <- reduce4barParameters(linkage)
 
 	# Set mean value vectors
 	mean_axes <- red_params[c(paste0('RA1', letters[24:26]), paste0('RA2', letters[24:26]))]
