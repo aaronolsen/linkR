@@ -29,7 +29,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
 
 		# IF JOINT CONSTRAINT IS ALREADY AN ARRAY, MAKE SURE VECTORS ARE UNIT VECTORS
-		if(is.array(joint.cons[[i]])) for(j in 1:dim(joint.cons[[i]])) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
+		if(is.array(joint.cons[[i]]) && length(dim(joint.cons[[i]])) > 2) for(j in 1:dim(joint.cons[[i]])) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
 
 		# MAKE SURE JOINT CONSTRAINTS ARE ARRAY AND MAKE SURE VECTORS ARE UNIT LENGTH
 		if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(1, length(joint.cons[[i]]), 1))
@@ -97,7 +97,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 	}
 
 	# SET SOLVABLE FRAGMENTS
-	solvable_paths <- c('R-U-U-U-U-R', 'R-R-L')
+	solvable_paths <- c('R-S-S', 'R-R-L', 'S-S-S')
 
 	# GET LIST OF ALL CLOSED LOOPS
 	find_joint_paths <- findJointPaths(body_conn_num, joint.types, solvable_paths)
