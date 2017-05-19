@@ -97,7 +97,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 	}
 
 	# SET SOLVABLE FRAGMENTS
-	solvable_paths <- c('R-S-S', 'R-R-L', 'S-S-S')
+	solvable_paths <- c('R-S-S', 'R-R-L', 'S-S-S', 'R-R-R')
 
 	# GET LIST OF ALL CLOSED LOOPS
 	find_joint_paths <- findJointPaths(body_conn_num, joint.types, solvable_paths)
