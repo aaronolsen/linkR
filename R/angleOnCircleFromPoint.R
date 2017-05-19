@@ -1,4 +1,4 @@
-angleOnCircleFromPoint <- function(circle, dist, P, point_compare=NULL, rerun=NULL){
+angleOnCircleFromPoint <- function(circle, dist, P, point_compare=NULL){
 
 	# GIVEN A CIRCLE, DISTANCE AND POINT P THIS FUNCTION FINDS THE ANGLE OF THE CIRCLE, SPECIFYING A
 	#	POINT ON THE CIRCLE AT THE GIVEN DISTANCE TO POINT P. THERE WILL EITHER BE ZERO, TWO OR AN
