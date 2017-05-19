@@ -146,6 +146,10 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# DEFAULT
 	print_progress_iter <- FALSE
 
+	# CREATE LIST FOR INPUT RESOLVE PARAMETERS
+	input_resolve <- list()
+	for(i in 1:n_joints) input_resolve[[i]] <- NA
+
 	#
 	for(iter in 1:n_iter){
 	
@@ -193,15 +197,22 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				
 					# CHECK WHETHER INPUT AT S JOINT IS TO RESOLVE INTER-CHAIN JOINT ORIENTATION
 					if(ncol(input.param[[input_num]]) < 3){
+					
+						# SAVE INPUT PARAMETERS FOR SOLVING JOINT PATH
+						input_resolve[[input.joint[input_num]]] <- input.param[[input_num]]
+						
 						if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Input will be used to resolve multiple solutions during solving.\n'))
-						next
-					}
 
-					# APPLY ROTATION TO TRANSFORMATION MATRIX - ZYX
-					tmat2[1:3, 1:3] <- 
-						tMatrixEP(joint_cons[[input.joint[input_num]]][1, , iter], -input.param[[input_num]][iter, 1]) %*%
-						tMatrixEP(joint_cons[[input.joint[input_num]]][2, , iter], -input.param[[input_num]][iter, 2]) %*%
-						tMatrixEP(joint_cons[[input.joint[input_num]]][3, , iter], -input.param[[input_num]][iter, 3])
+						next
+
+					}else{
+
+						# APPLY ROTATION TO TRANSFORMATION MATRIX - ZYX
+						tmat2[1:3, 1:3] <- 
+							tMatrixEP(joint_cons[[input.joint[input_num]]][1, , iter], -input.param[[input_num]][iter, 1]) %*%
+							tMatrixEP(joint_cons[[input.joint[input_num]]][2, , iter], -input.param[[input_num]][iter, 2]) %*%
+							tMatrixEP(joint_cons[[input.joint[input_num]]][3, , iter], -input.param[[input_num]][iter, 3])
+					}
 				}
 
 			}else if(mechanism$joint.types[input.joint[input_num]] == 'R'){
@@ -267,7 +278,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint.change=joint_change[path], joint.coor=joint_coor[path, , iter], 
 					joint.cons=joint_cons[path], joint.names=dimnames(mechanism$joint.coor)[[1]][path],
 					joint.dist=mechanism$paths.closed.dist[[i]], joint.prev=joint_coor[path, , prev_iter],
-					joint.init=joint_coor[path, , 1], iter=iter, print.progress=print_progress_iter, indent=indent)
+					joint.init=mechanism$joint.coor[path, ], input.resolve=input_resolve[path], 
+					iter=iter, print.progress=print_progress_iter, indent=indent)
 
 				if(is.null(solve_joint_path)) next
 				
@@ -287,7 +299,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint_coor[path[j], , iter] <- applyTransform(joint_coor[path[j], , iter], solve_joint_path$joint.tmat[[j]])
 
 					# CHECK THAT JOINT CONSTRAINT IS NOT NULL
-					if(is.null(joint_cons[[path[j]]])) next
+					if(path[j] > length(joint_cons) || is.null(joint_cons[[path[j]]])) next
 
 					# APPLY TO JOINT CONSTRAINT
 					joint_cons_point <- rbind(joint_coor[path[j], , iter], joint_coor[path[j], , iter]+joint_cons[[path[j]]][, , iter])
@@ -350,6 +362,54 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			if(is.na(mechanism$points.assoc[[body_num]][1])) next
 			
 			body_points[mechanism$points.assoc[[body_num]], , ] <- applyTransform(body_points[mechanism$points.assoc[[body_num]], , ], tmarr[, , body_num, ])
+		}
+	}
+
+	# CHECK THAT DISTANCES WITHIN LINKS HAVE NOT CHANGED
+	if(check.inter.joint.dist && n_joints > 1){
+
+		joint_pairs_checked <- c()
+		
+		for(path_num in 1:length(mechanism$paths.closed)){
+			for(path_joint in 1:(length(path)-1)){
+				
+				# GET INDICES FOR JOINTS TO MEASURE DISTANCE
+				jt_idx <- c(mechanism$paths.closed[[path_num]][path_joint], mechanism$paths.closed[[path_num]][path_joint+1])
+
+				# CREATE STRING TO SAVE SO INTERJOINT DISTANCE IS ONLY MEASURED ONCE
+				path_pair_idx <- paste0(sort(jt_idx), collapse='-')
+
+				# CHECK IF JOINT PAIR HAS ALREADY BEEN CHECKED
+				if(path_pair_idx %in% joint_pairs_checked) next
+
+				# ADD TO JOINT PAIRS CHECKED
+				joint_pairs_checked <- c(joint_pairs_checked, path_pair_idx)
+
+				# GET JOINT TYPES
+				path_pair_types <- mechanism$joint.types[jt_idx]
+
+				# REFERENCE DISTANCE
+				ref_dist <- mechanism$paths.closed.dist[[path_num]][path_joint]
+				
+				# FIND DISTANCE BETWEEN JOINTS OVER ANIMATION
+				anim_dist <- apply(joint_coor[jt_idx, , ], 3, distPointToPoint)
+				
+				# FIND SD OF DIFFERENCE IN DISTANCE
+				dist_sd <- abs(sd(anim_dist - ref_dist) / linkage_size)
+
+				# SKIP NA
+				if(is.na(dist_sd)) next
+
+				# ALL DISTANCES CONSTANT
+				if(dist_sd < 1e-7) next
+				
+				#print(path_pair_idx)
+				#print(path_pair_types)
+				#print(dist_sd)
+
+				# PRINT DISTANCES THAT CHANGE
+				warning(paste0("The distance between joints ", paste0(sort(joint_names[jt_idx]), collapse=" and "), " is non-constant (", round(dist_sd, 6), ")."))
+			}
 		}
 	}
 
