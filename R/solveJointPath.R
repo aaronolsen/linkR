@@ -9,7 +9,7 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 	type_str <- paste0(paste0(type_vec, trfm_vec), collapse='-')
 
 	# REVERSE INPUTS
-	if(type_str %in% c('R*-U*-U-U-U-R', 'R*-R-L', 'S*-S-R', 'R*-R-R', 'S*-S-S', 'R*-R-R')){
+	if(type_str %in% c('R*-R-L', 'S*-S-R', 'R*-R-R', 'S*-S-S')){
 
 		solve_joint_path <- solveJointPath(
 			joint.types=joint.types[length(joint.types):1], 
@@ -199,15 +199,9 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 			tmat1[1:3, 4] <- joint2_npos
 
 			# ROTATION ABOUT AXIS BETWEEN S-JOINTS
-			if(length(input.resolve[[2]]) > 1){
-				if(is.null(input.resolve[[2]])){
-					tmat2[1:3, 1:3] <- tMatrixEP(vf, input.resolve[[3]][iter, 1])
-				}else{
-					tmat2[1:3, 1:3] <- tMatrixEP(vf, input.resolve[[2]][iter, 1])
-				}
-			}else{
-				tmat2[1:3, 1:3] <- diag(3)
-			}
+			tmat2[1:3, 1:3] <- diag(3)
+			if(length(input.resolve[[2]]) > 1 && !is.null(input.resolve[[2]])) tmat2[1:3, 1:3] <- tMatrixEP(vf, input.resolve[[2]][iter, 1])
+			if(length(input.resolve[[3]]) > 1 && !is.null(input.resolve[[3]])) tmat2[1:3, 1:3] <- tMatrixEP(vf, input.resolve[[3]][iter, 1])
 
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
 			tmat3[1:3, 1:3] <- tMatrixEP(rot_axis, avec(vi, vf, axis=rot_axis, about.axis=TRUE))
