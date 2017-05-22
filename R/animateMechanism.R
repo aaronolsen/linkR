@@ -77,45 +77,56 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		#if(sum(!input.joint %in% mechanism$fixed.joints) > 0) stop("If 'input.body' is NULL all joints in 'input.joint' must be connected to the fixed body so that the input.body can be designated as the corresponding mobile body.")
 	}
 
-	# FIND MOBILE LINK ATTACHED TO JOINT
-	input_body <- rep(NA, length(input.joint))
-	for(i in 1:length(input.joint)){
+	# IF INPUT BODY IS NULL CREATE LIST
+	if(is.null(input.body)){
+		input_body <- as.list(rep(NA, length(input.joint)))
+	}else{
+		input_body <- input.body
+	}
 	
+	# FILL EMPTY ELEMENTS IN LIST
+	for(i in 1:length(input_body)){
+	
+		if(!is.na(input_body[[i]][1])){
+
+			for(j in 1:length(input_body[[i]])){
+
+				if(is.numeric(input_body[[i]][j])) next
+
+				# GET NON-NA VALUES
+				input_body_nna <- input_body[!is.na(input_body)]
+			
+				# MAKE SURE THAT ALL BODY NAMES ARE FOUND
+				if(!input_body[[i]][j] %in% mechanism$body.names) stop(paste0("Name '", input_body[[i]][j], "' in 'input.body' not found in body names."))
+			
+				# FIND NUMBER CORRESPONDING TO BODY
+				input_body[[i]][j] <- which(input_body[[i]][j] == mechanism$body.names)
+			}
+
+			# MAKE NUMERIC
+			input_body[[i]] <- as.numeric(input_body[[i]])
+
+			next
+		}
+
 		if(1 %in% mechanism$body.conn.num[input.joint[i], ]){
 		
 			# LINK OTHER THAN 1 (FIXED)
-			input_body[i] <- max(mechanism$body.conn.num[input.joint[i], ])
+			input_body[[i]] <- max(mechanism$body.conn.num[input.joint[i], ])
 		}else{
 
 			# CHOOSE MAX FOR NOW - PERHAPS NOT NECESSARY IN MOST CASES SINCE INPUT AT JOINT 
 			# WITHIN CLOSED LOOP LIKELY USED FOR SPECIFIC PATH FRAGMENTS IN SOLVING PATH
-			input_body[i] <- max(mechanism$body.conn.num[input.joint[i], ])
+			input_body[[i]] <- max(mechanism$body.conn.num[input.joint[i], ])
 		}
+
+		if(is.null(mechanism$body.transform)) next
+
+		# ADD OPEN CHAIN BODIES TO TRANSFORM FOR EACH INPUT PARAMETER
+		body_transform <- sort(unique(c(input_body[[i]], mechanism$body.transform[[input.joint[i]]])))
+		input_body[[i]] <- body_transform[!is.na(body_transform)]
 	}
-
-	## REPLACE WITH INPUTS IF NON-NA
-	# IF INPUT BODY IS NULL
-	if(!is.null(input.body)){
-
-		if(!is.numeric(input.body[1])){
-
-			# GET NON-NA VALUES
-			input_body_nna <- input.body[!is.na(input.body)]
-			
-			# MAKE SURE THAT ALL BODY NAMES ARE FOUND
-			if(sum(!input_body_nna %in% mechanism$body.names) > 0) stop("Names in 'input.body' do not match body names.")
-			
-			# FIND NUMBER CORRESPONDING TO BODY
-			for(i in 1:length(input.body)){
-				if(is.na(input.body[i])) next
-				input_body[i] <- which(input.body[i] == mechanism$body.names)
-			}
-		}
-	}
-
-	# MAKE SURE INPUT BODY IS NUMERIC
-	input.body <- as.numeric(input_body)
-
+	
 	# SET DEFAULT LINKAGE SIZE
 	linkage_size <- 1
 	
@@ -131,17 +142,6 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	
 	# CREATE ARRAY OF TRANSFORMATION MATRICES FOR EACH BODY AND ITERATION
 	tmarr <- array(diag(4), dim=c(4,4,n_bodies,n_iter))
-
-	# CREATE INPUT BODY LIST
-	input_body_list <- as.list(input.body)
-
-	# ADD OPEN CHAIN BODIES TO TRANSFORM FOR EACH INPUT PARAMETER
-	if(!is.null(mechanism$body.transform)){
-		for(i in 1:length(input.joint)){
-			body_transform <- sort(unique(c(input_body_list[[i]], mechanism$body.transform[[input.joint[i]]])))
-			input_body_list[[i]] <- body_transform[!is.na(body_transform)]
-		}
-	}
 
 	# DEFAULT
 	print_progress_iter <- FALSE
@@ -198,12 +198,36 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					# CHECK WHETHER INPUT AT S JOINT IS TO RESOLVE INTER-CHAIN JOINT ORIENTATION
 					if(ncol(input.param[[input_num]]) < 3){
 					
-						# SAVE INPUT PARAMETERS FOR SOLVING JOINT PATH
-						input_resolve[[input.joint[input_num]]] <- input.param[[input_num]]
-						
-						if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Input will be used to resolve multiple solutions during solving.\n'))
+						# IF NO JOINT CONSTRAINT, TREAT AS INPUT RESOLVE
+						if(is.null(joint_cons[[input.joint[input_num]]])){
 
-						next
+							# SAVE INPUT PARAMETERS FOR SOLVING JOINT PATH
+							input_resolve[[input.joint[input_num]]] <- input.param[[input_num]]
+
+							if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Input will be used to resolve multiple solutions during solving.\n'))
+
+							next
+
+						}else{
+
+							if(print_progress_iter) cat(paste0('{CoR:', paste0(round(joint_coor[input.joint[input_num], , iter], 2), collapse=','), '; AoR:', paste0(round(joint_cons[[input.joint[input_num]]][1, , iter], 2), collapse=','), '; angle:', round(input.param[[input_num]][iter, 1], 2),'} '))
+
+							if(ncol(input.param[[input_num]]) == 1){
+					
+								# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
+								tmat2[1:3, 1:3] <- tMatrixEP(joint_cons[[input.joint[input_num]]][1, , iter], -input.param[[input_num]][iter, 1])
+
+							}else if(ncol(input.param[[input_num]]) == 2){
+
+								# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
+								tmat2[1:3, 1:3] <- tMatrixEP(joint_cons[[input.joint[input_num]]][1, , iter], -input.param[[input_num]][iter, 1])
+
+								# SAVE INPUT PARAMETERS FOR SOLVING JOINT PATH
+								input_resolve[[input.joint[input_num]]] <- input.param[[input_num]][iter, 2]
+
+								if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Input will be used to resolve multiple solutions during solving.\n'))
+							}
+						}
 
 					}else{
 
@@ -247,10 +271,10 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			#
 			joint_change[mechanism$joints.tform[[input.joint[input_num]]]] <- TRUE
 
-			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(sort(mechanism$body.names[input_body_list[[input_num]]]), collapse=', '), '\n'))
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(sort(mechanism$body.names[input_body[[input_num]]]), collapse=', '), '\n'))
 
 			# APPLY TO EACH BODY
-			for(body_num in input_body_list[[input_num]]) tmarr[, , body_num, iter] <- tmat %*% tmarr[, , body_num, iter]
+			for(body_num in input_body[[input_num]]) tmarr[, , body_num, iter] <- tmat %*% tmarr[, , body_num, iter]
 		}
 
 		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed by input parameters: ', paste0(sort(names(joint_change)[joint_change]), collapse=', '), '\n'))
