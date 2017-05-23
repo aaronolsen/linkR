@@ -89,18 +89,22 @@ draw_joint_fit <- function(file, ref.coor, model.coor, model.cons, joint.type, p
 	}
 
 	diag_3 <- diag(3)
-	if(joint.type %in% c('L', 'P', 'T')) svg.points(model_centroid, col='orange', cex=3)
-	if(joint.type == 'T') for(i in 1:3) svg.arrows(rbind(model_centroid[, , 1]-arrow_len*diag_3[i,], model_centroid[, , 1]+arrow_len*diag_3[i,]), col='orange', lwd=2)
-	if(joint.type == 'L'){
-		svg.arrows(rbind(model_centroid[, , 1]-arrow_len*jt_cons[1, 1:3], 
-			model_centroid[, , 1]+arrow_len*jt_cons[1, 1:3]), col='orange', lwd=2, len=arrow_len/5)
+	if(FALSE){
+
+		if(joint.type %in% c('L', 'P', 'T')) svg.points(model_centroid, col='orange', cex=3)
+		if(joint.type == 'T') for(i in 1:3) svg.arrows(rbind(model_centroid[, , 1]-arrow_len*diag_3[i,], model_centroid[, , 1]+arrow_len*diag_3[i,]), col='orange', lwd=2)
+		if(joint.type == 'L'){
+			svg.arrows(rbind(model_centroid[, , 1]-arrow_len*jt_cons[1, 1:3], 
+				model_centroid[, , 1]+arrow_len*jt_cons[1, 1:3]), col='orange', lwd=2, len=arrow_len/5)
+		}
+		if(joint.type == 'P'){
+			svg.arrows(rbind(model_centroid[, , 1]-arrow_len*jt_cons[1, 1:3], 
+				model_centroid[, , 1]+arrow_len*jt_cons[1, 1:3]), col='orange', lwd=2, len=arrow_len/5)
+			svg.arrows(rbind(model_centroid[, , 1]-arrow_len*jt_cons[1, 4:6], 
+				model_centroid[, , 1]+arrow_len*jt_cons[1, 4:6]), col='orange', lwd=2, len=arrow_len/5)
+		}
 	}
-	if(joint.type == 'P'){
-		svg.arrows(rbind(model_centroid[, , 1]-arrow_len*jt_cons[1, 1:3], 
-			model_centroid[, , 1]+arrow_len*jt_cons[1, 1:3]), col='orange', lwd=2, len=arrow_len/5)
-		svg.arrows(rbind(model_centroid[, , 1]-arrow_len*jt_cons[1, 4:6], 
-			model_centroid[, , 1]+arrow_len*jt_cons[1, 4:6]), col='orange', lwd=2, len=arrow_len/5)
-	}
+
 	if(joint.type %in% c('R', 'U', 'S')) svg.points(jt_cons[1, 1:3], col='green', cex=3)
 	if(joint.type %in% c('R', 'U')){
 		svg.arrows(rbind(jt_cons[1, 1:3]-arrow_len*jt_cons[1, 4:6], 
@@ -116,13 +120,21 @@ draw_joint_fit <- function(file, ref.coor, model.coor, model.cons, joint.type, p
 	}
 
 
+
+#	svg.pointsC(t(model.coor['LowerJawL_symphysis', , ]), col.stroke.C='red', col.stroke='red', 
+#		col.fill.C='none', cex=0, opacity.stroke.C=0.3, close=TRUE, lwd.C=2)
+
+#	svg.pointsC(t(model.coor['LowerJawL_symphysis', , ]), col.stroke.C='blue', col.stroke='blue', 
+#		col.fill.C='none', cex=0, opacity.stroke.C=0.9, close=TRUE, lwd.C=2)
+
 #	svg.pointsC(ref.coor, col.stroke.C='black', col.stroke='black', col.fill.C='none', close=TRUE, lwd.C=2)
 
 	#svg.points(model.coor, col.stroke='red', col.fill='none', cex=cex.model)
 	#svg.points(ref.coor, col.stroke='black', col.fill='black', cex=cex.ref)
 
 	# Draw frame
-	svg.frame(ref.coor, z.index=-1)
+#	svg.frame(ref.coor, z.index=-1)
+	svg.box(ref.coor, z.index=-1, sides=c(1,3,5), tick.axes=c(2,3,1), tick.labels=c(2,3,1))
 
 	svg.close()
 }
