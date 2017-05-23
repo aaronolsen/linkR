@@ -1,18 +1,19 @@
-solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, joint.names, 
-	joint.dist, joint.prev, joint.init, input.resolve = NULL, iter = 1, print.progress = FALSE, 
-	indent = ''){
+solveJointPath <- function(joint.types, joint.known, joint.change, joint.coor, joint.cons, 
+	joint.names, joint.dist, joint.prev, joint.init, input.resolve = NULL, iter = 1, 
+	print.progress = FALSE, indent = ''){
 
 	# CREATE STRING WITH JOINT TYPES AND TRANSFORM INDICATOR
 	type_vec <- joint.types
 	trfm_vec <- rep('*', length(type_vec))
-	trfm_vec[!joint.change] <- ''
+	trfm_vec[!joint.known] <- ''
 	type_str <- paste0(paste0(type_vec, trfm_vec), collapse='-')
 
 	# REVERSE INPUTS
-	if(type_str %in% c('R*-R-L', 'S*-S-R', 'R*-R-R', 'S*-S-S')){
+	if(type_str %in% c('R*-R-L', 'S*-S-R', 'R*-R-R', 'S*-S-S', 'R*-S-S', 'S*-R-S')){
 
 		solve_joint_path <- solveJointPath(
 			joint.types=joint.types[length(joint.types):1], 
+			joint.known=joint.known[length(joint.known):1], 
 			joint.change=joint.change[length(joint.change):1], 
 			joint.coor=joint.coor[nrow(joint.coor):1, ], 
 			joint.cons=joint.cons[length(joint.cons):1], 
@@ -99,10 +100,10 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 		return(list('joint.tmat'=list(tmat_L, tmat_L, NA), 'body.tmat'=list(tmat_L, tmat_R)))
 
 	# 3-DoF 4-BAR
-	}else if(type_str %in% c('S-S-S*', 'R-R-R*', 'R-S-S*')){
+	}else if(type_str %in% c('S-S-S*', 'R-R-R*', 'R-S-S*', 'S-S-R*', 'S-R-S*')){
 
 		# FIND 3D CIRCLE OF POTENTIAL SOLUTIONS
-		if(type_str == 'S-S-S*'){
+		if(type_str %in% c('S-S-S*', 'S-S-R*', 'S-R-S*')){
 
 			# USE JOINT CONSTRAINT VECTOR TO PROJECT POINT INTO CIRCLE PLANE, THEN 
 			# SCALE TO RADIUS MAGNITUDE TO IDENTIFY SOLUTION
@@ -110,29 +111,51 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 			# CONSTRAINT VECTOR
 
 			## FIND NEW JOINT2 POSITION
-			# DEFINE SPHERE OF POTENTIAL SOLUTIONS FROM S*
-			sphere <- list('C'=joint.coor[3, ], 'R'=joint.dist[2])
+			if(type_str == 'S-S-S*'){
+
+				# DEFINE SPHERE OF POTENTIAL SOLUTIONS FROM S*
+				sphere <- list('C'=joint.coor[3, ], 'R'=joint.dist[2])
 		
-			# FIND CIRCLE ON SPHERE
-			circle <- circleOnSphereFromPoint(sphere, d=joint.dist[1], p=joint.coor[1, ])
+				# FIND CIRCLE ON SPHERE
+				circle <- circleOnSphereFromPoint(sphere, d=joint.dist[1], p=joint.coor[1, ])
 
-			# CHOOSE POINT ON CIRCLE
-			joint2_npos <- circlePoint(circle, T=input.resolve[[1]][iter, 1])
+				# CHOOSE POINT ON CIRCLE
+				joint2_npos <- circlePoint(circle, T=input.resolve[[1]][iter, 1])
 
+			}else if(type_str %in% c('S-S-R*', 'S-R-S*')){
+			
+				# GET CONSTRAINT VECTOR
+				if(type_str == 'S-S-R*'){
+					nvector <- joint.cons[[3]][, , iter]
+				}else if(type_str == 'S-R-S*'){
+					nvector <- joint.cons[[2]][, , iter]
+				}
+
+				# DEFINE CIRCLE FOR OUTPUT LINK
+				output_circle <- defineCircle(center=joint.coor[3, ], nvector=nvector, 
+					radius=joint.dist[2])
+
+				# FIND ANGLE ON CIRCLE AT DISTANCE FROM TRANSMISSION LINK JOINT
+				output_link_t <- angleOnCircleFromPoint(circle=output_circle, dist=joint.dist[1], 
+					P=joint.coor[1, ], point_compare=joint.prev[2, ])
+
+				# FIND CORRESPONDING POINT ON CIRCLE
+				joint2_npos <- circlePoint(circle=output_circle, T=output_link_t)
+			}
 
 			## FIND TRANSFORMATION OF FIRST BODY
 			# ROTATE COUPLER LINK TO MATCH VECTOR BETWEEN UNTRANSFORMED AND TRANSFORMED JOINT
-			vi <- joint.coor[2, ]-joint.coor[1, ]
+			vi <- joint.init[2, ]-joint.init[1, ]
 			vf <- joint2_npos-joint.coor[1, ]
 		
 			# GET ROTATIONAL AXIS BETWEEN TWO VECTORS
 			rot_axis <- cprod(vi, vf)
+			#if(type_str == 'S-S-S*'){
+			#}else if(type_str == 'S-S-R*'){
+			#}
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION
 			tmat1[1:3, 4] <- joint.coor[1, ]
-
-			# ROTATION ABOUT AXIS BETWEEN S-JOINTS
-			tmat2[1:3, 1:3] <- tMatrixEP(vf, input.resolve[[1]][iter, 2])
 
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
 			tmat3[1:3, 1:3] <- tMatrixEP(rot_axis, avec(vi, vf, axis=rot_axis, about.axis=TRUE))
@@ -141,14 +164,16 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 			tmat4[1:3, 4] <- -joint.coor[1, ]
 
 			# COMBINE TRANSFORMATIONS
-			tmat_A <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
+			tmat_A <- tmat1 %*% tmat3 %*% tmat4
+
+			#if(type_str == 'S-S-R*') tmat_A <- diag(4)
 
 		}else if(type_str %in% c('R-R-R*', 'R-S-S*')){
 
 			## FIND ROTATION OF FIRST LINK
 			# DEFINE CIRCLE FOR OUTPUT LINK
 			output_circle <- defineCircle(center=joint.coor[1, ], nvector=joint.cons[[1]][, , iter], 
-				point_on_radius=joint.coor[2, ])
+				radius=joint.dist[1])
 
 			# FIND ANGLE ON CIRCLE AT DISTANCE FROM TRANSMISSION LINK JOINT
 			output_link_t <- angleOnCircleFromPoint(circle=output_circle, dist=joint.dist[2], 
@@ -158,12 +183,12 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 			output_joint_r <- circlePoint(circle=output_circle, T=output_link_t)
 
 			# FIND ROTATION ANGLE FOR OUTLINK
-			r_transform <- avec(joint.coor[2, ] - output_circle$C, output_joint_r - output_circle$C)
+			rot_angle <- avec(joint.coor[2, ] - joint.coor[1, ], output_joint_r - joint.coor[1, ])
 
 			# FIND TRANSFORMATION MATRIX
-			tmat1[1:3, 4] <- output_circle$C
-			tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter], -r_transform)
-			tmat3[1:3, 4] <- -output_circle$C
+			tmat1[1:3, 4] <- joint.coor[1, ]
+			tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter], -rot_angle)
+			tmat3[1:3, 4] <- -joint.coor[1, ]
 			tmat_A <- tmat1 %*% tmat2 %*% tmat3
 
 			# ROTATE TRANSMISSION LINK-OUTPUT JOINT
@@ -171,7 +196,7 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 		
 			# CHECK THAT ROTATION WAS IN THE RIGHT DIRECTION
 			if(abs(distPointToPoint(joint.coor[3, ], joint2_npos) - joint.dist[2]) > 1e-4){
-				tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter], r_transform)
+				tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter], rot_angle)
 				tmat_A <- tmat1 %*% tmat2 %*% tmat3
 				joint2_npos <- applyTransform(joint.coor[2, ], tmat_A)
 			}
@@ -184,7 +209,14 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 		tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 
 		## FIND TRANSFORMATION OF SECOND BODY
-		vi <- joint.init[3, ]-joint.init[2, ]
+		# FIND VECTORS TO TRANSFORM
+		if(sum(joint.change[2:3]) == 2){
+			# IF BOTH JOINTS HAVE BEEN CHANGED
+			vi <- joint.coor[3, ]-joint.coor[2, ]
+		}else{
+			# ONLY ONE JOINT HAS BEEN CHANGED
+			vi <- joint.init[3, ]-joint.init[2, ]
+		}
 		vf <- joint.coor[3, ]-joint2_npos
 
 		# CHECK FOR ZERO DIFFERENCE IN ROTATION
@@ -212,8 +244,10 @@ solveJointPath <- function(joint.types, joint.change, joint.coor, joint.cons, jo
 			# COMBINE TRANSFORMATIONS
 			tmat_B <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
 		}
+		
+		#tmat_B <- diag(4)
 
-		return(list('joint.tmat'=list(tmat_A, tmat_A, NA), 'body.tmat'=list(tmat_A, tmat_B)))
+		return(list('joint.tmat'=list(tmat_A, tmat_B, NA), 'body.tmat'=list(tmat_A, tmat_B)))
 
 	# 3D 4-BAR
 	}else if(type_str == 'R-U-U-U-U*-R*'){
