@@ -81,6 +81,10 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 		m1 <- xr_arr[rownames(ct_mat)[rownames(ct_mat) %in% dimnames(xr_arr)[[1]]], , iter]
 		m2 <- ct_mat
 		m3 <- apply(cs_ini, 2, as.matrix)
+
+		# Skip if all markers are NA
+		if(sum(is.na(m1)) == length(m1)) next
+
 		align_ct_xr <- findBestAlignment(m1, m2, m3=m3, sign=1)
 		ct_mat_align <- align_ct_xr$mat
 		cs_ini_align <- cs_ini
@@ -105,6 +109,9 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 				if(print.progress) cat(paste0('\t0 common point(s) between CT and X-Ray sets for body \'', body_name, '\'\n'))
 				next
 			}
+
+			# If fewer than 3 non-NA values, skip
+			if(sum(!is.na(xr_arr_n[rownames(ct_mat_sub)[ct_in_xr], 1, iter])) < 3) next
 
 			# XROMM markers in CT
 			xr_mat_sub <- matrix(xr_arr_n[rownames(ct_mat_sub)[ct_in_xr], , iter], nrow=sum(ct_in_xr), ncol=ncol(xr_arr_n), 
