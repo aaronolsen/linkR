@@ -1,5 +1,9 @@
 intersectSphereLine <- function(c, r, x, l, point.compare=NULL){
 	# http://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection
+	# c: center
+	# r: radius
+	# x: point on line
+	# l: direction of line
 
 	# MAKE SURE l IS A UNIT VECTOR
 	l <- uvector(l)
