@@ -4,7 +4,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 	joint.col.stroke="black", joint.cex=1.5, joint.lwd=2,
 	point.col.fill="black", point.col.stroke="black", point.cex=1, point.lwd=2,
 	path.col.fill=NA, path.opacity.fill=1, path.opacity.stroke=1, path.col.stroke="black", 
-	path.lwd = 1, add = FALSE, ...){
+	path.lwd = 1, add = FALSE, debug = FALSE, ...){
 
 	#if(is.null(file) && method == "svgViewR") stop("To plot a linkage using the svgViewR method, 'file' must be non-NULL.")
 	if(is.null(file)) method <- "plot"
@@ -122,6 +122,10 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 
 		# CREATE JOINT CONSTRAINTS
 		cons_vec <- list()
+		if(debug){
+			cons_vec1 <- cons_vec
+			cons_vec2 <- cons_vec
+		}
 		for(i in 1:length(linkage$joint.cons)){
 		
 			if(is.null(linkage$joint.cons[[i]])) next
@@ -144,14 +148,37 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 					cons_vec[[i]][k+1, 1:3, j] <- joints[i, , j] + arrow_len*uvector(linkage$joint.cons[[i]][(k+1)/2, , j])
 				}
 			}
+
+			if(debug){
+
+				# CREATE EMPTY ARRAY
+				cons_vec1[[i]] <- cons_vec2[[i]] <- array(NA, dim=c(n_vectors*2, 3, num_iter))
+
+				# FILL ARRAY
+				for(j in 1:num_iter){
+					for(k in seq(1, n_vectors*2, by=2)){
+						cons_vec1[[i]][k, , j] <- linkage$joint.coorn[i, , j, 1]
+						cons_vec1[[i]][k+1, 1:3, j] <- linkage$joint.coorn[i, , j, 1] + arrow_len*uvector(linkage$joint.consn[[i]][(k+1)/2, , j, 1])
+						cons_vec2[[i]][k, , j] <- linkage$joint.coorn[i, , j, 2]
+						cons_vec2[[i]][k+1, 1:3, j] <- linkage$joint.coorn[i, , j, 2] + arrow_len*uvector(linkage$joint.consn[[i]][(k+1)/2, , j, 2])
+					}
+				}
+			}
 		}
 
 		# ANIMATED
 		if(animate || (length(dim(joints)) > 2 && num_iter == 1)){
 
 			# DRAW ANIMATED JOINTS
-			svg.points(joints, col.fill=joint.col.fill, 
-				col.stroke=joint.col.stroke, cex=joint.cex, lwd=joint.lwd, layer='Joints')
+			if(debug){
+				svg.points(linkage$joint.coorn[, , , 1], col.fill='red', 
+					col.stroke='red', cex=joint.cex, lwd=joint.lwd, layer='Joints')
+				svg.points(linkage$joint.coorn[, , , 2], col.fill='none', 
+					col.stroke='green', cex=joint.cex+2, lwd=joint.lwd, layer='Joints')
+			}else{
+				svg.points(joints, col.fill=joint.col.fill, 
+					col.stroke=joint.col.stroke, cex=joint.cex, lwd=joint.lwd, layer='Joints')
+			}
 
 			# DRAW CONSTRAINT VECTOR
 			for(i in 1:length(cons_vec)){
@@ -161,9 +188,19 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 				# GET NUMBER OF VECTORS TO DRAW
 				n_vectors <- dim(cons_vec[[i]])[1]
 
-				for(k in seq(1, n_vectors, by=2)){
-					svg.arrows(x=cons_vec[[i]][k:(k+1), 1:3, ], len=arrowhead_len, col=col_cons[1], 
-						lwd=2, layer='Joint constraints', z.index=1)
+				if(debug){
+					for(k in seq(1, n_vectors, by=2)){
+						svg.arrows(x=cons_vec1[[i]][k:(k+1), 1:3, ], len=arrowhead_len, col='red', 
+							lwd=2, layer='Joint constraints', z.index=1)
+						svg.arrows(x=cons_vec2[[i]][k:(k+1), 1:3, ], len=2*arrowhead_len, col='green', 
+							lwd=3, layer='Joint constraints', z.index=1)
+					}
+				}else{
+
+					for(k in seq(1, n_vectors, by=2)){
+						svg.arrows(x=cons_vec[[i]][k:(k+1), 1:3, ], len=arrowhead_len, col=col_cons[1], 
+							lwd=2, layer='Joint constraints', z.index=1)
+					}
 				}
 			}
 		}
@@ -227,9 +264,9 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 
 		# ADVANCE POINT COUNT FOR PATH INDEX
 		if(animate){
-			index.add <- index.add + dim(joints)[1]
+			if(debug){ index.add <- index.add + 2*dim(joints)[1] }else{ index.add <- index.add + dim(joints)[1] }
 		}else{
-			index.add <- index.add + (dim(joints)[1]*num_iter)
+			if(debug){ index.add <- index.add + (2*dim(joints)[1]*num_iter) }else{ index.add <- index.add + (dim(joints)[1]*num_iter) }
 		}
 
 		# DRAW POINTS AND CONNECTING PATHS
