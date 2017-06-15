@@ -5,9 +5,9 @@ citEntry(entry="Article",
         author = personList(as.person("AM Olsen"),as.person("MW Westneat")),
 	journal = "Journal of Morphology",
   	year = 2016,
-	volume = "Early View",
-	pages = "",
-        textVersion = "Olsen Aaron M, Mark W Westneat. 2016. Linkage mechanisms in the vertebrate skull: Structure and function of three-dimensional, parallel transmission systems. Journal of Morphology Early View.")
+	volume = "277",
+	pages = "1570-1583",
+        textVersion = "Olsen Aaron M, Mark W Westneat. 2016. Linkage mechanisms in the vertebrate skull: Structure and function of three-dimensional, parallel transmission systems. Journal of Morphology 277:1570-1583. DOI: 10.1002/jmor.20596.")
 
 citEntry(entry = "Manual",
 	title = "{linkR}: 3D Lever and Linkage Mechanism Modeling",
