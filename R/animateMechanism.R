@@ -2,19 +2,21 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, check.inter.point.dist = TRUE, 
 	print.progress = FALSE){
 	
+	if(print.progress) cat(paste0('animateMechanism()\n'))
+
 	# CONVERT INPUT.PARAM INTO LIST OF MATRICES FOR CONSISTENCY ACROSS LINKAGES WITH DIFFERING DEGREES OF FREEDOM
 	if(class(input.param) == 'numeric') input.param <- list(matrix(input.param, nrow=length(input.param), ncol=1))
 	if(class(input.param) == 'matrix') input.param <- list(input.param)
 	if(class(input.param) == 'list'){
 		for(i in 1:length(input.param)) if(is.vector(input.param[[i]])) input.param[[i]] <- matrix(input.param[[i]], nrow=length(input.param[[i]]), ncol=1)
 	}
-	
+
 	# SET NUMBER OF ITERATIONS
 	n_iter <- nrow(input.param[[1]])
 	
 	# SET ITERATIONS TO PRINT WITH PRINT PROGRESS
 	if(print.progress){
-		print.progress.iter <- 2
+		print.progress.iter <- 1
 		indent <- '  '
 	}
 	
@@ -27,19 +29,29 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# CONVERT ARRAY TO MATRIX - COPY OVER LAST DIMENSION OF ARRAY
 	if(length(dim(mechanism$joint.coor)) == 3) mechanism$joint.coor <- mechanism$joint.coor[, , dim(mechanism$joint.coor)[3]]
 
-	# CONVERT JOINT CONSTRAINTS INTO ARRAYS FOR CHANGING CONSTRAINT VECTORS
-	# ADD ITERATIONS TO JOINT CONSTRAINT ARRAY FOR CHANGING CONSTRAINT PARAMETERS
-	joint_cons <- list()
-	for(i in 1:length(mechanism$joint.cons)){
-		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
-		joint_cons[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter))
-	}
-
 	# GET JOINT NAMES
 	joint_names <- rownames(mechanism$joint.coor)
 
-	# COPY COORDINATES AND CONVERT TO ARRAY
+	# CONVERT JOINT CONSTRAINTS INTO ARRAYS FOR CHANGING CONSTRAINT VECTORS
+	# ADD ITERATIONS TO JOINT CONSTRAINT ARRAY FOR CHANGING CONSTRAINT PARAMETERS
+	# COPY CONSTRAINTS TO TWO SEPARATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
+	joint_cons <- list()
+	joint_consn <- list()
+	for(i in 1:length(mechanism$joint.cons)){
+		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
+		joint_cons[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter))
+		joint_consn[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter, 2))
+	}
+
+	# COPY COORDINATES TO TWO SEPARATE JOINT COORDINATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
 	joint_coor <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter), dimnames=list(joint_names, colnames(mechanism$joint.coor), NULL))
+	joint_coorn <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter, 2), dimnames=list(joint_names, colnames(mechanism$joint.coor), NULL, NULL))
+	
+	# CREATE MATRIX TO TRACK JOINT STATUS
+	joint_status_init <- matrix('', nrow=n_joints, ncol=2, dimnames=list(joint_names, colnames(mechanism$body.conn.num)))
+	joint_status_init[mechanism$body.conn.num == 1] <- 'f'
+
+	# COPY BODY POINTS AND CONVERT TO ARRAY
 	if(!is.null(mechanism$body.points)) body_points <- array(mechanism$body.points, dim=c(dim(mechanism$body.points), n_iter), dimnames=list(rownames(mechanism$body.points), NULL, NULL))
 
 	# IF INPUT.JOINT IS NON-NUMERIC, CONVERT TO NUMERIC EQUIVALENT
@@ -88,7 +100,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		input_body <- input.body
 	}
 	
-	# FILL EMPTY ELEMENTS IN LIST
+	# FILL IN UNKNOWNS IN INPUT BODY LIST
 	for(i in 1:length(input_body)){
 	
 		if(!is.na(input_body[[i]][1])){
@@ -130,7 +142,17 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		body_transform <- sort(unique(c(input_body[[i]], mechanism$body.transform[[input.joint[i]]])))
 		input_body[[i]] <- body_transform[!is.na(body_transform)]
 	}
-	
+
+	# SET JOINTS TRANSFORMED BY EACH BODY TRANSFORMATION
+	joints_transform <- list(setNames(as.list(rep(NA, n_bodies)), mechanism$body.names), setNames(as.list(rep(NA, n_bodies)), mechanism$body.names))
+
+	# FILL INPUT JOINT LIST (JOINTS TRANSFORMED BY EACH BODY)
+	for(jt_set in 1:2){
+		for(body_num in 1:n_bodies){
+			joints_transform[[jt_set]][[body_num]] <- which(mechanism$body.conn.num[, jt_set] %in% body_num)
+		}
+	}
+
 	# SET DEFAULT LINKAGE SIZE
 	linkage_size <- 1
 	
@@ -138,8 +160,6 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	if(n_joints > 1 && sum(apply(mechanism$joint.coor, 2, 'sd', na.rm=TRUE)) > 1e-5){
 		linkage_size <- mean(sqrt(rowSums((mechanism$joint.coor - matrix(colMeans(mechanism$joint.coor), nrow=n_joints, ncol=3, byrow=TRUE))^2)))
 	}
-
-	if(print.progress) cat(paste0('animateMechanism()\n'))
 
 	# SET PREVIOUS ITERATION
 	prev_iter <- 1
@@ -168,6 +188,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		if(print_progress_iter) cat(paste0(paste0(rep(indent, 1), collapse=''), 'Iteration: ', iter, '\n'))
 
 		# RESET TRANSFORM VECTORS
+		joint_status <- joint_status_init
 		joint_known <- setNames(rep(FALSE, n_joints), joint_names)
 		joint_change <- setNames(rep(FALSE, n_joints), joint_names)
 
@@ -176,6 +197,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		# APPLY INPUT PARAMETERS
 		for(input_num in 1:length(input.param)){
 		
+			## FIND TRANSFORMATION MATRIX
 			# RESET TRANSFORMATION MATRICES
 			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 
@@ -252,51 +274,53 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# COMBINE TRANSFORMATION MATRICES
 			tmat <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
 			
-			# SET JOINTS TO APPLY TRANSFORMATION TO
-			joints_transform <- unique(unlist(mechanism$body.joints[input_body[[input_num]]]))
-
-			if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): ', paste0(sort(joint_names[joints_transform]), collapse=', '), '\n'))
-
-			# APPLY TO JOINTS IN SAME BODY AND IN DESCENDANT OPEN CHAIN
-			joint_coor[joints_transform, , iter] <- applyTransform(joint_coor[joints_transform, , iter], tmat)
-
-			# APPLY TO JOINT CONSTRAINTS
-			for(joint_num in joints_transform){
-
-				if(is.null(joint_cons[[joint_num]][, , iter])) next
-				if(mechanism$joint.types[joint_num] == 'S') next
-
-				joint_cons_point <- rbind(joint_coor[joint_num, , iter], joint_coor[joint_num, , iter]+joint_cons[[joint_num]][, , iter])
-				joint_cons_point <- applyTransform(joint_cons_point, tmat)
-				joint_cons[[joint_num]][, , iter] <- joint_cons_point[2, ]-joint_cons_point[1, ]
-			}
-
-			# CHECK WHICH JOINTS HAVE CHANGED
-			joint_coor_diff <- abs(joint_coor[joints_transform, , iter] - mechanism$joint.init[joints_transform, ])
-			if(is.vector(joint_coor_diff)){
-				joint_coor_change <- sum(joint_coor_diff) > 1e-8
-			}else{
-				joint_coor_change <- rowSums(joint_coor_diff) > 1e-8
-			}
-
-			#
-			#if(25 %in% joints_transform[joint_coor_change]) joint_change[25] <- TRUE
-			
-			#
-			#joints_transform[joint_coor_change] <- joints_transform[joint_coor_change][joints_transform[joint_coor_change] != 25]
-
-			# SET JOINTS THAT DIFFER FROM REFERENCE AS CHANGED
-			joint_known[joints_transform[joint_coor_change]] <- TRUE
-			joint_change[joints_transform[joint_coor_change]] <- TRUE
-
-			if(print_progress_iter) cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(sort(mechanism$body.names[input_body[[input_num]]]), collapse=', '), '\n'))
+			# PRINT BODIES TO WHICH TRANSFORMATION IS APPLIED
+			if(print_progress_iter) cat(paste0('\n', paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: ', paste0(mechanism$body.names[input_body[[input_num]]], collapse=', '), '(', paste0(input_body[[input_num]], collapse=','), ')\n'))
 
 			# APPLY TO EACH BODY
 			for(body_num in input_body[[input_num]]) tmarr[, , body_num, iter] <- tmat %*% tmarr[, , body_num, iter]
+
+			# SET JOINTS TO APPLY TRANSFORMATION TO
+			joints_transformo <- unique(unlist(mechanism$body.joints[input_body[[input_num]]]))
+			jts_tsfm <- list(unlist(joints_transform[[1]][input_body[[input_num]]]), unlist(joints_transform[[2]][input_body[[input_num]]]))
+
+			if(print_progress_iter){
+				cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): ', paste0(c(paste0(sort(paste0(joint_names[jts_tsfm[[1]]], '(', jts_tsfm[[1]], ')')), '-1'), paste0(sort(paste0(joint_names[jts_tsfm[[2]]], '(', jts_tsfm[[2]], ')')), '-2')), collapse=', '), '\n'))
+			}
+			
+			for(jt_set in 1:2){
+			
+				# APPLY TO JOINTS IN SAME BODY AND IN DESCENDANT OPEN CHAIN
+				joint_coorn[jts_tsfm[[jt_set]], , iter, jt_set] <- applyTransform(joint_coorn[jts_tsfm[[jt_set]], , iter, jt_set], tmat)
+
+				# APPLY TO JOINT CONSTRAINTS
+				for(joint_num in jts_tsfm[[jt_set]]){
+				
+					if(is.null(joint_consn[[joint_num]])) next
+					if(mechanism$joint.types[joint_num] == 'S') next
+
+					joint_cons_point <- rbind(joint_coorn[joint_num, , iter, jt_set], joint_coorn[joint_num, , iter, jt_set]+joint_consn[[joint_num]][, , iter, jt_set])
+					joint_cons_point <- applyTransform(joint_cons_point, tmat)
+					joint_consn[[joint_num]][, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
+				}
+			}
+
+			# UPDATE JOINT STATUS
+			for(jt_set in 1:2) joint_status[jts_tsfm[[jt_set]], jt_set] <- 't'
 		}
 
-		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed to "known" by input parameters: ', paste0(sort(names(joint_known)[joint_known]), collapse=', '), '\n'))
-		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint(s) transformed to "changed" by input parameters: ', paste0(sort(names(joint_change)[joint_change]), collapse=', '), '\n'))
+		if(print_progress_iter){
+			cat(paste0(paste0(rep(indent, 2), collapse=''), 'Joint status\n'))
+			for(i in 1:nrow(joint_status)){
+				cat(paste0(paste0(rep(indent, 3), collapse=''), joint_names[i], ': '))
+				if(sum(joint_status[i, ] == 't') == 1 && sum(joint_status[i, ] == '') == 1) cat('changed')
+				if(sum(joint_status[i, ] != '') == 2) cat('known')
+				if(sum(joint_status[i, ] == '') == 2) cat('unknown')
+				if(sum(joint_status[i, ] == 'f') == 1 && sum(joint_status[i, ] == '') == 1) cat('unknown')
+				cat(paste0(' (', paste(joint_status[i, ], collapse=','), ')\n'))
+			}
+		}
+
 		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Path solving\n'))
 
 		# 
@@ -311,17 +335,22 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				path <- mechanism$paths.closed[[i]]
 				
 				# SKIP IF ALL JOINTS ARE KNOWN
-				if(sum(joint_known[path]) == length(path)) next
+				if(sum(joint_status[path, ] == '') == 0) next
 
 				# PRINT PATH DETAILS
 				if(print_progress_iter) cat(paste0(paste0(rep(indent, 3), collapse=''), 'Path ', i, ': '))
 				
 				# SET SOLVE JOINT PATH
 				solve_joint_path <- solveJointPath(joint.types=mechanism$joint.types[path], 
-					joint.known=joint_known[path], joint.change=joint_change[path], joint.coor=joint_coor[path, , iter], 
-					joint.cons=joint_cons[path], joint.names=dimnames(mechanism$joint.coor)[[1]][path],
+					joint.status=joint_status[path, ], joint.coor=joint_coor[path, , iter], 
+					joint.cons=joint_cons[path], 
+					joint.coorn=joint_coorn[path, , iter, ], 
+					tmarr=tmarr[, , , iter], body.conn=mechanism$body.conn.num[path, ], 
+					joint.consn=joint_consn[path], 
+					joint.names=dimnames(mechanism$joint.coor)[[1]][path],
 					joint.dist=mechanism$paths.closed.dist[[i]], joint.prev=joint_coor[path, , prev_iter],
-					joint.init=mechanism$joint.coor[path, ], input.resolve=input_resolve[path], 
+					joint.prevn=joint_coorn[path, , prev_iter, ],
+					joint.ref=mechanism$joint.coor[path, ], input.resolve=input_resolve[path], 
 					iter=iter, print.progress=print_progress_iter, indent=indent)
 
 				if(is.null(solve_joint_path)) next
@@ -329,33 +358,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				if(print_progress_iter){
 					apply_to_path_joints <- c()
 					apply_to_bodies <- c()
-				}
-				
-				# APPLY JOINT TRANSFORMATIONS
-				for(j in 1:length(solve_joint_path$joint.tmat)){
-
-					if(length(solve_joint_path$joint.tmat[[j]]) == 1) next
-
-					if(print_progress_iter) apply_to_path_joints <- c(apply_to_path_joints, path[j])
-					
-					# APPLY TO PATH JOINTS
-					joint_coor[path[j], , iter] <- applyTransform(joint_coor[path[j], , iter], solve_joint_path$joint.tmat[[j]])
-
-					# CHECK THAT JOINT CONSTRAINT IS NOT NULL
-					if(path[j] > length(joint_cons) || is.null(joint_cons[[path[j]]])) next
-
-					# APPLY TO JOINT CONSTRAINT
-					joint_cons_point <- rbind(joint_coor[path[j], , iter], joint_coor[path[j], , iter]+joint_cons[[path[j]]][, , iter])
-					joint_cons_point <- applyTransform(joint_cons_point, solve_joint_path$joint.tmat[[j]])
-					joint_cons[[path[j]]][, , iter] <- joint_cons_point[2, ]-joint_cons_point[1, ]
-				}
-
-				if(print_progress_iter){
-					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to path joint(s): '))
-					cat(paste0(paste0(sort(joint_names[apply_to_path_joints]), collapse=', '), '\n'))
 					apply_to_joints <- c()
 				}
-
+				
 				# APPLY BODY TRANSFORMATIONS
 				for(j in 1:length(solve_joint_path$body.tmat)){
 				
@@ -367,24 +372,39 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					if(print_progress_iter) apply_to_bodies <- c(apply_to_bodies, mechanism$paths.closed.bodies[[i]][j])
 
 					# GET JOINTS ASSOCIATED WITH BODY
-					body_joints <- mechanism$body.joints[[mechanism$paths.closed.bodies[[i]][j]]]
-					
-					# REMOVE JOINTS IN PATH
-					body_joints <- body_joints[!body_joints %in% path]
+					for(jt_set in 1:2){
 
-					if(length(body_joints) == 0) next
+						# GET JOINTS ASSOCIATED WITH BODY
+						body_joints <- joints_transform[[jt_set]][[mechanism$paths.closed.bodies[[i]][j]]]
 
-					# APPLY TO JOINTS ASSOCIATED WITH BODY BUT NOT IN PATH
-					joint_coor[body_joints, , iter] <- applyTransform(joint_coor[body_joints, , iter], solve_joint_path$body.tmat[[j]])
+						# SKIP IF NO ASSOCIATED JOINTS
+						#if(length(body_joints) == 0) next
 
-					if(print_progress_iter) apply_to_joints <- c(apply_to_joints, body_joints)
+						# APPLY TO JOINTS ASSOCIATED WITH BODY BUT NOT IN PATH
+						joint_coorn[body_joints, , iter, jt_set] <- applyTransform(joint_coorn[body_joints, , iter, jt_set], solve_joint_path$body.tmat[[j]])
+
+						# ADD TO LIST OF TRANSFORMED JOINTS
+						if(print_progress_iter) apply_to_joints <- c(apply_to_joints, paste0(joint_names[body_joints], '(', body_joints, ')-', jt_set))
+
+						# APPLY TO JOINT CONSTRAINTS
+						for(joint_num in body_joints){
+				
+							if(is.null(joint_consn[[joint_num]])) next
+							if(mechanism$joint.types[joint_num] == 'S') next
+
+							joint_cons_point <- rbind(joint_coorn[joint_num, , iter, jt_set], joint_coorn[joint_num, , iter, jt_set]+joint_consn[[joint_num]][, , iter, jt_set])
+							joint_cons_point <- applyTransform(joint_cons_point, tmat)
+							joint_consn[[joint_num]][, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
+						}
+					}
 				}
 
 				if(print_progress_iter){
 					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body/bodies: '))
 					cat(paste0(paste0(sort(mechanism$body.names[apply_to_bodies]), collapse=', '), '\n'))
-					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to body-associated joint(s): '))
-					cat(paste0(paste0(sort(joint_names[apply_to_joints]), collapse=', '), '\n'))
+					cat(paste0(paste0(rep(indent, 4), collapse=''), 'Apply to joint(s): '))
+					cat(paste0(paste0(sort(apply_to_joints), collapse=', '), '\n'))
+					#print(joint_coorn[, , iter, ])
 				}
 			}
 
@@ -407,6 +427,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			body_points[mechanism$points.assoc[[body_num]], , ] <- applyTransform(body_points[mechanism$points.assoc[[body_num]], , ], tmarr[, , body_num, ])
 		}
 	}
+	
+	# COMBINE TWO JOINT SETS INTO ONE
+	joint_coor <- joint_coorn[, , , 1]
 
 	# CHECK THAT DISTANCES WITHIN LINKS HAVE NOT CHANGED
 	if(check.inter.joint.dist && n_joints > 1){
@@ -459,7 +482,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	mechanism_r <- mechanism
 	
 	mechanism_r$joint.coor <- joint_coor
+	mechanism_r$joint.coorn <- joint_coorn
 	mechanism_r$joint.cons <- joint_cons
+	mechanism_r$joint.consn <- joint_consn
 	mechanism_r$body.points <- body_points
 
 	return(mechanism_r)
