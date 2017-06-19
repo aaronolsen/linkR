@@ -7,7 +7,7 @@ circleOnSphereFromPoint <- function(sphere, d, p, point.compare=NULL){
 	nvector <- uvector(p - sphere$C)
 
 	# SINGLE INTERSECTION - POINT AT RADIUS DISTANCE ALONG VECTOR BETWEEN P AND SPHERE CENTER
-	if(sphere$R == d) return(defineCircle(center=sphere$C+sphere$R*nvector, nvector=nvector, radius=0))
+	if(distPointToPoint(sphere$C, p) == d+sphere$R) return(defineCircle(center=sphere$C+sphere$R*nvector, nvector=nvector, radius=0))
 
 	# FIND DISTANCE BETWEEN POINT AND SPHERE CENTER
 	distCp <- distPointToPoint(sphere$C, p)
