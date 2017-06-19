@@ -1,5 +1,5 @@
 extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.coor, 
-	joint.cons, joint.types, joint.status, status.to, body.names = NULL, joint.names = NULL, 
+	joint.cons, joint.ref, joint.cons.ref, joint.types, joint.status, status.to, body.names = NULL, joint.names = NULL, 
 	indent = '', indent.level=1, print.progress = FALSE){
 
 	if(print.progress){
@@ -21,7 +21,7 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 		if(print.progress) apply_to_joints <- c(apply_to_joints, paste0(joint.names[body_joints], '(', body_joints, ')-', jt_set))
 
 		# APPLY TO JOINTS ASSOCIATED WITH BODY BUT NOT IN PATH
-		joint.coor[body_joints, , iter, jt_set] <- applyTransform(joint.coor[body_joints, , iter, jt_set], tmarr[, , body.num, iter])
+		joint.coor[body_joints, , iter, jt_set] <- applyTransform(joint.ref[body_joints, ], tmarr[, , body.num, iter])
 
 		# UPDATE JOINT STATUS
 		joint.status[body_joints, jt_set] <- status.to[body_joints, jt_set]
@@ -31,13 +31,19 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 			# SKIP IF NO CONSTRAINT
 			if(is.null(joint.cons[[joint_num]])) next
 			
-			# SKIP SPHERICAL JOINT
-			if(joint.types[joint_num] == 'S') next
-
 			# TRANSFORM JOINT CONSTRAINTS
-			joint_cons_point <- rbind(joint.coor[joint_num, , iter, jt_set], joint.coor[joint_num, , iter, jt_set]+joint.cons[[joint_num]][, , iter, jt_set])
-			joint_cons_point <- applyTransform(joint_cons_point, tmarr[, , body.num, iter])
-			joint.cons[[joint_num]][, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
+			if(is.matrix(joint.cons[[joint_num]][, , 1, jt_set])){
+				for(i in 1:nrow(joint.cons[[joint_num]][, , 1, jt_set])){
+					joint_cons_point <- rbind(joint.ref[joint_num, ], joint.ref[joint_num, ]+joint.cons[[joint_num]][i, , 1, jt_set])
+					joint_cons_point <- applyTransform(joint_cons_point, tmarr[, , body.num, iter])
+					joint.cons[[joint_num]][i, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
+				}
+			}else{
+				joint_cons_point <- rbind(joint.ref[joint_num, ], joint.ref[joint_num, ]+joint.cons[[joint_num]][, , 1, jt_set])
+				joint_cons_point <- applyTransform(joint_cons_point, tmarr[, , body.num, iter])
+				joint.cons[[joint_num]][, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
+			}
+
 		}
 
 		# IF TRANSFORMED JOINT IS _,i APPLY TRANSFORMATION THROUGH THAT JOINT
