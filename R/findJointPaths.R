@@ -21,6 +21,9 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 
 		# FIND ALL JOINTS CONNECTED TO LINK
 		joints_conn <- (1:num_joints)[(rowSums(link_idx == body.conn) == 1)]
+		
+		# REMOVE NA VALUES
+		#joints_conn <- joints_conn[!is.na(joints_conn)]
 
 		# SKIP IF ONLY SINGLE JOINT CONNECTED
 		if(length(joints_conn) == 1) next
@@ -32,7 +35,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			}
 		}
 	}
-	
+
 	# FIND JOINTS CONNECTED TO FIXED LINK
 	fixed.joints <- unique(c(joint.conn[joint.conn[, 1] == 1, 2:3]))
 
@@ -86,36 +89,40 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			# CHECK IF NO CONNECTED JOINTS
 			if(length(joints_conn) == 0) next
 
-			if(length(paths[[i]]) > 1 && paths[[i]][length(paths[[i]])] != 0){
-				
-				## IF LAST TWO JOINTS ARE WITHIN SAME BODY, REMOVE JOINTS IN THE SAME BODY - AVOIDS LOOPS WITHIN A LINK
-				# GET LAST TWO JOINTS
-				last_two <- paths[[i]][(length(paths[[i]])-1):length(paths[[i]])]
-				
-				# FIND ASSOCIATED BODIES
-				body1 <- unique(body.conn[last_two[1], ])
-				body2 <- unique(body.conn[last_two[2], ])
-				
-				# FIND SAME BODY BETWEEN TWO JOINTS
-				shared_body <- body1[body1 %in% body2]
-				
-				# FIND JOINTS
-				if(length(shared_body) > 0){
+			# TRYING WITHOUT FOR NOW - SHOULD REFINE TO LIMIT NUMBER OF LOOPS WITHIN LINK
+			if(FALSE){
 
-					# FIND JOINTS CONNECTED TO SHARED BODY
-					shared_body_joints <- unique(c(joint.conn[joint.conn[, 1] == shared_body, 2:3]))
+				if(length(paths[[i]]) > 1 && paths[[i]][length(paths[[i]])] != 0){
+				
+					## IF LAST TWO JOINTS ARE WITHIN SAME BODY, REMOVE JOINTS IN THE SAME BODY - AVOIDS LOOPS WITHIN A LINK
+					# GET LAST TWO JOINTS
+					last_two <- paths[[i]][(length(paths[[i]])-1):length(paths[[i]])]
+				
+					# FIND ASSOCIATED BODIES
+					body1 <- unique(body.conn[last_two[1], ])
+					body2 <- unique(body.conn[last_two[2], ])
+				
+					# FIND SAME BODY BETWEEN TWO JOINTS
+					shared_body <- body1[body1 %in% body2]
+				
+					# FIND JOINTS
+					if(length(shared_body) > 0){
+
+						# FIND JOINTS CONNECTED TO SHARED BODY
+						shared_body_joints <- unique(c(joint.conn[joint.conn[, 1] == shared_body, 2:3]))
 					
-					# REMOVE
-					joints_conn <- joints_conn[!joints_conn %in% shared_body_joints]
-				}
+						# REMOVE
+						joints_conn <- joints_conn[!joints_conn %in% shared_body_joints]
+					}
 
-				# IF ALL CONNECTING JOINTS WERE ELIMINATED BECAUSE THEY WERE IN THE SAME LINK, ADD NA TO FLAG PATH FOR REMOVAL
-				if(length(joints_conn) == 0){
-					paths[[i]] <- c(paths[[i]], NA)
-					next
+					# IF ALL CONNECTING JOINTS WERE ELIMINATED BECAUSE THEY WERE IN THE SAME LINK, ADD NA TO FLAG PATH FOR REMOVAL
+					if(length(joints_conn) == 0){
+						paths[[i]] <- c(paths[[i]], NA)
+						next
+					}
 				}
+				#cat('J2 ');print(joints_conn)
 			}
-			#cat('J2 ');print(joints_conn)
 
 			# REMOVE ZERO IF PATH IS ONLY TWO JOINTS LONG
 			if(length(paths[[i]]) == 2) joints_conn <- joints_conn[joints_conn > 0]
@@ -223,27 +230,30 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			next
 		}
 
-		# REMOVE PATHS THAT DOUBLE BACK ON THE SAME LINK
-		bodies_in_path <- rep(NA, length(paths[[i]])-1)
-		for(j in 1:(length(paths[[i]])-1)){
-		
-			# FIND BODY ASSOCIATED WITH PAIR OF JOINTS
-			body_num <- joint.conn[rowSums((joint.conn[, 2:3] == paths[[i]][j])+(joint.conn[, 2:3] == paths[[i]][j+1])) == 2, 1]
-			
-			# PATH WITH ZERO AT ENDS TO INDICATE CLOSED PATH BUT ACTUALLY A FRAGMENT WITHIN CLOSED PATH
-			if(length(body_num) == 0) next
-			
-			# SKIP IF 0
-			if(body_num == 1) next
-			
-			# IF SAME BODY IS PRESENT IN PATH TWICE, MARK AS NA
-			if(body_num %in% bodies_in_path){
-				paths_str[i] <- NA
-				next
-			}
+		if(FALSE){
 
-			# ADD BODY NUMBER TO VECTOR
-			bodies_in_path[j] <- body_num
+			# REMOVE PATHS THAT DOUBLE BACK ON THE SAME LINK
+			bodies_in_path <- rep(NA, length(paths[[i]])-1)
+			for(j in 1:(length(paths[[i]])-1)){
+		
+				# FIND BODY ASSOCIATED WITH PAIR OF JOINTS
+				body_num <- joint.conn[rowSums((joint.conn[, 2:3] == paths[[i]][j])+(joint.conn[, 2:3] == paths[[i]][j+1])) == 2, 1]
+			
+				# PATH WITH ZERO AT ENDS TO INDICATE CLOSED PATH BUT ACTUALLY A FRAGMENT WITHIN CLOSED PATH
+				if(length(body_num) == 0) next
+			
+				# SKIP IF 0
+				if(body_num == 1) next
+			
+				# IF SAME BODY IS PRESENT IN PATH TWICE, MARK AS NA
+				if(body_num %in% bodies_in_path){
+					paths_str[i] <- NA
+					next
+				}
+
+				# ADD BODY NUMBER TO VECTOR
+				bodies_in_path[j] <- body_num
+			}
 		}
 		
 		# REMOVE PATHS THAT ARE REVERSE OF ANOTHER PATH - EVERY FIXED-TO-FIXED PATH SHOULD HAVE REVERSE
