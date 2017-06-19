@@ -43,7 +43,7 @@ angleOnCircleFromPoint <- function(circle, dist, P, point_compare=NULL){
 		# FIND POINT CLOSEST TO PREVIOUS POINT AND CORRESPONDING ANGLE
 		dist_to_point_compare <- distPointToPoint(output_points, point_compare)
 		if(identical(dist_to_point_compare[1], dist_to_point_compare[2])) return(t[1])
-		return(t[dist_to_point_compare == min(dist_to_point_compare)])
+		return(t[which(dist_to_point_compare == min(dist_to_point_compare))[1]])
 	}
 
 	return(t)
