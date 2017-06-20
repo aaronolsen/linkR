@@ -141,7 +141,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			J3_sphere_r <- distPointToPoint(joint.coor[3, , 1], joint.coor[2, , J2_J3_set])
 		}
 
-		if(type_str %in% c('S-S*-R', 'S-S*-S')){
+		if(type_str %in% c('R-R*-R', 'S-S*-R', 'S-S*-S')){
 
 			# GET POINT DISTANCE
 			dist_J1_J2 <- distPointToPoint(joint.coor[2, , J2_J1_set], joint.coor[1, , 1])
@@ -180,7 +180,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 		}
 
 
-		if(type_str == 'S-S*-R'){
+		if(type_str %in% c('S-S*-R', 'R-R*-R')){
 
 			## FIND JOINT POSITION THAT SOLVES CONSTRAINT
 			# DEFINE CIRCLE FOR OUTPUT LINK (NEED TO REDEFINE CENTER BECAUSE CIRCLE CENTER MAY NOT BE SAME AS JOINT)
@@ -215,7 +215,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			tmat_body1 <- tmat1 %*% tmat2 %*% tmat3
 		}
 
-		if(type_str == 'S-S*-R'){
+		if(type_str %in% c('S-S*-R', 'R-R*-R')){
 
 			## FIND ROTATION OF SECOND BODY
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
@@ -233,6 +233,25 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 			# COMBINE TRANSFORMATIONS
 			tmat_body2 <- tmat4 %*% tmat5 %*% tmat6
+		}
+
+		if(type_str == 'R-R*-R'){
+			
+			## FIND ROTATION OF FIRST BODY
+			v_pre <- joint.coor[2, , J2_J1_set] - joint.coor[1, , 1]
+			v_new <- J2_npos - joint.coor[1, , 1]
+
+			# TRANSLATE BACK FROM CENTER OF ROTATION
+			tmat1[1:3, 4] <- joint.coor[1, , 1]
+
+			# ROTATION TO ALIGN WITH NEW JOINT POSITION
+			tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter, 1], avec(v_pre, v_new, axis=joint.cons[[1]][, , iter, 1], about.axis=TRUE))
+
+			# TRANSLATE TO CENTER OF ROTATION
+			tmat3[1:3, 4] <- -joint.coor[1, , 1]
+
+			# COMBINE TRANSFORMATIONS
+			tmat_body1 <- tmat1 %*% tmat2 %*% tmat3
 		}
 
 		if(type_str == 'L-S*-S'){
@@ -271,7 +290,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			tmat_body2 <- tmat4 %*% tmat3 %*% tmat2
 		}
 
-		if(type_str %in% c('L-S*-S', 'S-S*-R', 'S-S*-S')){
+		if(type_str %in% c('L-S*-S', 'S-S*-R', 'S-S*-S', 'R-R*-R')){
 			
 			# UPDATE JOINT STATUS
 			joint.status[2, ] <- 's'
