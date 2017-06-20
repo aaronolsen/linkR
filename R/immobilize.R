@@ -1,6 +1,6 @@
 immobilize <- function(coor, ref){
 
-	## Fixes motion of coor relative to pts
+	## Fixes motion of coor over multiple iterations relative to ref points (single iteration)
 	
 	# Get number of iterations
 	n_iter <- dim(coor)[3]
