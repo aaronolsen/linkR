@@ -1,4 +1,30 @@
-fitJointConstraint <- function(coor, type, control, select.t.axis='min', print.progress = FALSE){
+fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.t.axis='min', 
+	print.progress = FALSE){
+
+	# Set default controls
+	if(is.null(control)){
+		control <- list(
+			'subsample.method'='Evenly spaced',		# or 'Maximum dispersion'
+			'max.disp.prop.R'=0.2,					# Proportion of time points used in max dispersion sampling
+			'max.disp.prop.S'=0.2,
+			'max.disp.prop.U'=0.2
+		)
+	}
+
+	# If fixed coordinate names are provided, get mobile coordinates relative to fixed
+	if(!is.null(fixed)){
+
+		# 3 or more fixed coordinates
+		if(length(fixed) >= 3){
+
+			# Fix coordinates using best alignment to first iteration
+			coor <- immobilize(coor, coor[fixed, , 1])
+
+		# 2 fixed coordinates
+		}else{
+
+		}
+	}
 
 	# Set number of coordinates
 	n_coor <- dim(coor)[1]
