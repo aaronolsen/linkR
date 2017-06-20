@@ -137,7 +137,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 			
 			# SET NUMBER OF CONSTRAINT VECTORS
 			n_vectors <- dim(linkage$joint.cons[[i]])[1]
-
+			
 			# CREATE EMPTY ARRAY
 			cons_vec[[i]] <- array(NA, dim=c(n_vectors*2, 3, num_iter))
 			
@@ -149,6 +149,12 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 				}
 			}
 
+			if(n_vectors == 1){
+				arrow_len_part <- arrow_len
+			}else{
+				arrow_len_part <- arrow_len / 2
+			}
+
 			if(debug){
 
 				# CREATE EMPTY ARRAY
@@ -158,9 +164,9 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 				for(j in 1:num_iter){
 					for(k in seq(1, n_vectors*2, by=2)){
 						cons_vec1[[i]][k, , j] <- linkage$joint.coorn[i, , j, 1]
-						cons_vec1[[i]][k+1, 1:3, j] <- linkage$joint.coorn[i, , j, 1] + arrow_len*uvector(linkage$joint.consn[[i]][(k+1)/2, , j, 1])
+						cons_vec1[[i]][k+1, 1:3, j] <- linkage$joint.coorn[i, , j, 1] + arrow_len_part*uvector(linkage$joint.consn[[i]][(k+1)/2, , j, 1])
 						cons_vec2[[i]][k, , j] <- linkage$joint.coorn[i, , j, 2]
-						cons_vec2[[i]][k+1, 1:3, j] <- linkage$joint.coorn[i, , j, 2] + arrow_len*uvector(linkage$joint.consn[[i]][(k+1)/2, , j, 2])
+						cons_vec2[[i]][k+1, 1:3, j] <- linkage$joint.coorn[i, , j, 2] + arrow_len_part*uvector(linkage$joint.consn[[i]][(k+1)/2, , j, 2])
 					}
 				}
 			}
