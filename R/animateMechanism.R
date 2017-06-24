@@ -13,7 +13,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	if(class(input.param) == 'list'){
 		for(i in 1:n_inputs) if(is.vector(input.param[[i]])) input.param[[i]] <- matrix(input.param[[i]], nrow=length(input.param[[i]]), ncol=1)
 	}
-
+	
 	# SET NUMBER OF ITERATIONS
 	n_iter <- nrow(input.param[[1]])
 	
@@ -25,12 +25,16 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	
 	# SET NUMBER OF JOINTS
 	n_joints <- nrow(mechanism$joint.coor)
-
+	
 	# SET NUMBER OF BODIES
 	n_bodies <- mechanism$num.bodies
 
 	# CONVERT ARRAY TO MATRIX - COPY OVER LAST DIMENSION OF ARRAY
 	if(length(dim(mechanism$joint.coor)) == 3) mechanism$joint.coor <- mechanism$joint.coor[, , dim(mechanism$joint.coor)[3]]
+
+	# CREATE JOINT COORDINATE AND CONSTRAINT REFERENCE
+	joint_ref <- mechanism$joint.coor
+	joint_cons_ref <- mechanism$joint.cons
 
 	# GET JOINT NAMES
 	joint_names <- rownames(mechanism$joint.coor)
@@ -245,7 +249,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				#	next
 				#}
 
-				# COPY TRANSFORMATIONS ACROSS '_,t' JOINTS IN PATH (RULE 2)
+				# COPY TRANSFORMATIONS ACROSS '_,t' JOINTS IN PATH
 				for(j in 1:length(path)){
 
 					# CHECK THAT STATUS IS _,t
@@ -266,7 +270,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					# applied to input joint to input body first
 					extend <- extendTransformation(tmarr=tmarr, body.num=u_body, iter=iter, 
 						joints.transform=joints_transform, joint.coor=joint_coorn, joint.cons=joint_consn, 
-						joint.ref=mechanism$joint.ref, joint.types=mechanism$joint.types, joint.status=joint_status, status.to='c', 
+						joint.ref=joint_ref, joint.cons.ref=joint_cons_ref, joint.types=mechanism$joint.types, joint.status=joint_status, status.to='c', 
 						body.names=mechanism$body.names, joint.names=joint_names, 
 						indent=indent, indent.level=4,  print.progress=print_progress_iter)
 					
@@ -313,7 +317,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					# EXTEND TRANSFORMATION ACROSS _,i JOINTS
 					extend <- extendTransformation(tmarr=tmarr, body.num=paths_bodies[[i]][j], iter=iter, 
 						joints.transform=joints_transform, joint.coor=joint_coorn, joint.cons=joint_consn, 
-						joint.ref=mechanism$joint.ref, joint.cons.ref=mechanism$joint.cons.ref, joint.types=mechanism$joint.types, joint.status=joint_status, status.to=joint_status_out, 
+						joint.ref=joint_ref, joint.cons.ref=joint_cons_ref, joint.types=mechanism$joint.types, joint.status=joint_status, status.to=joint_status_out, 
 						body.names=mechanism$body.names, joint.names=joint_names, 
 						indent=indent, indent.level=4,  print.progress=print_progress_iter)
 
@@ -364,9 +368,19 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			joint_cons[[i]] <- joint_consn[[i]][, , , 1]
 		}
 	}
+	
+	# If single iteration convert to 3D array
+	if(length(dim(joint_coor)) == 2) joint_coor <- array(joint_coor, dim=c(dim(joint_coor), 1), dimnames=list(dimnames(joint_coor)[[1]], NULL, NULL))
+	for(i in 1:length(joint_cons)){
+		if(length(dim(joint_cons[[i]])) == 0){
+			joint_cons[[i]] <- array(joint_cons[[i]], dim=c(1, length(joint_cons[[i]]), 1))
+		}else if(length(dim(joint_cons[[i]])) == 2){
+			joint_cons[[i]] <- array(joint_cons[[i]], dim=c(dim(joint_cons[[i]]), 1))
+		}
+	}
 
 	# CHECK THAT LINK MOTIONS OBEY JOINT CONSTRAINTS
-	if(check.joint.cons){
+	if(check.joint.cons && dim(joint_coor)[3] > 1){
 		
 		for(body_num in 2:n_bodies){
 			
@@ -398,7 +412,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 							distances[iter] <- distPointToLine(joint_coor[joint_num, , iter], R_axis1[iter, ], R_axis2[iter, ])
 						}
 
-						if(sd(distances, na.rm=TRUE) > 1e-10) warning(paste0('R-joint motion constraint not obeyed: distance between R-axis of joint ', joint_names[R_joint], ' and joint ', joint_names[joint_num], ' is non-constant.'))
+						if(sd(distances, na.rm=TRUE) > 1e-10) warning(paste0('R-joint motion constraint not obeyed: distance between joint ', joint_names[joint_num], ' and R-axis of joint ', joint_names[R_joint], ' is non-constant.'))
 					}
 				}
 			}
@@ -406,7 +420,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	}
 
 	# CHECK THAT DISTANCES WITHIN LINKS HAVE NOT CHANGED
-	if(check.inter.joint.dist && n_joints > 1){
+	if(check.inter.joint.dist && n_joints > 1 && dim(joint_coor)[3] > 1){
 
 		joint_pairs_checked <- c()
 		
@@ -460,6 +474,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	mechanism_r$joint.cons <- joint_cons
 	mechanism_r$joint.consn <- joint_consn
 	mechanism_r$body.points <- body_points
+	mechanism_r$tmarr <- tmarr
 
 	return(mechanism_r)
 }
