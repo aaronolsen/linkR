@@ -19,8 +19,8 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			if(sum(is.na(input[iter, 1:3])) == 3) return(NULL)
 
 			if(print.progress){
-				AOR <- paste0(paste0(round(joint.cons[[1]][1, , iter, jt_set], 2), collapse=','), ' ', paste0(round(joint.cons[[1]][2, , iter, jt_set], 2), collapse=','), ' ', paste0(round(joint.cons[[1]][3, , iter, jt_set], 2), collapse=','))
-				cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 2), collapse=','), '; AoR:', AOR, '; Angle:', round(input[iter, 1], 2),'}\n'))
+				AOR <- paste0(paste0(round(joint.cons[[1]][1, , iter, jt_set], 3), collapse=','), ' ', paste0(round(joint.cons[[1]][2, , iter, jt_set], 3), collapse=','), ' ', paste0(round(joint.cons[[1]][3, , iter, jt_set], 3), collapse=','))
+				cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 3), collapse=','), '; AoR:', AOR, '; Angle:', round(input[iter, 1], 3),'}\n'))
 			}
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
@@ -41,7 +41,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			
 		}else if(joint.types == 'R'){
 			
-			if(print.progress) cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 2), collapse=','), '; AoR:', paste0(round(joint.cons[[1]][1, , iter, jt_set], 2), collapse=','), '; Angle:', round(input[iter, 1], 2),'}\n'))
+			if(print.progress) cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 3), collapse=','), '; AoR:', paste0(round(joint.cons[[1]][1, , iter, jt_set], 3), collapse=','), '; Angle:', round(input[iter, 1], 3),'}\n'))
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
 			tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(joint.coor[, jt_set], 1))
@@ -51,7 +51,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION
 			tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint.coor[, jt_set], 1))
-
+			
 		}else if(joint.types == 'P'){
 
 			if(print.progress) cat('\n')
@@ -193,6 +193,13 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 			# FIND CORRESPONDING POINT ON CIRCLE
 			J2_npos <- circlePoint(circle=output_circle, T=output_link_t)
+			
+			# If no solution, return NULL
+			if(is.vector(J2_npos)){
+				if(is.na(J2_npos[1])) return(NULL)
+			}else{
+				if(is.na(J2_npos[1,1])) return(NULL)
+			}
 		}
 
 		if(type_str %in% c('S-S*-R', 'S-S*-S')){
