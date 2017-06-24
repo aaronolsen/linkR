@@ -243,7 +243,7 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 		# Use n% most dispersed points, in order of dispersion
 		sub_max <- round(max_disp_prop*dim(coor)[3])
 		max_disp <- whichMaxDisperse(t(coor[which.max(Csizes_time), , ]), n=sub_max)
-	
+
 		# Set as subset
 		coor_s <- coor[, , max_disp]
 		n_iter_s <- length(max_disp)
