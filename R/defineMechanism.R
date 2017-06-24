@@ -19,6 +19,9 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 	# CHECK THAT JOINTS ARE 3D
 	if(ncol(joint.coor) == 2) stop("Joint coordinates must be three-dimensional.")
+	
+	# GET NUMBER OF JOINTS
+	n_joints <- nrow(joint.coor)
 
 	# MAKE SURE JOINT CONSTRAINTS ARE LIST
 	if(!is.list(joint.cons)) joint.cons <- list(joint.cons)
@@ -38,8 +41,8 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 	# ADD ROWNAMES TO JOINTS (NAME BASED ON JOINT TYPE AND ORDER IN INPUT SEQUENCE)
 	if(is.null(rownames(joint.coor))){
-		joint_names <- rep(NA, nrow(joint.coor))
-		for(i in 1:nrow(joint.coor)){
+		joint_names <- rep(NA, n_joints)
+		for(i in 1:n_joints){
 			if(i == 1){
 				joint_names[i] <- paste0(joint.types[i], i)
 			}else{
@@ -211,7 +214,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(!is.null(paths_open)){
 
 			# CREATE EMPTY LIST
-			joint_desc_open <- as.list(rep(NA, nrow(joint.coor)))
+			joint_desc_open <- as.list(rep(NA, n_joints))
 		
 			# GET ALL OPEN JOINTS
 			joints_open <- unique(unlist(paths_open))
@@ -249,13 +252,13 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		}
 
 		# FIND JOINT ASSOCIATED WITH THE SAME MOBILE BODY - MAY BE ABLE TO COMBINE WITH JOINT DESC OPEN
-		joints_cobody <- as.list(rep(NA, nrow(joint.coor)))
+		joints_cobody <- as.list(rep(NA, n_joints))
 
 		# REMOVE FIXED BODY ROWS
 		joint_conn_m <- find_joint_paths$joint.conn[find_joint_paths$joint.conn[, 1] > 1, ]
 
 		# CREATE LIST OF JOINTS THAT SHARE A BODY WITH EACH JOINT
-		for(i in 1:nrow(joint.coor)){
+		for(i in 1:n_joints){
 
 			# FIND ALL CONNECTED JOINTS
 			joints_conn_i <- c(i, joint_conn_m[rowSums(i == joint_conn_m[, 2:3]) > 0, 2:3])
@@ -273,7 +276,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 			joints_tform <- list()
 			if(!is.null(joint_desc_open)){
 		
-				for(i in 1:nrow(joint.coor)){
+				for(i in 1:n_joints){
 
 					all_joints <- c(i, joint_desc_open[[i]])
 
@@ -308,7 +311,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(!is.null(joint_desc_open)){
 	
 			# CREATE LIST
-			body_transform <- as.list(rep(NA, nrow(joint.coor)))
+			body_transform <- as.list(rep(NA, n_joints))
 
 			for(i in 1:length(body_transform)){
 		
@@ -372,16 +375,16 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'paths.closed.bodies' = paths_closed_bodies,
 		'joint.desc.open'=joint_desc_open,
 		'joints.open' = joints_open,
+		'joint.names' = rownames(joint.coor),
 		'joint.conn' = find_joint_paths$joint.conn,
 #		'joints.tform' = joints_tform,
 		'body.conn' = body.conn,
 		'body.conn.num' = body_conn_num,
 		'body.joints'=body_joints,
-		'joint.ref' = joint.coor,
-		'joint.cons.ref' = joint.cons,
 		'body.names' = body.names,
 		'body.transform'=body_transform,
 		'fixed.joints' = find_joint_paths$fixed.joints,
+		'num.joints' = n_joints,
 		'num.bodies' = num_bodies,
 		'body.points' = NULL,
 		'points.assoc' = NULL,
