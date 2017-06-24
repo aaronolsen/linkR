@@ -29,17 +29,17 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 		for(joint_num in body_joints){
 
 			# SKIP IF NO CONSTRAINT
-			if(is.null(joint.cons[[joint_num]])) next
+			if(is.null(joint.cons.ref[[joint_num]])) next
 			
 			# TRANSFORM JOINT CONSTRAINTS
-			if(is.matrix(joint.cons[[joint_num]][, , 1, jt_set])){
-				for(i in 1:nrow(joint.cons[[joint_num]][, , 1, jt_set])){
-					joint_cons_point <- rbind(joint.ref[joint_num, ], joint.ref[joint_num, ]+joint.cons[[joint_num]][i, , 1, jt_set])
+			if(is.matrix(joint.cons.ref[[joint_num]][, , 1])){
+				for(i in 1:nrow(joint.cons.ref[[joint_num]][, , 1])){
+					joint_cons_point <- rbind(joint.ref[joint_num, ], joint.ref[joint_num, ]+joint.cons.ref[[joint_num]][i, , 1])
 					joint_cons_point <- applyTransform(joint_cons_point, tmarr[, , body.num, iter])
 					joint.cons[[joint_num]][i, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
 				}
 			}else{
-				joint_cons_point <- rbind(joint.ref[joint_num, ], joint.ref[joint_num, ]+joint.cons[[joint_num]][, , 1, jt_set])
+				joint_cons_point <- rbind(joint.ref[joint_num, ], joint.ref[joint_num, ]+joint.cons.ref[[joint_num]][, , 1])
 				joint_cons_point <- applyTransform(joint_cons_point, tmarr[, , body.num, iter])
 				joint.cons[[joint_num]][, , iter, jt_set] <- joint_cons_point[2, ]-joint_cons_point[1, ]
 			}
@@ -52,6 +52,10 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 	if(print.progress){
 		cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Apply to joint(s): '))
 		cat(paste0(paste0(sort(apply_to_joints), collapse=', '), '\n'))
+	}
+
+	if(print.progress && apply_to_joints[1] == "R2(2)-1"){
+		#print(joint.coor[, , 1, ])
 	}
 
 	list(
