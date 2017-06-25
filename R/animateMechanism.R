@@ -1,7 +1,22 @@
 animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.body = NULL, 
 	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, check.inter.point.dist = TRUE, 
 	print.progress = FALSE){
-	
+
+	if(FALSE){
+		tA <- 0
+		tAA <- 0
+		tAB <- 0
+		tABA <- 0
+		tABB <- 0
+		tABBA <- 0
+		tABBB <- 0
+		tABBC <- 0
+		tAC <- 0
+		tAD <- 0
+		tA1 <- proc.time()['user.self']
+		tAA1 <- proc.time()['user.self']
+	}
+
 	if(print.progress) cat(paste0('animateMechanism()\n'))
 
 	# SET NUMBER OF INPUT PARAMETERS
@@ -200,9 +215,14 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# DEFAULT
 	print_progress_iter <- FALSE
 
+	#tAA <- tAA + proc.time()['user.self'] - tAA1
+	#tAB1 <- proc.time()['user.self']
+
 	# LOOP THROUGH EACH ITERATION
 	for(iter in 1:n_iter){
 	
+		#tABA1 <- proc.time()['user.self']
+
 		# SET WHETHER TO PRINT PROGRESS FOR CURRENT ITERATION
 		if(print.progress && iter %in% print.progress.iter){
 			print_progress_iter <- TRUE
@@ -216,17 +236,22 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		# RESET TRANSFORM VECTORS
 		joint_status <- joint_status_init
 
+		#tABA <- tABA + proc.time()['user.self'] - tABA1
+		#tABB1 <- proc.time()['user.self']
+
 		# CYCLE THROUGH PATHS
 		path_cycle <- 1
 		while(path_cycle < 4){
 
 			# RESET STATUS CHANGED FLAG
 			status_changed <- FALSE
+			
+			# SET STARTING PATH
+			if(path_cycle == 1){ start_path <- 1 }else{ start_path <- n_inputs + 1 }
 
-			for(i in 1:length(paths)){
+			for(i in start_path:length(paths)){
 		
-				if(print_progress_iter && iter == 1 && path_cycle == 1 && i == n_inputs+1) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Path solving\n'))
-				if(print_progress_iter && iter == 1 && path_cycle == 1 && i == 1) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Input transformations\n'))
+				#tABBA1 <- proc.time()['user.self']
 
 				# SET PATH
 				path <- paths[[i]]
@@ -236,6 +261,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				
 				# PRINT PATH DETAILS
 				if(print_progress_iter){
+					if(i == n_inputs+1) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Path solving (Cycle ', path_cycle, ')\n'))
+					if(path_cycle == 1 && i == 1) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Input transformations\n'))
 					if(is_input){
 						path_print <- paste0('Input transformation ', tolower(as.roman(i)), ' to ', mechanism$body.names[paths_bodies[[i]]], '(', paths_bodies[[i]], ') body at joint ', dimnames(mechanism$joint.coor)[[1]][path], '(', path, ') of type: ', mechanism$joint.types[path], ' ')
 					}else{
@@ -286,7 +313,12 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 						cat('')
 						for(k in 1:nrow(joint_status_print)) cat(paste0(paste0(rep(indent, 5), collapse=''), joint_names[k], ': ', paste0(joint_status_print[k,], collapse=','), '\n'))
 					}
+					
+					status_changed <- TRUE
 				}
+
+				#tABBA <- tABBA + proc.time()['user.self'] - tABBA1
+				#tABBB1 <- proc.time()['user.self']
 
 				# SOLVE OR APPLY INPUT TRANSFORMATIONS
 				solve_joint_path <- solveJointPath(joint.types=mechanism$joint.types[path], 
@@ -299,8 +331,12 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint.ref=mechanism$joint.coor[path, ], iter=iter, 
 					print.progress=print_progress_iter, indent=indent)
 				
+				#tABBB <- tABBB + proc.time()['user.self'] - tABBB1
+
 				# IF NO TRANSFORMATION FOUND, SKIP
 				if(is.null(solve_joint_path)) next
+
+				#tABBC1 <- proc.time()['user.self']
 				
 				# SET OUTPUT JOINT STATUS
 				joint_status_out <- joint_status_change
@@ -326,6 +362,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint_consn <- extend$joint.cons
 					joint_status <- extend$joint.status
 					tmarr <- extend$tmarr
+
+					status_changed <- TRUE
 				}
 
 				if(print_progress_iter){
@@ -333,6 +371,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					#joint_status_print[joint_status_print == ''] <- '_'
 					#for(k in 1:nrow(joint_status_print)) cat(paste0(paste0(rep(indent, 5), collapse=''), joint_names[k], ': ', paste0(joint_status_print[k,], collapse=','), '\n'))
 				}
+
+				#tABBC <- tABBC + proc.time()['user.self'] - tABBC1
 			}
 
 			# INCREASE PATH CYCLE COUNT
@@ -344,7 +384,12 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 		# SET PREVIOUS ITERATION
 		prev_iter <- iter
+
+		#tABB <- tABB + proc.time()['user.self'] - tABB1
 	}
+
+	#tAB <- tAB + proc.time()['user.self'] - tAB1
+	#tAC1 <- proc.time()['user.self']
 
 	# APPLY BODY TRANSFORMATIONS TO POINTS
 	if(!is.null(mechanism$body.points)){
@@ -356,9 +401,18 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			body_points[mechanism$points.assoc[[body_num]], , ] <- applyTransform(body_points[mechanism$points.assoc[[body_num]], , ], tmarr[, , body_num, ])
 		}
 	}
+
+	#tAC <- tAC + proc.time()['user.self'] - tAC1
+	#tAD1 <- proc.time()['user.self']
 	
-	# *****FIX: COMBINE TWO JOINT SETS INTO ONE
+	# ****ADD***** CHECK THAT BOTH JOINT COORDINATE SETS ARE THE SAME
+
+	# COMBINE TWO JOINT COORDINATE SETS INTO ONE
 	joint_coor <- joint_coorn[, , , 1]
+
+	# IF SINGLE ITERATION, CONVERT TO 3 DIM ARRAY
+	if(length(dim(joint_coor)) == 2) joint_coor <- array(joint_coor, dim=c(dim(joint_coor), 1), dimnames=list(dimnames(joint_coor)[[1]], NULL, NULL))
+
 	joint_cons <- joint_consn
 	for(i in 1:length(joint_cons)){
 		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
@@ -370,7 +424,6 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	}
 	
 	# If single iteration convert to 3D array
-	if(length(dim(joint_coor)) == 2) joint_coor <- array(joint_coor, dim=c(dim(joint_coor), 1), dimnames=list(dimnames(joint_coor)[[1]], NULL, NULL))
 	for(i in 1:length(joint_cons)){
 		if(length(dim(joint_cons[[i]])) == 0){
 			joint_cons[[i]] <- array(joint_cons[[i]], dim=c(1, length(joint_cons[[i]]), 1))
@@ -475,6 +528,11 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	mechanism_r$joint.consn <- joint_consn
 	mechanism_r$body.points <- body_points
 	mechanism_r$tmarr <- tmarr
+
+	#tAD <- tAD + proc.time()['user.self'] - tAD1
+	#tA <- tA + proc.time()['user.self'] - tA1
+
+	#user_times <<- rbind(user_times, c('tA'=tA, 'tAA'=tAA, 'tAB'=tAB, 'tABA'=tABA, 'tABB'=tABB, 'tABBA'=tABBA, 'tABBB'=tABBB, 'tABBC'=tABBC, 'tAC'=tAC, 'tAD'=tAD))
 
 	return(mechanism_r)
 }
