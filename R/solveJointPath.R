@@ -24,7 +24,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			}
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(joint.coor[, jt_set], 1))
+			tmat1[1:3, 4] <- joint.coor[, jt_set]
 
 			# LOOP THROUGH EACH COLUMNN OF INPUT PARAMETERS
 			for(i in 1:nrow(joint.cons[[1]][, , iter, jt_set])){
@@ -37,34 +37,34 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			}
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION
-			tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint.coor[, jt_set], 1))
+			tmat3[1:3, 4] <- -joint.coor[, jt_set]
 			
 		}else if(joint.types == 'R'){
 			
 			if(print.progress) cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 3), collapse=','), '; AoR:', paste0(round(joint.cons[[1]][1, , iter, jt_set], 3), collapse=','), '; Angle:', round(input[iter, 1], 3),'}\n'))
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(joint.coor[, jt_set], 1))
+			tmat1[1:3, 4] <- joint.coor[, jt_set]
 
 			# APPLY ROTATION TO TRANSFORMATION MATRIX
-			tmat2 <- cbind(rbind(tMatrixEP(joint.cons[[1]][, , iter, jt_set], -input[iter, 1]), rep(0,3)), c(0,0,0,1))
+			tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter, jt_set], -input[iter, 1])
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION
-			tmat3 <- cbind(rbind(diag(3), rep(0,3)), c(-joint.coor[, jt_set], 1))
+			tmat3[1:3, 4] <- -joint.coor[, jt_set]
 			
 		}else if(joint.types == 'P'){
 
 			if(print.progress) cat('\n')
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(colSums(input[iter, ] * joint.cons[[1]][, , iter, jt_set]), 1))
+			tmat1[1:3, 4] <- colSums(input[iter, ] * joint.cons[[1]][, , iter, jt_set])
 
 		}else if(joint.types == 'L'){
 
 			if(print.progress) cat('\n')
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1 <- cbind(rbind(diag(3), rep(0,3)), c(input[iter, 1]*joint.cons[[1]][, , iter, jt_set], 1))
+			tmat1[1:3, 4] <- input[iter, 1]*joint.cons[[1]][, , iter, jt_set]
 		}
 		
 		# CHANGE JOINT STATUS
