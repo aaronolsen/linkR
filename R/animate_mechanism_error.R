@@ -1,5 +1,6 @@
-animate_mechanism_error <- function(p, fit.points, mechanism, 
-	input.param, input.joint, input.body, replace, n.input = NULL, n.cons = NULL){
+animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input.joint, 
+	input.body, fit.wts, replace, n.input = NULL, n.cons = NULL, 
+	coor.vectors = NULL){
 
 	# Replace parameter with optimize parameters
 	if(replace == 'input.param'){
@@ -9,7 +10,20 @@ animate_mechanism_error <- function(p, fit.points, mechanism,
 			n <- n + n.input[i]
 		}
 	}else if(replace == 'joint.coor'){
-		mechanism$joint.coor <- matrix(p, mechanism$num.joints, 3, byrow=TRUE)
+
+		#mechanism$joint.coor <- mechanism$joint.coor + matrix(p, mechanism$num.joints, 3, byrow=TRUE)
+		
+		j <- 1
+		for(i in 1:mechanism$num.joints){
+			if(mechanism$joint.types[i] == 'R'){
+				mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j:(j+1)]*coor.vectors[[i]])
+				j <- j + 2
+			}else{
+				mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + p[j:(j+2)]
+				j <- j + 3
+			}
+		}
+
 	}else if(replace == 'joint.cons'){
 		i_params <- 1
 		for(i in 1:mechanism$num.joints){
@@ -25,6 +39,6 @@ animate_mechanism_error <- function(p, fit.points, mechanism,
 		check.joint.cons=FALSE))
 	
 	# Compare simulated coordinates to ideal
-	if(dim(anim_mech$body.points)[3] == 1) return(sqrt(mean((anim_mech$body.points[, , 1] - fit.points)^2)))
-	return(sqrt(mean((anim_mech$body.points - fit.points)^2)))
+	if(dim(anim_mech$body.points)[3] == 1) return(sqrt(mean(fit.wts*(anim_mech$body.points[, , 1] - fit.points)^2)))
+	return(sqrt(mean(fit.wts*(anim_mech$body.points - fit.points)^2)))
 }
