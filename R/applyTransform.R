@@ -5,16 +5,16 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 
 	# Transformation matrix
 	if(length(dim(tarr)) == 2){
-
+	
 		# Get point coordinates as matrix for transformation - coerce to matrix if single point
-		pcoor <- rbind(matrix(t(pmat), ncol=nrow(pmat)), rep(1, nrow(pmat)))
-		colnames(pcoor) <- rownames(pmat)
+		pcoor <- matrix(1, nrow(pmat), 4, dimnames=list(rownames(pmat), NULL))
+		pcoor[, 1:3] <- pmat
 
 		# Apply transformation
-		parr <- tarr %*% pcoor
-	
+		parr <- pcoor %*% t(tarr)
+
 		# Remove 1s row and transpose
-		parr <- t(parr[1:3, ])
+		return(parr[, 1:3])
 
 	# Transformation 3-d array
 	}else if(length(dim(tarr)) == 3){
@@ -26,8 +26,8 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 			parr <- array(NA, dim=c(nrow(pmat), 3, dim(tarr)[3]), dimnames=list(rownames(pmat), NULL, NULL))
 
 			# Get point coordinates as matrix for transformation - coerce to matrix if single point
-			pcoor <- rbind(matrix(t(pmat), ncol=nrow(pmat)), rep(1, nrow(pmat)))
-			colnames(pcoor) <- rownames(pmat)
+			pcoor <- matrix(1, 4, nrow(pmat), dimnames=list(NULL, rownames(pmat)))
+			pcoor[1:3, ] <- t(pmat)
 
 			# Apply transformation
 			tcoor <- apply(tarr, 3, '%*%', pcoor)
@@ -36,7 +36,7 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 			tcoor_arr <- array(tcoor, dim=c(4, nrow(pmat), dim(tarr)[3]))
 
 			# Swap first two dimensions (transpose each "matrix" within array) and remove 1s
-			parr <- aperm(tcoor_arr[1:3, , ], perm=c(2,1,3))
+			return(aperm(tcoor_arr[1:3, , ], perm=c(2,1,3)))
 
 		}else if(length(dim(pmat)) == 3){
 		
