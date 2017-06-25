@@ -1,4 +1,4 @@
-ref_transform_error <- function(p, ref.points, fit.points, transform){
+ref_transform_error <- function(p, ref.points, fit.points, transform, fit.wts){
 
 	# Create test transformation matrix from p
 	tmat <- diag(4)
@@ -12,5 +12,5 @@ ref_transform_error <- function(p, ref.points, fit.points, transform){
 	ref.points <- applyTransform(ref.points, transform)	
 
 	# Return error
-	return(sqrt(mean((ref.points - fit.points)^2)))
+	return(sqrt(mean(fit.wts*(ref.points - fit.points)^2)))
 }
