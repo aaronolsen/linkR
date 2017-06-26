@@ -196,10 +196,14 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# ADD INPUT PARAMETERS TO PATHS
 	paths[1:n_inputs] <- input.joint
 	paths_bodies[1:n_inputs] <- input_body
-	
+
 	#
 	for(i in 1:length(paths)){
 		if(length(paths[[i]]) == 1){
+			
+			# Check that input isn't single column to S-joint (temp fix for long-axis rotation)
+			if(mechanism$joint.types[paths[[i]]] == 'S' && ncol(joint.input[paths[[i]]][[1]]) == 1) next
+			
 			paths_input[i] <- joint.input[paths[[i]]]
 		}else{
 			paths_input[i] <- list(joint.input[paths[[i]]])
@@ -258,6 +262,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				
 				# SET PATH AS INPUT
 				is_input <- ifelse(i <= n_inputs, TRUE, FALSE)
+				
+				# TEMP CHECK FOR S-JOINT WITH SINGLE COLUMN INPUT (LONG AXIS ROTATION)
+				if(is_input && is.na(paths_input[[i]][1])) next
 				
 				# PRINT PATH DETAILS
 				if(print_progress_iter){
@@ -330,7 +337,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					joint.prev=joint_coorn[path, , prev_iter, 1],						#joint.dist=paths_dist[[i]], 
 					joint.ref=mechanism$joint.coor[path, ], iter=iter, 
 					print.progress=print_progress_iter, indent=indent)
-				
+
 				#tABBB <- tABBB + proc.time()['user.self'] - tABBB1
 
 				# IF NO TRANSFORMATION FOUND, SKIP
