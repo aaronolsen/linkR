@@ -1,6 +1,6 @@
 animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input.joint, 
 	input.body, fit.wts, replace, n.input = NULL, n.cons = NULL, 
-	coor.vectors = NULL){
+	coor.vectors = NULL, joint.optim = NULL){
 
 	# Replace parameter with optimize parameters
 	if(replace == 'input.param'){
@@ -14,7 +14,7 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 		#mechanism$joint.coor <- mechanism$joint.coor + matrix(p, mechanism$num.joints, 3, byrow=TRUE)
 		
 		j <- 1
-		for(i in 1:mechanism$num.joints){
+		for(i in joint.optim){
 			if(mechanism$joint.types[i] == 'R'){
 				mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j:(j+1)]*coor.vectors[[i]])
 				j <- j + 2
