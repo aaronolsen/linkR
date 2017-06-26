@@ -1,5 +1,5 @@
 fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.param, 
-	input.joint, input.body, fit.wts = NULL, joint.names = NULL, fixed.body = 'Fixed', 
+	input.joint, input.body, joint.coor = NULL, fit.wts = NULL, joint.names = NULL, fixed.body = 'Fixed', 
 	print.progress = FALSE){
 
 	# Start run time
@@ -10,9 +10,9 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	control <- list(
 		'joint.coor.bounds.factor'=0.1,
 		'fit.points.bounds.factor'=0.1,
-		'optim.frame.max'=10,
+		'optim.frame.max'=20,
 		'optim.to.prop'=0.001,
-		'optim.iter.max'=1
+		'optim.iter.max'=3
 	)
 
 	# Use motion between two bodies connected by each joint to generate initial joint 
@@ -31,14 +31,17 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	n_joints <- length(joint.types)
 
 	# Set NA joint coordinates
-	joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
+	if(is.null(joint.coor)) joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
 	
+	# Set joint coordinates to optimize
+	joints_optim <- which(is.na(joint.coor[, 1]))
+
 	# Set NA joint constraints
 	joint.cons <- setNames(as.list(rep(NA, n_joints)), joint.names)
 
 	# Use define linkage just to get body.conn.num and other mechanism properties (skip path finding)
 	mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
-		joint.cons=joint.cons, body.conn=body.conn, find.paths=FALSE)
+		joint.cons=joint.cons, body.conn=body.conn, fixed.body=fixed.body, find.paths=FALSE)
 
 	# Create numeric body association
 	body_assoc_num <- rep(NA, length(body.assoc))
@@ -62,6 +65,11 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	## Estimate initial joint constraints
 	if(print.progress) cat(paste0('\tEstimating joint constraints...\n'))
 	for(joint_num in 1:nrow(mechanism$body.conn.num)){
+	
+		if(!is.na(joint.coor[joint_num, 1]) && joint.types[joint_num] == 'S'){
+			joint.cons[[joint_num]] <- diag(3)
+			next
+		}
 		
 		# Get two bodies connected by joint
 		bodies <- mechanism$body.conn.num[joint_num, ]
@@ -108,7 +116,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	
 	# Re-define linkage with initial joint coordinate and constraints
 	mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
-		joint.cons=joint.cons, body.conn=body.conn)
+		joint.cons=joint.cons, body.conn=body.conn, fixed.body=fixed.body)
 
 	# If input.joint is non-numeric, convert to numeric equivalent
 	if(!is.numeric(input.joint[1])){
@@ -143,7 +151,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		}
 
 		# Create optimization input parameters
-		input_param_optim[[i]] <- matrix(input.param[[i]], nrow=n_optim, ncol=n_input[i])
+		input_param_optim[[i]] <- matrix(NA, nrow=n_optim, ncol=n_input[i])
 		
 		# Set input value
 		if(joint.types[input_joint_num[i]] %in% c('R', 'S')){
@@ -205,7 +213,6 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	# Set bound for translation
 	pose_optim_bounds_add <- fit_points_range*control$fit.points.bounds.factor
 	
-
 	## Align coordinates across all time points using generalized procrustes analysis to 
 	# find mean (consensus) shape scaled to mean centroid size
 	#ccoor <- procAlign(coor_s)
@@ -321,7 +328,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		## Optimize joint coordinates
 		# Create list for vector components
 		coor_vectors <- as.list(rep(NA, n_joints))
-		for(j in 1:n_joints){
+		for(j in joints_optim){
 			if(joint.types[j] == 'R'){
 				vo <- vorthogonal(mechanism$joint.cons[[j]][, , 1])
 				coor_vectors[[j]] <- rbind(vo, cprod(vo, mechanism$joint.cons[[j]][, , 1]))
@@ -332,7 +339,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		if(print.progress) coor_fit_error_i <- animate_mechanism_error(coor_optim, 
 			replace='joint.coor', fit.points=fit.points[, , optim_use], mechanism=mechanism, 
 			input.param=input_param_optim, input.joint=input.joint, input.body=input.body, 
-			fit.wts=fit.wts, n.input=n_input, coor.vectors=coor_vectors)
+			fit.wts=fit.wts, coor.vectors=coor_vectors, joint.optim=joints_optim)
 
 		# Run optimization
 		coor_fit <- tryCatch(
@@ -341,7 +348,8 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 					lower=-coor_optim_bounds_add, upper=coor_optim_bounds_add, 
 					replace='joint.coor', fit.points=fit.points[, , optim_use], 
 					mechanism=mechanism, input.param=input_param_optim, input.joint=input.joint, 
-					input.body=input.body, fit.wts=fit.wts, n.input=n_input, coor.vectors=coor_vectors)
+					input.body=input.body, fit.wts=fit.wts, coor.vectors=coor_vectors, 
+					joint.optim=joints_optim)
 			},
 			error=function(cond) {print(cond);return(NULL)},
 			warning=function(cond) {print(cond);return(NULL)}
@@ -352,7 +360,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 		# Replace previous with optimized joint coordinates
 		j <- 1
-		for(i in 1:mechanism$num.joints){
+		for(i in joints_optim){
 			if(mechanism$joint.types[i] == 'R'){
 				mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(coor_fit$par[j:(j+1)]*coor_vectors[[i]])
 				j <- j + 2
@@ -539,7 +547,11 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	# Print error
 	if(print.progress) cat(paste0('\t\tError: ', round(mean(input_fit_errors_i, na.rm=TRUE), 5), '->', round(mean(input_fit_errors_f, na.rm=TRUE), 5), '\n'))
-	
+
+#	mechanism_g <<- mechanism
+#}
+
+#mechanism <- mechanism_g
 
 	## Standardize joint coordinates equivalent 
 	# Slide joint coordinates, when applicable, to closest points between connected bodies
@@ -556,7 +568,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		
 		# Find mean point
 		nearest_pt <- colMeans(nearest_pts)
-		
+
 		if(joint.types[i] == 'R'){
 
 			# Find point on R-joint axis closest to nearest point between bodies
