@@ -203,7 +203,9 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 		}
 
 		if(type_str %in% c('S-S*-R', 'S-S*-S')){
-
+		
+			tmat22 <- diag(4)
+		
 			## FIND TRANSFORMATION OF FIRST BODY
 			# ROTATE COUPLER LINK TO MATCH VECTOR BETWEEN UNTRANSFORMED AND TRANSFORMED JOINT
 			v_pre <- joint.coor[2, , J2_J1_set] - joint.coor[1, , 1]
@@ -215,11 +217,20 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
 			tmat2[1:3, 1:3] <- tMatrixEP(cprod(v_pre, v_new), -avec(v_pre, v_new))
 
+			# CHECK FOR ROTATION BETWEEN S-JOINTS
+			if(!is.na(input[[1]][1]) || !is.na(input[[2]][1])){
+			
+				if(!is.na(input[[1]][1])) angle <- input[[1]][iter, 1]
+				if(!is.na(input[[2]][1])) angle <- input[[2]][iter, 1]
+				
+				tmat22[1:3, 1:3] <- tMatrixEP(J2_npos - joint.coor[1, , 1], angle)
+			}
+
 			# TRANSLATE TO CENTER OF ROTATION
 			tmat3[1:3, 4] <- -joint.coor[1, , 1]
 
 			# COMBINE TRANSFORMATIONS
-			tmat_body1 <- tmat1 %*% tmat2 %*% tmat3
+			tmat_body1 <- tmat1 %*% tmat22 %*% tmat2 %*% tmat3
 		}
 
 		if(type_str %in% c('S-S*-R', 'R-R*-R')){
