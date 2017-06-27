@@ -243,7 +243,8 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 				for(i in 1:nrow(linkage$joint.conn)){
 
 					# SKIP LINES AMONG JOINTS CONNECTED TO GROUND
-					if(linkage$joint.conn[i, 'body.idx'] == 1) next
+					#if(linkage$joint.conn[i, 'body.idx'] == 1) next
+					if(linkage$joint.conn[i, 'joint1'] == 0 || linkage$joint.conn[i, 'joint2'] == 0) next
 					#if(linkage$joint.conn[i, 'joint1'] == 1 || linkage$joint.conn[i, 'joint2'] == 1) next
 
 					# ADD PATHS
