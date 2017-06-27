@@ -341,7 +341,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				#tABBB <- tABBB + proc.time()['user.self'] - tABBB1
 
 				# IF NO TRANSFORMATION FOUND, SKIP
-				if(is.null(solve_joint_path)) next
+#				if(!solve_joint_path$solution) next
+				if(is.null(solve_joint_path$body.tmat) && solve_joint_path$solution) next
+				if(is.null(solve_joint_path$body.tmat) && !solve_joint_path$solution) next
 
 				#tABBC1 <- proc.time()['user.self']
 				
@@ -472,7 +474,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 							distances[iter] <- distPointToLine(joint_coor[joint_num, , iter], R_axis1[iter, ], R_axis2[iter, ])
 						}
 
-						if(sd(distances, na.rm=TRUE) > 1e-10) warning(paste0('R-joint motion constraint not obeyed: distance between joint ', joint_names[joint_num], ' and R-axis of joint ', joint_names[R_joint], ' is non-constant.'))
+						if(sd(distances, na.rm=TRUE) > 1e-5) warning(paste0('R-joint motion constraint not obeyed: distance between joint ', joint_names[joint_num], ' and R-axis of joint ', joint_names[R_joint], ' is non-constant (SD: ', round(sd(distances, na.rm=TRUE), 7), ').'))
 					}
 				}
 			}
@@ -515,7 +517,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				if(is.na(dist_sd)) next
 
 				# ALL DISTANCES CONSTANT
-				if(dist_sd < 1e-7) next
+				if(dist_sd < 1e-6) next
 				
 				#print(path_pair_idx)
 				#print(path_pair_types)
