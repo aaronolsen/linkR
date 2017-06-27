@@ -16,7 +16,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 		if(joint.types %in% c('S')){
 
 			# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
-			if(sum(is.na(input[iter, 1:3])) == 3) return(NULL)
+			if(sum(is.na(input[iter, 1:3])) == 3) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=TRUE))
 
 			if(print.progress){
 				AOR <- paste0(paste0(round(joint.cons[[1]][1, , iter, jt_set], 3), collapse=','), ' ', paste0(round(joint.cons[[1]][2, , iter, jt_set], 3), collapse=','), ' ', paste0(round(joint.cons[[1]][3, , iter, jt_set], 3), collapse=','))
@@ -78,9 +78,6 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 	# SOLVE
 	}else{
 
-		# SET NULL TRANSFORMATION MATRICES
-		tmat1 <- tmat2 <- tmat3 <- tmat4 <- tmat5 <- tmat6 <- diag(4)
-
 		# SET TRANSFORM INDICATOR
 		trfm_vec <- rep('', length(joint.types))
 		#trfm_vec[rowSums(joint.status == '') > 0] <- '^'
@@ -108,11 +105,12 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 				joint.ref=joint.ref[nrow(joint.ref):1, ], 
 				iter=iter, print.progress=print.progress, indent=indent)
 			
-			if(is.null(solve_joint_path)) return(NULL)
-
+			if(is.null(solve_joint_path$body.tmat)) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=solve_joint_path$solution))
+			
 			return(list(
 				'body.tmat'=solve_joint_path$body.tmat[length(solve_joint_path$body.tmat):1],
-				'joint.status'=solve_joint_path$joint.status[nrow(solve_joint_path$joint.status):1, ]
+				'joint.status'=solve_joint_path$joint.status[nrow(solve_joint_path$joint.status):1, ],
+				'solution'=solve_joint_path$solution
 				))
 		}
 
@@ -151,15 +149,20 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 			#if(print.progress) print(input)
 
+			# SET NULL TRANSFORMATION MATRICES
+			tmat4 <- tmat5 <- tmat6 <- tmat7 <- diag(4)
+
 			# DEFINE SPHERE OF POTENTIAL SOLUTIONS FROM J1
 			sphere <- list('C'=joint.coor[3, , 1], 'R'=J3_sphere_r)
 	
 			# FIND CIRCLE ON SPHERE
 			circle <- circleOnSphereFromPoint(sphere, d=dist_J1_J2, p=joint.coor[1, , 1])
 			
-			# CHOOSE POINT ON CIRCLE
-			J2_npos <- circlePoint(circle, T=input[[2]][iter, 4])
+			# IF NO CIRCLE
+			if(is.null(circle)) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=TRUE))
 
+			# CHOOSE POINT ON CIRCLE
+			J2_npos <- circlePoint(circle, T=input[[2]][iter, 1])
 
 			## FIND ROTATION OF SECOND BODY
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
@@ -170,13 +173,23 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			tmat4[1:3, 4] <- joint.coor[3, , 1]
 
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
-			tmat5[1:3, 1:3] <- tMatrixEP(cprod(v_pre, v_new), -avec(v_pre, v_new))
+			tmat6[1:3, 1:3] <- tMatrixEP(cprod(v_pre, v_new), -avec(v_pre, v_new))
+
+			# CHECK FOR ROTATION BETWEEN S-JOINTS
+			#if(!is.na(input[[2]][1]) || !is.na(input[[3]][1])){
+			
+			#	if(!is.na(input[[2]][1])) angle <- input[[2]][iter, 1]
+			#	if(!is.na(input[[3]][1])) angle <- input[[3]][iter, 1]
+				
+			#	tmat5[1:3, 1:3] <- tMatrixEP(J2_npos - joint.coor[3, , 1], angle)
+			#}
+			if(!is.na(input[[3]][1])) tmat5[1:3, 1:3] <- tMatrixEP(J2_npos - joint.coor[3, , 1], angle <- input[[3]][iter, 1])
 
 			# TRANSLATE TO CENTER OF ROTATION
-			tmat6[1:3, 4] <- -joint.coor[3, , 1]
+			tmat7[1:3, 4] <- -joint.coor[3, , 1]
 
 			# COMBINE TRANSFORMATIONS
-			tmat_body2 <- tmat4 %*% tmat5 %*% tmat6
+			tmat_body2 <- tmat4 %*% tmat5 %*% tmat6 %*% tmat7
 		}
 
 
@@ -196,15 +209,16 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			
 			# If no solution, return NULL
 			if(is.vector(J2_npos)){
-				if(is.na(J2_npos[1])) return(NULL)
+				if(is.na(J2_npos[1])) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=FALSE))
 			}else{
-				if(is.na(J2_npos[1,1])) return(NULL)
+				if(is.na(J2_npos[1,1])) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=FALSE))
 			}
 		}
 
 		if(type_str %in% c('S-S*-R', 'S-S*-S')){
 		
-			tmat22 <- diag(4)
+			# SET NULL TRANSFORMATION MATRICES
+			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 		
 			## FIND TRANSFORMATION OF FIRST BODY
 			# ROTATE COUPLER LINK TO MATCH VECTOR BETWEEN UNTRANSFORMED AND TRANSFORMED JOINT
@@ -215,25 +229,29 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 			tmat1[1:3, 4] <- joint.coor[1, , 1]
 
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
-			tmat2[1:3, 1:3] <- tMatrixEP(cprod(v_pre, v_new), -avec(v_pre, v_new))
+			tmat3[1:3, 1:3] <- tMatrixEP(cprod(v_pre, v_new), -avec(v_pre, v_new))
 
 			# CHECK FOR ROTATION BETWEEN S-JOINTS
-			if(!is.na(input[[1]][1]) || !is.na(input[[2]][1])){
+			#if(!is.na(input[[1]][1]) || !is.na(input[[2]][1])){
 			
-				if(!is.na(input[[1]][1])) angle <- input[[1]][iter, 1]
-				if(!is.na(input[[2]][1])) angle <- input[[2]][iter, 1]
+			#	if(!is.na(input[[1]][1])) angle <- input[[1]][iter, 1]
+			#	if(!is.na(input[[2]][1])) angle <- input[[2]][iter, 1]
 				
-				tmat22[1:3, 1:3] <- tMatrixEP(J2_npos - joint.coor[1, , 1], angle)
-			}
+			#	tmat2[1:3, 1:3] <- tMatrixEP(J2_npos - joint.coor[1, , 1], angle)
+			#}
+			if(!is.na(input[[1]][1])) tmat2[1:3, 1:3] <- tMatrixEP(J2_npos - joint.coor[1, , 1], input[[1]][iter, 1])
 
 			# TRANSLATE TO CENTER OF ROTATION
-			tmat3[1:3, 4] <- -joint.coor[1, , 1]
+			tmat4[1:3, 4] <- -joint.coor[1, , 1]
 
 			# COMBINE TRANSFORMATIONS
-			tmat_body1 <- tmat1 %*% tmat22 %*% tmat2 %*% tmat3
+			tmat_body1 <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
 		}
 
 		if(type_str %in% c('S-S*-R', 'R-R*-R')){
+
+			# SET NULL TRANSFORMATION MATRICES
+			tmat4 <- tmat5 <- tmat6 <- diag(4)
 
 			## FIND ROTATION OF SECOND BODY
 			# ROTATION TO ALIGN WITH NEW JOINT POSITION
@@ -255,6 +273,9 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 		if(type_str == 'R-R*-R'){
 			
+			# SET NULL TRANSFORMATION MATRICES
+			tmat1 <- tmat2 <- tmat3 <- diag(4)
+			
 			## FIND ROTATION OF FIRST BODY
 			v_pre <- joint.coor[2, , J2_J1_set] - joint.coor[1, , 1]
 			v_new <- J2_npos - joint.coor[1, , 1]
@@ -274,6 +295,9 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 		if(type_str == 'L-S*-S'){
 		
+			# SET NULL TRANSFORMATION MATRICES
+			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
+			
 			#if(print.progress) print(joint.status)
 		
 			## SLIDE S TO ALIGN L- AND S-JOINTS: INTERSECTION OF SPHERE AND LINE
@@ -325,5 +349,5 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 		}
 	}
 
-	return(NULL)
+	return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=FALSE))
 }
