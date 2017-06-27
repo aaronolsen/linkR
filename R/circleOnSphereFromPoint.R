@@ -14,9 +14,9 @@ circleOnSphereFromPoint <- function(sphere, d, p, point.compare=NULL){
 	
 	# SOLVE FOR DISTANCE OF CIRCLE CENTER FROM SPHERE CENTER
 	distCC <- (d^2 - distCp^2 - sphere$R^2) / (-2*distCp)
-	
+
 	# NO INTERSECTION - POINT IS TOO FAR FROM SPHERE
-	if(distCC > sphere$R) return(NULL)
+	if(abs(distCC) > sphere$R) return(NULL)
 
 	# SOLVE FOR CIRCLE RADIUS
 	radius <- sqrt(sphere$R^2 - distCC^2)
