@@ -1,6 +1,6 @@
 fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.param, 
-	input.joint, input.body, joint.coor = NULL, fit.wts = NULL, joint.names = NULL, fixed.body = 'Fixed', 
-	print.progress = FALSE){
+	input.joint, input.body, joint.coor = NULL, joint.optim = rep(TRUE, nrow(joint.coor)), fit.wts = NULL, 
+	joint.names = NULL, planar = FALSE, fixed.body = 'Fixed', print.progress = FALSE){
 
 	# Start run time
 	time1 <- proc.time()
@@ -10,9 +10,9 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	control <- list(
 		'joint.coor.bounds.factor'=0.1,
 		'fit.points.bounds.factor'=0.1,
-		'optim.frame.max'=20,
+		'optim.frame.max'=25,
 		'optim.to.prop'=0.001,
-		'optim.iter.max'=3
+		'optim.iter.max'=5
 	)
 
 	# Use motion between two bodies connected by each joint to generate initial joint 
@@ -34,7 +34,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	if(is.null(joint.coor)) joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
 	
 	# Set joint coordinates to optimize
-	joints_optim <- which(is.na(joint.coor[, 1]))
+	joints_optim <- which(joint.optim)
 
 	# Set NA joint constraints
 	joint.cons <- setNames(as.list(rep(NA, n_joints)), joint.names)
@@ -64,7 +64,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	## Estimate initial joint constraints
 	if(print.progress) cat(paste0('\tEstimating joint constraints...\n'))
-	for(joint_num in 1:nrow(mechanism$body.conn.num)){
+	for(joint_num in 1:n_joints){
 	
 		if(!is.na(joint.coor[joint_num, 1]) && joint.types[joint_num] == 'S'){
 			joint.cons[[joint_num]] <- diag(3)
@@ -104,16 +104,45 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		# **** Could use the angles recovered from fitJointConstraint to fill initial input parameter estimates
 		fit_joint_cons <- fitJointConstraint(coor=fit_points, type=joint.types[joint_num], print.progress=FALSE)
 
-		if(joint.types[joint_num] == 'R'){
-			joint.coor[joint_num, ] <- fit_joint_cons$cons[1:3]
-			joint.cons[[joint_num]] <- fit_joint_cons$cons[4:6]
+		if(joint.types[joint_num] %in% c('R', 'S')){
+
+			if(is.na(joint.coor[joint_num, 1])) joint.coor[joint_num, ] <- fit_joint_cons$cons[1:3]
+
+			if(joint.types[joint_num] == 'R') joint.cons[[joint_num]] <- fit_joint_cons$cons[4:6]
+			if(joint.types[joint_num] == 'S') joint.cons[[joint_num]] <- diag(3)
 		}
-		if(joint.types[joint_num] == 'S'){
-			joint.coor[joint_num, ] <- fit_joint_cons$cons[1:3]
-			joint.cons[[joint_num]] <- diag(3)
+	}
+
+	# If planar is TRUE, set joint coordinates into same plane and R-joint axes perpendicular to plane
+	if(planar){
+		
+		# Find normal vector to plane
+		v123 <- cprod(joint.coor[3, ]-joint.coor[1, ], joint.coor[2, ]-joint.coor[1, ])
+		v124 <- cprod(joint.coor[4, ]-joint.coor[1, ], joint.coor[2, ]-joint.coor[1, ])
+		plane_nvector <- uvector(colMeans(rbind(v123, v124)))
+		
+		# Check if a joint is fixed
+		if(sum(!joint.optim) == 1){
+
+			# Set joint center as point in plane
+			plane_point <- joint.coor[!joint.optim, ]
+		}else{
+
+			# Set joint center as point in plane
+			plane_point <- colMeans(joint.coor)
+		}
+		
+		# Set all R-joint axes to normal vector
+		for(joint_num in 1:n_joints){
+
+			# Project joint coordinates into plane
+			joint.coor[joint_num, ] <- pointPlaneProj(joint.coor[joint_num, ], plane_point, plane_nvector)
+
+			if(joint.types[joint_num] == 'R') joint.cons[[joint_num]] <- plane_nvector
 		}
 	}
 	
+
 	# Re-define linkage with initial joint coordinate and constraints
 	mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
 		joint.cons=joint.cons, body.conn=body.conn, fixed.body=fixed.body)
@@ -177,7 +206,6 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	# Set initial value for reference iteration to 0 - this will also be optimized
 	input_optim[ref.iter, ] <- 0
 
-
 	## Prepare joint coordinate optimization vectors
 	# Get range of joint coordinate positions along each axis
 	joint_coor_range <- apply(apply(mechanism$joint.coor, 2, 'range'), 2, 'diff')
@@ -202,6 +230,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		if(joint.types[i] == 'S') next
 		if(joint.types[i] == 'R') n_cons[i] <- 3
 	}
+	
 
 	## Prepare fit point pose optimization vectors
 	# Get range of joint coordinate positions along each axis
@@ -266,6 +295,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	optim_iter <- 0
 	optim_errors <- c(mean(fit_points_range)*1000, mean(fit_points_range)*1000-opt_to_diff*2)
 
+
 #if(FALSE){
 	# Cycle optimizing the input parameters, joint constraints and coordinates, and body 
 	#	pose until error changes less than difference threshold between consecutive 
@@ -313,7 +343,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			# If first cycle, set next input parameters to current values
 			if(optim_iter == 0 && i < n_optim) input_optim[optim_use[i+1], ] <- input_fit$par
 		}
-
+		
 		# Print error
 		if(print.progress) cat(paste0('', round(mean(input_fit_errors_i, na.rm=TRUE), 5), '->', round(mean(input_fit_errors_f, na.rm=TRUE), 5)))
 
@@ -322,6 +352,54 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		for(j in 1:length(input_param_optim)){
 			input_param_optim[[j]] <- matrix(input_optim[optim_use, n:(n + n_input[j] - 1)], nrow=n_optim, ncol=n_input[j])
 			n <- n + n_input[j]
+		}
+
+		#return(list('mechanism'=mechanism, 'input.param'=input_param_optim, 'rmse.error'=input_fit_errors_f))
+
+		## Optimize mechanism orientation
+		if(planar){
+
+			# Find initial error
+			if(print.progress) mtfm_fit_error_i <- mechanism_transform_error(rep(0, 3), 
+				fit.points=fit.points[, , optim_use], mechanism=mechanism, 
+				input.param=input_param_optim, input.joint=input.joint, input.body=input.body, 
+				fit.wts=fit.wts, center=mechanism$joint.coor[!joint.optim, ])
+
+			# Run optimization
+			mtfm_fit <- tryCatch(
+				expr={
+					nlminb(start=rep(0, 3), objective=mechanism_transform_error, 
+						lower=c(rep(-2*pi, 3)), 
+						upper=c(rep(2*pi, 3)), 
+						fit.points=fit.points[, , optim_use], mechanism=mechanism, 
+						input.param=input_param_optim, input.joint=input.joint, input.body=input.body, 
+						fit.wts=fit.wts, center=mechanism$joint.coor[!joint.optim, ])
+				},
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
+			)
+			
+			# Print error
+			if(print.progress) cat(paste0(', ', round(mtfm_fit_error_i, 5), '->', round(mtfm_fit$objective, 5)))
+			
+			# Apply optimized parameters
+			tmat1 <- tmat2 <- tmat3 <- diag(4)
+			tmat1[1:3, 4] <- mechanism$joint.coor[!joint.optim, ]
+			tmat2[1:3, 1:3] <- rotationMatrixZYX(mtfm_fit$par[1:3])
+			tmat3[1:3, 4] <- -mechanism$joint.coor[!joint.optim, ]
+			tmat <- tmat1 %*% tmat2 %*% tmat3
+			
+			# Apply transformation to joint constraints
+			for(i in 1:mechanism$num.joints){
+				if(mechanism$joint.types[i] == 'R'){
+					cons_vec <- rbind(mechanism$joint.coor[i,], mechanism$joint.coor[i,]+mechanism$joint.cons[[i]][, , 1])
+					cons_vec_t <- applyTransform(cons_vec, tmat)
+					mechanism$joint.cons[[i]][, , 1] <- cons_vec_t[2, ] - cons_vec_t[1, ]
+				}
+			}
+
+			# Apply transformation to joint coordinates
+			mechanism$joint.coor <- applyTransform(mechanism$joint.coor, tmat)	
 		}
 
 
@@ -371,48 +449,58 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		}
 
 
+		#return(list('mechanism'=mechanism, 'input.param'=input_param_optim, 'rmse.error'=input_fit_errors_f))
+
 		## Optimize joint constraints
-		# Convert joint constraint list into vector
-		cons_optim <- c()
-		cons_names <- c()
-		for(i in 1:n_joints){
-			if(n_cons[i] == 0) next
-			cons_optim <- c(cons_optim, c(mechanism$joint.cons[[i]][, , 1]))
-			cons_names <- c(cons_names, paste0(mechanism$joint.names[i], '_', 1:n_cons[i]))
-		}
-		
-		# Set constraint vector names
-		names(cons_optim) <- cons_names
-		
-		# Get initial error
-		if(print.progress) cons_fit_error_i <- animate_mechanism_error(cons_optim, 
-			replace='joint.cons', fit.points=fit.points[, , optim_use], mechanism=mechanism, 
-			input.param=input_param_optim, input.joint=input.joint, input.body=input.body, 
-			fit.wts=fit.wts, n.cons=n_cons)
+		if(!planar){
 
-		# Run optimization
-		cons_fit <- tryCatch(
-			expr={
-				nlminb(start=cons_optim, objective=animate_mechanism_error, 
-					lower=rep(-1, length(cons_optim)), upper=rep(1, length(cons_optim)), 
-					replace='joint.cons', fit.points=fit.points[, , optim_use], 
-					mechanism=mechanism, input.param=input_param_optim, input.joint=input.joint, 
-					input.body=input.body, fit.wts=fit.wts, n.cons=n_cons)
-			},
-			error=function(cond) {print(cond);return(NULL)},
-			warning=function(cond) {print(cond);return(NULL)}
-		)
+			# Convert joint constraint list into vector
+			if(sum(n_cons) > 0){
 
-		# Print error
-		if(print.progress) cat(paste0(', ', round(cons_fit_error_i, 5), '->', round(cons_fit$objective, 5)))
+				cons_optim <- c()
+				cons_names <- c()
+				for(i in 1:n_joints){
+					if(n_cons[i] == 0) next
+					cons_optim <- c(cons_optim, c(mechanism$joint.cons[[i]][, , 1]))
+					cons_names <- c(cons_names, paste0(mechanism$joint.names[i], '_', 1:n_cons[i]))
+				}
 		
-		# Replace previous with optimized joint coordinates
-		i_params <- 1
-		for(i in 1:n_joints){
-			if(n_cons[i] == 0) next
-			mechanism$joint.cons[[i]][, , 1] <- cons_fit$par[i_params:(i_params+n_cons[i]-1)]
-			i_params <- i_params + n_cons[i]
+				# Set constraint vector names
+				names(cons_optim) <- cons_names
+		
+				# Get initial error
+				if(print.progress) cons_fit_error_i <- animate_mechanism_error(cons_optim, 
+					replace='joint.cons', fit.points=fit.points[, , optim_use], mechanism=mechanism, 
+					input.param=input_param_optim, input.joint=input.joint, input.body=input.body, 
+					fit.wts=fit.wts, n.cons=n_cons)
+
+				# Run optimization
+				cons_fit <- tryCatch(
+					expr={
+						nlminb(start=cons_optim, objective=animate_mechanism_error, 
+							lower=rep(-1, length(cons_optim)), upper=rep(1, length(cons_optim)), 
+							replace='joint.cons', fit.points=fit.points[, , optim_use], 
+							mechanism=mechanism, input.param=input_param_optim, input.joint=input.joint, 
+							input.body=input.body, fit.wts=fit.wts, n.cons=n_cons)
+					},
+					error=function(cond) {print(cond);return(NULL)},
+					warning=function(cond) {print(cond);return(NULL)}
+				)
+
+				# Print error
+				if(print.progress) cat(paste0(', ', round(cons_fit_error_i, 5), '->', round(cons_fit$objective, 5)))
+		
+				# Replace previous with optimized joint constraints
+				i_params <- 1
+				for(i in 1:n_joints){
+					if(n_cons[i] == 0) next
+					mechanism$joint.cons[[i]][, , 1] <- cons_fit$par[i_params:(i_params+n_cons[i]-1)]
+					i_params <- i_params + n_cons[i]
+				}
+			}
 		}
+
+		#return(list('mechanism'=mechanism, 'input.param'=input_param_optim, 'rmse.error'=input_fit_errors_f))
 
 
 		## Optimize reference pose of each body
@@ -555,24 +643,26 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	## Standardize joint coordinates equivalent 
 	# Slide joint coordinates, when applicable, to closest points between connected bodies
-	for(i in 1:n_joints){
+	if(!planar){
+		for(i in 1:n_joints){
 
-		if(joint.types[i] == 'S') next
+			if(joint.types[i] == 'S') next
 		
-		# Get points of bodies connected by joint
-		body1_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 1], ]
-		body2_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 2], ]
+			# Get points of bodies connected by joint
+			body1_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 1], ]
+			body2_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 2], ]
 
-		# Find nearest points on connected bodies
-		nearest_pts <- nearestPointsOnBodies(body1_pts, body2_pts)
+			# Find nearest points on connected bodies
+			nearest_pts <- nearestPointsOnBodies(body1_pts, body2_pts)
 		
-		# Find mean point
-		nearest_pt <- colMeans(nearest_pts)
+			# Find mean point
+			nearest_pt <- colMeans(nearest_pts)
 
-		if(joint.types[i] == 'R'){
+			if(joint.types[i] == 'R'){
 
-			# Find point on R-joint axis closest to nearest point between bodies
-			mechanism$joint.coor[i, ] <- pointNormalOnLine(nearest_pt, mechanism$joint.coor[i, ], mechanism$joint.coor[i, ]+mechanism$joint.cons[[i]][, , 1])
+				# Find point on R-joint axis closest to nearest point between bodies
+				mechanism$joint.coor[i, ] <- pointNormalOnLine(nearest_pt, mechanism$joint.coor[i, ], mechanism$joint.coor[i, ]+mechanism$joint.cons[[i]][, , 1])
+			}
 		}
 	}
 	
