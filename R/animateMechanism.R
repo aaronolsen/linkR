@@ -1,6 +1,6 @@
 animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.body = NULL, 
-	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, check.inter.point.dist = TRUE, 
-	print.progress = FALSE){
+	use.ref.as.prev = FALSE, check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
+	check.inter.point.dist = TRUE, print.progress = FALSE){
 
 	if(FALSE){
 		tA <- 0
@@ -392,7 +392,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		}
 
 		# SET PREVIOUS ITERATION
-		prev_iter <- iter
+		if(use.ref.as.prev){ prev_iter <- 1 }else{ prev_iter <- iter }
 
 		#tABB <- tABB + proc.time()['user.self'] - tABB1
 	}
