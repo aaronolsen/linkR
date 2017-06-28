@@ -236,6 +236,11 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 		AoRs <- matrix(NA, n_coor, 3)
 		
 		#
+		if(type == 'S'){
+			#print(coor)
+		}
+		
+		#
 		if(type == 'S') max_disp_prop <- control$max.disp.prop.S
 		if(type == 'R') max_disp_prop <- control$max.disp.prop.R
 		if(type == 'U') max_disp_prop <- control$max.disp.prop.U

@@ -54,10 +54,6 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 		cat(paste0(paste0(sort(apply_to_joints), collapse=', '), '\n'))
 	}
 
-	if(print.progress && apply_to_joints[1] == "R2(2)-1"){
-		#print(joint.coor[, , 1, ])
-	}
-
 	list(
 		'tmarr'=tmarr, 
 		'joint.coor'=joint.coor, 
