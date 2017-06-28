@@ -1,6 +1,6 @@
 animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input.joint, 
 	input.body, fit.wts, replace, n.input = NULL, n.cons = NULL, 
-	coor.vectors = NULL, joint.optim = NULL){
+	coor.vectors = NULL, joint.optim = NULL, use.ref.as.prev = FALSE){
 
 	# Replace parameter with optimize parameters
 	if(replace == 'input.param'){
@@ -35,7 +35,7 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 	
 	# Run mechanism model
 	anim_mech <- suppressWarnings(animateMechanism(mechanism, input.param=input.param, input.joint=input.joint, 
-		input.body=input.body, print.progress=FALSE, check.inter.joint.dist=FALSE, 
+		input.body=input.body, use.ref.as.prev=use.ref.as.prev, print.progress=FALSE, check.inter.joint.dist=FALSE, 
 		check.joint.cons=FALSE))
 	
 	# Compare simulated coordinates to ideal
