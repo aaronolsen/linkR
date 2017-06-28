@@ -7,11 +7,20 @@ mechanism_transform_error <- function(p, fit.points, mechanism,
 		tmat[1:3, 1:3] <- rotationMatrixZYX(p[1:3])
 		tmat[1:3, 4] <- p[4:6]
 	}else{
-		tmat1 <- tmat2 <- tmat3 <- diag(4)
-		tmat1[1:3, 4] <- center
-		tmat2[1:3, 1:3] <- rotationMatrixZYX(p)
-		tmat3[1:3, 4] <- -center
-		tmat <- tmat1 %*% tmat2 %*% tmat3
+		if(nrow(center) == 1){
+			tmat1 <- tmat2 <- tmat3 <- diag(4)
+			tmat1[1:3, 4] <- center
+			tmat2[1:3, 1:3] <- rotationMatrixZYX(p)
+			tmat3[1:3, 4] <- -center
+			tmat <- tmat1 %*% tmat2 %*% tmat3
+		}else{
+
+			tmat1 <- tmat2 <- tmat3 <- diag(4)
+			tmat1[1:3, 4] <- center[1, ]
+			tmat2[1:3, 1:3] <- tMatrixEP(center[4, ]-center[1, ], p)
+			tmat3[1:3, 4] <- -center[1, ]
+			tmat <- tmat1 %*% tmat2 %*% tmat3
+		}
 	}
 
 	# Apply transformation to joint constraints
