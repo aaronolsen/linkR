@@ -41,7 +41,8 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 	# GET XYZ OF ALL POINTS
 	if(!is.null(body.points)){
 		if(is.matrix(body.points)) xyz <- rbind(xyz, body.points)
-		if(is.array(body.points) && length(dim(body.points)) > 2) xyz <- rbind(xyz, apply(body.points, 2, matrix, nrow=dim(body.points)[1]*dim(body.points)[3], ncol=dim(body.points)[2]))
+		if(is.array(body.points) && length(dim(body.points)) == 3) xyz <- rbind(xyz, cbind(c(body.points[, 1, ]), c(body.points[, 2, ]), c(body.points[, 3, ])))
+		#if(is.array(body.points) && length(dim(body.points)) > 2) xyz <- rbind(xyz, apply(body.points, 2, matrix, nrow=dim(body.points)[1]*dim(body.points)[3], ncol=dim(body.points)[2]))
 	}
 
 	# GET XYZ CENTROID SIZE
@@ -177,12 +178,24 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 
 			# DRAW ANIMATED JOINTS
 			if(debug){
-				svg.points(linkage$joint.coorn[, , , 1], col.fill='red', 
+			
+				joints_n1 <- linkage$joint.coorn[, , , 1]
+				joints_n2 <- linkage$joint.coorn[, , , 2]
+				if(dim(linkage$joint.coorn)[1] == 1){
+					joints_n1 <- array(joints_n1, dim=dim(linkage$joint.coorn)[1:3])
+					joints_n2 <- array(joints_n2, dim=dim(linkage$joint.coorn)[1:3])
+				}
+			
+				svg.points(joints_n1, col.fill='red', 
 					col.stroke='red', cex=joint.cex, lwd=joint.lwd, layer='Joints')
-				svg.points(linkage$joint.coorn[, , , 2], col.fill='none', 
+				svg.points(joints_n2, col.fill='none', 
 					col.stroke='green', cex=joint.cex+2, lwd=joint.lwd, layer='Joints')
 			}else{
-				svg.points(joints, col.fill=joint.col.fill, 
+
+				joints_plot <- joints
+				if(dim(joints)[1] == 1) joints_plot <- array(joints_plot, dim=dim(joints)[1:3])
+
+				svg.points(joints_plot, col.fill=joint.col.fill, 
 					col.stroke=joint.col.stroke, cex=joint.cex, lwd=joint.lwd, layer='Joints')
 			}
 
@@ -238,7 +251,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 		}
 
 		# CONNECT JOINTS WITH PATHS
-		if(connect.joints){
+		if(connect.joints && !is.null(linkage$joint.conn)){
 			if(animate){
 				for(i in 1:nrow(linkage$joint.conn)){
 
@@ -254,7 +267,6 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 			}else{
 
 				for(itr in 1:num_iter){
-					
 					for(i in 1:nrow(linkage$joint.conn)){
 
 						# SKIP LINES AMONG JOINTS CONNECTED TO GROUND
