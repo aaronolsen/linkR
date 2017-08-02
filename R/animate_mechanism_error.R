@@ -1,5 +1,5 @@
 animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input.joint, 
-	input.body, fit.wts, replace, n.input = NULL, n.cons = NULL, 
+	input.body, fit.wts, replace, planar = FALSE, n.input = NULL, cons.fill = NULL, 
 	coor.vectors = NULL, joint.optim = NULL, use.ref.as.prev = FALSE){
 
 	# Replace parameter with optimize parameters
@@ -12,24 +12,46 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 	}else if(replace == 'joint.coor'){
 
 		#mechanism$joint.coor <- mechanism$joint.coor + matrix(p, mechanism$num.joints, 3, byrow=TRUE)
-		
+
 		j <- 1
 		for(i in joint.optim){
-			if(mechanism$joint.types[i] == 'R'){
-				mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j:(j+1)]*coor.vectors[[i]])
-				j <- j + 2
-			}else{
+			if(length(coor.vectors[[i]]) == 1){
 				mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + p[j:(j+2)]
 				j <- j + 3
+			}else{
+				if(nrow(coor.vectors[[i]]) == 1){
+					mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j]*coor.vectors[[i]])
+					j <- j + 1
+				}else if(nrow(coor.vectors[[i]]) == 2){
+					mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j:(j+1)]*coor.vectors[[i]])
+					j <- j + 2
+				}
+			}
+
+			if(planar){
+				mechanism$joint.coor[i, ] <- pointPlaneProj(mechanism$joint.coor[i, ], 
+					p=mechanism$joint.coor[1, ], n=mechanism$joint.cons[[i]][, , 1])
 			}
 		}
+		
 
 	}else if(replace == 'joint.cons'){
-		i_params <- 1
-		for(i in 1:mechanism$num.joints){
-			if(n.cons[i] == 0) next
-			mechanism$joint.cons[[i]][, , 1] <- p[i_params:(i_params+n.cons[i]-1)]
-			i_params <- i_params + n.cons[i]
+
+		k <- 1
+		n <- 1
+		for(i in 1:length(mechanism$joint.cons)){
+			for(j in 1:nrow(mechanism$joint.cons[[i]])){
+				if(cons.fill[k] == 'v'){
+					mechanism$joint.cons[[i]][j, , 1] <- p[n:(n+2)]
+					n <- n + 3
+				}else if(cons.fill[k] == 'vo'){
+					mechanism$joint.cons[[i]][j, , 1] <- rotateBody(m=mechanism$joint.cons[[i]][j, , 1], v=mechanism$joint.cons[[i]][j-1, , 1], a=p[n])
+					n <- n + 1
+				}else if(cons.fill[k] == 'cprod'){
+					mechanism$joint.cons[[i]][j, , 1] <- cprod(mechanism$joint.cons[[i]][j-2, , 1], mechanism$joint.cons[[i]][j-1, , 1])
+				}
+				k <- k + 1
+			}
 		}
 	}
 	
