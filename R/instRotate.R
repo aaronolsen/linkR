@@ -78,7 +78,7 @@ instRotate <- function(m1, m2, na.rm = FALSE, positive.only = TRUE, aor.only = F
 			matrix(dcen*uvector(v2rcen), 2, 3, byrow=TRUE)*matrix(rep(c(-1,1), 6), 2, 3)
 
 		# Try both potential CoRs
-		rmatch <- c(sum(abs(rotateBody(m1, rcen[1, ], AoR, angle) - m2)), sum(abs(rotateBody(m1, rcen[2, ], AoR, angle) - m2)))
+		rmatch <- c(sum(abs(rotateBody(m=m1, p=rcen[1, ], v=AoR, a=angle) - m2)), sum(abs(rotateBody(m=m1, p=rcen[2, ], v=AoR, a=angle) - m2)))
 
 		# Find center with lowest difference from actual body position
 		rcen <- rcen[which.min(rmatch), ]
@@ -96,7 +96,7 @@ instRotate <- function(m1, m2, na.rm = FALSE, positive.only = TRUE, aor.only = F
 	#rcen <- pointNormalOnLine(pt=m1_centroid, l1=rcen, l2=rcen + AoR)
 
 	# Find error as mean distance between points
-	#mean_error <- mean(sqrt(rowSums((rotateBody(m1, p=rcen, v=AoR, a=angle) - m2)^2))); print(mean_error)
+	#mean_error <- mean(sqrt(rowSums((rotateBody(m=m1, p=rcen, v=AoR, a=angle) - m2)^2))); print(mean_error)
 
 	list(
 		'AoR'=AoR,

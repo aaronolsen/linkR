@@ -30,11 +30,11 @@ rtd <- function(m1, m2, tvec = NULL, na.rm = FALSE, positive.only = TRUE){
 
 	## Test that combination of rotation and translation gives 0 error
 	# Translation first
-	#m1r <- rotateBody(m1t, p=inst_rotate2$CoR, v=inst_rotate2$AoR, a=inst_rotate2$angle)
+	#m1r <- rotateBody(m=m1t, p=inst_rotate2$CoR, v=inst_rotate2$AoR, a=inst_rotate2$angle)
 	#mean_error <- mean(sqrt(rowSums((m1r - m2)^2))); print(mean_error)
 
 	# Rotation first - CoR must be translated
-	#m1r <- rotateBody(m1, p=inst_rotate2$CoR - tvec, v=inst_rotate2$AoR, a=inst_rotate2$angle) + matrix(tvec, nrow(m1), 3, byrow=TRUE)
+	#m1r <- rotateBody(m=m1, p=inst_rotate2$CoR - tvec, v=inst_rotate2$AoR, a=inst_rotate2$angle) + matrix(tvec, nrow(m1), 3, byrow=TRUE)
 	#mean_error <- mean(sqrt(rowSums((m1r - m2)^2))); print(mean_error)
 
 	rlist <- list(
