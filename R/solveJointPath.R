@@ -1,7 +1,6 @@
-solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons, 
-	body.num, input, body.conn, 
-	joint.names, joint.prev, joint.ref, iter = 1, 
-	print.progress = FALSE, indent = ''){
+solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  body.num, 
+	input, body.conn, joint.names, joint.prev, joint.ref, iter = 1, print.progress = FALSE, 
+	indent = ''){
 
 	# INPUT
 	if(length(joint.types) == 1){
@@ -13,44 +12,43 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 		jt_set <- which(body.num == body.conn)
 		
 		# CREATE TRANSFORMATION MATRIX
-		if(joint.types %in% c('S')){
+		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U')){
 
 			# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
-			if(sum(is.na(input[iter, 1:3])) == 3) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=TRUE))
+			if(sum(is.na(input[iter, ])) == ncol(input)) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=TRUE))
+			
+			#
+			if(joint.types == 'U'){
+				jt_set <- 1:2
+				joint.cons[[1]][2, , iter, jt_set[2]] <- rotateBody(m=joint.cons[[1]][2, , iter, jt_set[2]], v=joint.cons[[1]][1, , iter, jt_set[1]], a=input[iter, 1])
+			}else{
+				jt_set <- rep(jt_set, dim(joint.cons[[1]])[1])
+			}
 
 			if(print.progress){
-				AOR <- paste0(paste0(round(joint.cons[[1]][1, , iter, jt_set], 3), collapse=','), ' ', paste0(round(joint.cons[[1]][2, , iter, jt_set], 3), collapse=','), ' ', paste0(round(joint.cons[[1]][3, , iter, jt_set], 3), collapse=','))
-				cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 3), collapse=','), '; AoR:', AOR, '; Angle:', round(input[iter, 1], 3),'}\n'))
+
+				AORs <- c()
+				for(i in 1:dim(joint.cons[[1]])[1]) AORs <- c(AORs, paste0(round(joint.cons[[1]][i, , iter, jt_set[i]], 3), collapse=','))
+				AOR <- paste0(paste0('AoR', 1:length(AORs), ':', AORs), collapse='; ')
+
+				cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set[1]], 3), collapse=','), '; ', AOR, '; Angle:', round(input[iter, 1], 3),'}\n'))
 			}
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1[1:3, 4] <- joint.coor[, jt_set]
+			tmat1[1:3, 4] <- joint.coor[, jt_set[1]]
 
 			# LOOP THROUGH EACH COLUMNN OF INPUT PARAMETERS
-			for(i in 1:nrow(joint.cons[[1]][, , iter, jt_set])){
+			for(i in dim(joint.cons[[1]])[1]:1){
 			
 				# SKIP IF NA
 				if(is.na(input[iter, i])) next
-
+				
 				# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
-				tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(joint.cons[[1]][i, , iter, jt_set], -input[iter, i])
+				tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(joint.cons[[1]][i, , iter, jt_set[i]], -input[iter, i])
 			}
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION
-			tmat3[1:3, 4] <- -joint.coor[, jt_set]
-			
-		}else if(joint.types == 'R'){
-			
-			if(print.progress) cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set], 3), collapse=','), '; AoR:', paste0(round(joint.cons[[1]][1, , iter, jt_set], 3), collapse=','), '; Angle:', round(input[iter, 1], 3),'}\n'))
-
-			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1[1:3, 4] <- joint.coor[, jt_set]
-
-			# APPLY ROTATION TO TRANSFORMATION MATRIX
-			tmat2[1:3, 1:3] <- tMatrixEP(joint.cons[[1]][, , iter, jt_set], -input[iter, 1])
-
-			# TRANSLATE BACK FROM CENTER OF ROTATION
-			tmat3[1:3, 4] <- -joint.coor[, jt_set]
+			tmat3[1:3, 4] <- -joint.coor[, jt_set[1]]
 			
 		}else if(joint.types == 'P'){
 
@@ -65,10 +63,14 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
 			tmat1[1:3, 4] <- input[iter, 1]*joint.cons[[1]][, , iter, jt_set]
+
+		}else{
+			
+			cat('\n');stop(paste0("Unrecognized joint type '", joint.types, "'"))
 		}
 		
 		# CHANGE JOINT STATUS
-		joint.status[jt_set] <- 'i'
+		joint.status[unique(jt_set)] <- 'i'
 
 		# COMBINE TRANSFORMATION MATRICES
 		tmat <- tmat1 %*% tmat2 %*% tmat3
