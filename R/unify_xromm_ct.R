@@ -1,4 +1,4 @@
-unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
+unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE, print.progress.iter = c(1)){
 
 	# Get body names
 	body_names <- rownames(ct_mat)
@@ -61,7 +61,7 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 	body_order <- setNames(rep(2, length(body_names)), body_names)
 	body_order[unique(names(body_names_vm[!is.na(body_names_vm)]))] <- 1
 	body_order <- sort(body_order)
-	
+
 	# Get names of virtual markers
 	virtual_markers <- rownames(ct_mat)[!is.na(body_names_vm)]
 
@@ -75,7 +75,15 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 	max_iter <- dim(xr_arr_n)[3]
 	for(iter in min_iter:max_iter){
 	
-		#if(print.progress) cat(iter, '\n')
+		if(print.progress){
+			if(iter %in% print.progress.iter){
+				cat(paste0('Iteration: ', iter, '\n'))
+			}else if(iter == max(print.progress.iter) + 1){
+				#cat(paste0('Iterations: ', iter))
+			}else{
+				#cat(iter)
+			}
+		}
 
 		# Do unification of all common points to approximately orient bodies with single X-ray marker
 		m1 <- xr_arr[rownames(ct_mat)[rownames(ct_mat) %in% dimnames(xr_arr)[[1]]], , iter]
@@ -94,8 +102,8 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 		for(body_name in names(body_order)){
 
 			#if(!body_name %in% c('SuspensoriumL', 'Neurocranium')) next
-			if(print.progress) cat(paste0(body_name, '\n'))
-
+			if(print.progress && iter %in% print.progress.iter) cat(paste0('\t', body_name))
+			
 			# Get body landmarks
 			#ct_mat_sub <- ct_mat[which(body_assoc == body_name), ]
 			ct_row_sub <- grepl(paste0(body_name, '[_|-]'), paste0(rownames(ct_mat), '_'))
@@ -106,23 +114,37 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 			ct_in_xr <- rownames(ct_mat_sub) %in% dimnames(xr_arr_n)[[1]]
 
 			if(sum(ct_in_xr) == 0){
-				if(print.progress) cat(paste0('\t0 common point(s) between CT and X-Ray sets for body \'', body_name, '\'\n'))
+				if(print.progress && iter %in% print.progress.iter) cat(paste0(': 0 common point(s) between CT and X-Ray sets for body \'', body_name, '\'\n'))
 				next
 			}
 
 			# If fewer than 3 non-NA values, skip
-			if(sum(!is.na(xr_arr_n[rownames(ct_mat_sub)[ct_in_xr], 1, iter])) < 3) next
+			#if(sum(!is.na(xr_arr_n[rownames(ct_mat_sub)[ct_in_xr], 1, iter])) < 3){
+			#	if(print.progress && iter %in% print.progress.iter) print(rownames(ct_mat_sub)[ct_in_xr])
+			#	next
+			#}
+			
+			# CT marker names in Xray
+			ct_in_xr_names <- rownames(ct_mat_sub)[ct_in_xr]
 
 			# XROMM markers in CT
-			xr_mat_sub <- matrix(xr_arr_n[rownames(ct_mat_sub)[ct_in_xr], , iter], nrow=sum(ct_in_xr), ncol=ncol(xr_arr_n), 
-				dimnames=list(rownames(ct_mat_sub)[ct_in_xr], NULL))
+			xr_mat_sub <- matrix(xr_arr_n[ct_in_xr_names, , iter], nrow=sum(ct_in_xr), ncol=ncol(xr_arr_n), 
+				dimnames=list(ct_in_xr_names, NULL))
 			
 			# Remove NA values
 			xr_mat_sub <- matrix(xr_mat_sub[!is.na(xr_mat_sub[, 1]), ], nrow=sum(!is.na(xr_mat_sub[, 1])), ncol=ncol(xr_mat_sub), 
 				dimnames=list(rownames(xr_mat_sub)[!is.na(xr_mat_sub[, 1])], NULL))
-			
+
 			# Translate bodies with single marker in common
-			if(nrow(xr_mat_sub) == 1){
+			if(nrow(xr_mat_sub) == 0){
+
+				if(print.progress && iter %in% print.progress.iter) cat(' : all X-ray markers are NA\n')
+				
+				next
+
+			}else if(nrow(xr_mat_sub) == 1){
+
+				if(print.progress && iter %in% print.progress.iter) cat(' : translate body with CT alignment\n')
 
 				# Find translation from CT coordinates to X-ray coordinates
 				tmat <- align_ct_xr$tmat
@@ -136,13 +158,21 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 				# Save transformation matrix
 				tm_arr[, , body_name, iter] <- tmat
 
-			}else if(nrow(xr_mat_sub) == 2){
+				# Set align as NULL
+				align <- NULL
 
-				if(print.progress) cat(paste0('\t', sum(ct_in_xr), ' common point(s) between CT and X-Ray sets for body \'', body_name, '\'\n'))
-				if(print.progress) cat(paste0('\t', sum(is.na(xr_arr_n[rownames(ct_mat_sub)[ct_in_xr], 1, 1])), ' point(s) are NA\n'))
+			}else if(nrow(xr_mat_sub) == 2){
+			
+				# Find which are NA
+				which_is_na <- is.na(xr_arr_n[ct_in_xr_names, 1, 1])
+
+				if(print.progress && iter %in% print.progress.iter) cat(paste0(' : ', sum(ct_in_xr), ' common point(s) between CT and X-Ray sets for body \'', body_name, '\'\n'))
+				if(print.progress && iter %in% print.progress.iter && sum(which_is_na) > 0) cat(paste0('\t\t"', paste0(ct_in_xr_names[which_is_na], collapse='","'), '" is/are are NA\n'))
 				next
 
 			}else{
+
+				if(print.progress && iter %in% print.progress.iter) cat(' : transform CT markers to align with XROMM markers\n')
 
 				# Transform CT markers to correspond with XROMM markers
 				align <- findBestAlignment(xr_mat_sub, ct_mat_sub, m3=cs_ini[, , body_name], sign=1)
@@ -152,28 +182,38 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE){
 				tm_arr[, , body_name, iter] <- align$tmat
 			}
 
-			if(print.progress && !is.null(align)){
-				print(align$dist.error)
-				#cat(paste0('\tError range: ', paste(range(align$dist.error), collapse=', '), '\n'))
+			if(print.progress && iter %in% print.progress.iter && !is.null(align)){
+				#print(align$dist.error)
+				#cat(paste0('\t\tError range: ', paste(round(range(align$dist.error), 3), collapse=', '), '\n'))
+				cat(paste0('\t\tErrors: ', paste0(rownames(align$dist.error), ': ', c(round(align$dist.error, 3)), collapse='; '), '\n'))
 			}
 			
 			# Add new positions of any virtual markers to xr_arr_n
 			if(sum(rownames(ct_mat_sub) %in% virtual_markers) > 0){
-				
+
 				# Virtual markers in subset
 				virtual_markers_sub <- rownames(ct_mat_sub)[rownames(ct_mat_sub) %in% virtual_markers]
 
 				# Remove virtual markers that are non-NA in xr_arr (previously positioned with first body)
 				virtual_markers_sub <- virtual_markers_sub[is.na(xr_arr_n[virtual_markers_sub, 1, iter])]
-				
+
 				# Add new virtual markers
-				if(length(virtual_markers_sub) > 0) xr_arr_n[virtual_markers_sub, , iter] <- ct_mat_sub_t[rownames(ct_mat_sub) %in% virtual_markers, ]
+				if(length(virtual_markers_sub) > 0){
+
+					if(print.progress && iter %in% print.progress.iter) cat(paste0('\t\tAdding virtual markers: ', paste0(virtual_markers_sub, collapse=', '), '\n'))
+					
+					xr_arr_n[virtual_markers_sub, , iter] <- ct_mat_sub_t[virtual_markers_sub, ]
+				}
 			}
 
 			ct_arr[rownames(ct_mat_sub_t), , iter] <- ct_mat_sub_t
 
 			#print(xr_mat_sub);print(ct_mat_sub_t)
 		}
+		
+		#return(1)
+		
+		#if(iter > 4) break
 		
 		#print(ct_arr[, , iter])
 	}
