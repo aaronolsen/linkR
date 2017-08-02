@@ -19,22 +19,22 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 	if(print.progress) cat(paste0('animateMechanism()\n'))
 
+	# CONVERT INPUT.PARAM INTO LIST OF MATRICES FOR CONSISTENCY ACROSS LINKAGES WITH DIFFERING DEGREES OF FREEDOM
+	if(class(input.param) == 'numeric') input.param <- list(matrix(input.param, nrow=length(input.param), ncol=1))
+	if(class(input.param) == 'matrix') input.param <- list(input.param)
+	if(class(input.param) == 'list'){
+		for(i in 1:length(input.param)) if(is.vector(input.param[[i]])) input.param[[i]] <- matrix(input.param[[i]], nrow=length(input.param[[i]]), ncol=1)
+	}
+	
 	# SET NUMBER OF INPUT PARAMETERS
 	n_inputs <- length(input.param)
 
-	# CONVERT INPUT.PARAM INTO LIST OF MATRICES FOR CONSISTENCY ACROSS LINKAGES WITH DIFFERING DEGREES OF FREEDOM
-	if(class(input.param) == 'numeric') input.param <- list(matrix(input.param, nrow=n_inputs, ncol=1))
-	if(class(input.param) == 'matrix') input.param <- list(input.param)
-	if(class(input.param) == 'list'){
-		for(i in 1:n_inputs) if(is.vector(input.param[[i]])) input.param[[i]] <- matrix(input.param[[i]], nrow=length(input.param[[i]]), ncol=1)
-	}
-	
 	# SET NUMBER OF ITERATIONS
 	n_iter <- nrow(input.param[[1]])
 	
 	# SET ITERATIONS TO PRINT WITH PRINT PROGRESS
 	if(print.progress){
-		print.progress.iter <- 1
+		print.progress.iter <- 1:2
 		indent <- '  '
 	}
 	
@@ -57,12 +57,16 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# CONVERT JOINT CONSTRAINTS INTO ARRAYS FOR CHANGING CONSTRAINT VECTORS
 	# ADD ITERATIONS TO JOINT CONSTRAINT ARRAY FOR CHANGING CONSTRAINT PARAMETERS
 	# COPY CONSTRAINTS TO TWO SEPARATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
-	joint_cons <- list()
 	joint_consn <- list()
 	for(i in 1:length(mechanism$joint.cons)){
 		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
-		joint_cons[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter))
 		joint_consn[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter, 2))
+		
+		# If U-joint, make sure only corresponding axis is in each set
+		if(mechanism$joint.types[i] == 'U'){
+			joint_consn[[i]][1, , , 2] <- NA
+			joint_consn[[i]][2, , , 1] <- NA
+		}
 	}
 
 	# COPY COORDINATES TO TWO SEPARATE JOINT COORDINATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
@@ -79,11 +83,13 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# COPY BODY POINTS AND CONVERT TO ARRAY
 	if(!is.null(mechanism$body.points)) body_points <- array(mechanism$body.points, dim=c(dim(mechanism$body.points), n_iter), dimnames=list(rownames(mechanism$body.points), NULL, NULL))
 
-	# IF INPUT.JOINT IS NON-NUMERIC, CONVERT TO NUMERIC EQUIVALENT
+	# IF INPUT.JOINT IS NULL AND A SINGLE JOINT, SET AS INPUT
 	if(is.null(input.joint)){
 		if(n_joints > 1) stop("If the mechanism has more than one joint 'input.joint' must be specified.")
 		input.joint <- 1
 	}
+
+	# IF INPUT.JOINT IS NON-NUMERIC, CONVERT TO NUMERIC EQUIVALENT
 	if(!is.numeric(input.joint[1])){
 		if(sum(!input.joint %in% joint_names) > 0) stop("'input.joint' names do not match joint names.")
 		input_joint_num <- rep(NA, length(input.joint))
@@ -253,6 +259,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# SET STARTING PATH
 			if(path_cycle == 1){ start_path <- 1 }else{ start_path <- n_inputs + 1 }
 
+			# FOR SINGLE JOINT, ONLY INPUT - NO ADDITIONAL PATHS SO LENGTH OF PATHS IS EQUAL TO NUMBER OF INPUTS
+			if(start_path > length(paths)) break
+			
 			for(i in start_path:length(paths)){
 		
 				#tABBA1 <- proc.time()['user.self']
@@ -277,7 +286,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					}
 					cat(paste0(paste0(rep(indent, 3), collapse=''), path_print))
 				}
-
+				
 				# SKIP IF ALL JOINTS ARE KNOWN
 				#if(sum(joint_status[path, ] == '') == 0){
 				#	next
@@ -326,6 +335,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 				#tABBA <- tABBA + proc.time()['user.self'] - tABBA1
 				#tABBB1 <- proc.time()['user.self']
+				#cat('\n')
+				#print(path)
+				#print(mechanism$body.conn.num)
 
 				# SOLVE OR APPLY INPUT TRANSFORMATIONS
 				solve_joint_path <- solveJointPath(joint.types=mechanism$joint.types[path], 
@@ -365,7 +377,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 						joint.ref=joint_ref, joint.cons.ref=joint_cons_ref, joint.types=mechanism$joint.types, joint.status=joint_status, status.to=joint_status_out, 
 						body.names=mechanism$body.names, joint.names=joint_names, 
 						indent=indent, indent.level=4,  print.progress=print_progress_iter)
-
+					
 					# SAVE RESULT
 					joint_coorn <- extend$joint.coor
 					joint_consn <- extend$joint.cons
@@ -418,12 +430,16 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 	# COMBINE TWO JOINT COORDINATE SETS INTO ONE
 	joint_coor <- joint_coorn[, , , 1]
+	
+	# IF SINGLE JOINT MAKE SURE DIMENSIONS ARE CORRECT
+	if(dim(joint_coorn)[1] == 1) joint_coor <- array(joint_coor, dim=dim(joint_coorn)[1:3], dimnames=dimnames(joint_coorn)[1:3])
 
 	# IF SINGLE ITERATION, CONVERT TO 3 DIM ARRAY
 	if(length(dim(joint_coor)) == 2) joint_coor <- array(joint_coor, dim=c(dim(joint_coor), 1), dimnames=list(dimnames(joint_coor)[[1]], NULL, NULL))
 
-	joint_cons <- joint_consn
-	for(i in 1:length(joint_cons)){
+	# Take first joint set to create joint constraint arrays for single body
+	joint_cons <- list()
+	for(i in 1:length(joint_consn)){
 		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
 		if(length(dim(joint_consn[[i]][, , , 1])) == 2){
 			joint_cons[[i]] <- array(joint_consn[[i]][, , , 1], dim=c(1,3,n_iter))
@@ -431,7 +447,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			joint_cons[[i]] <- joint_consn[[i]][, , , 1]
 		}
 	}
-	
+
 	# If single iteration convert to 3D array
 	for(i in 1:length(joint_cons)){
 		if(length(dim(joint_cons[[i]])) == 0){
@@ -530,7 +546,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	}
 
 	mechanism_r <- mechanism
-	
+
 	mechanism_r$joint.coor <- joint_coor
 	mechanism_r$joint.coorn <- joint_coorn
 	mechanism_r$joint.cons <- joint_cons
