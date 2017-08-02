@@ -1,4 +1,4 @@
-readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
+readMotion <- function(file, landmark.names=NULL, multiple.as='array', nrows = -1){
 
 	## Reads in matrix of coordinates over time, with or without time column, or 
 	## transformation matrices. File type is detected based on whether first column name 
@@ -15,20 +15,46 @@ readMotionData <- function(file, landmark.names=NULL, multiple.as='array'){
 	if(file_format == 'txt'){
 		tmta <- time_mat_to_arr(as.matrix(read.table(file[1])))
 	}else{
-		read_matrix <- as.matrix(read.csv(file[1]))
-		
+
+		# Read csv
+		read_matrix <- as.matrix(read.csv(file[1], nrows=nrows))
+
+		# If transformations
 		if(grepl('_R11$', colnames(read_matrix)[1])){
-			
+		
+			# Check for non-transformation columns
+			tm_grepl <- grepl('_(R[1-3]{2}|[0-3]{2}|1|TX|TY|TZ)', colnames(read_matrix), ignore.case=TRUE)
+		
+			# Get tm matrix
+			tm_matrix <- read_matrix[, tm_grepl]
+
 			# Transformation matrix
-			tmat <- matrix(suppressWarnings(as.numeric(read_matrix)), nrow(read_matrix), ncol(read_matrix), 
-				dimnames=dimnames(read_matrix))
+			tmat <- matrix(suppressWarnings(as.numeric(tm_matrix)), nrow(tm_matrix), ncol(tm_matrix), 
+				dimnames=dimnames(tm_matrix))
 			
 			# Convert transformation matrix into array
-			return(tmmat2arr(tmat))
+			tm_arr <- tmmat2arr(tmat)
+
+			# Set return list
+			rlist <- list('tm.arr'=tm_arr)
+			
+			# Get non-transformation column names
+			if(sum(!tm_grepl) > 0){
+
+				# Add column as list element
+				for(non_tm_colname in colnames(read_matrix)[!tm_grepl]) rlist[[non_tm_colname]] <- gsub('^[ ]*|[ ]*$', '', read_matrix[, non_tm_colname])
+			}
+
+			return(rlist)
 			
 		}else{
 			if(colnames(read_matrix)[1] == 'X') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
-			tmta <- time_mat_to_arr(read_matrix)
+			
+			if('time' %in% colnames(read_matrix)){
+				tmta <- time_mat_to_arr(read_matrix)
+			}else{
+				return(mat2arr(read_matrix))
+			}
 		}
 	}
 	
