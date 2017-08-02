@@ -27,10 +27,8 @@ intersectSphereLine <- function(c, r, x, l, point.compare=NULL){
 
 	# FIND DISTANCE FROM TWO INTERSECTION POINTS TO LINE ORIGIN OR COMPARE POINT, IF PROVIDED
 	if(is.null(point.compare)){
-		dist <- distPointToPoint(x, p)
+		return(p)
 	}else{
-		dist <- distPointToPoint(point.compare, p)
+		return(matrix(p[which.min(distPointToPoint(point.compare, p)), ], 1, 3))
 	}
-
-	p[which.min(dist), ]
 }
