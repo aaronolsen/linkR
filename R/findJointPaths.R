@@ -4,7 +4,8 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 	if(nrow(body.conn) == 1) return(list(
 		'paths.closed'=NULL,
 		'paths.open'=list(c(0,1)),
-		'fixed.joints'=1
+		'fixed.joints'=1,
+		'joint.conn'=NULL
 	))
 
 	## CREATE MATRIX FOR CONNECTED JOINTS
