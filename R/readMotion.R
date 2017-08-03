@@ -21,7 +21,7 @@ readMotion <- function(file, landmark.names=NULL, multiple.as='array', nrows = -
 
 		# If transformations
 		if(grepl('_R11$', colnames(read_matrix)[1])){
-		
+
 			# Check for non-transformation columns
 			tm_grepl <- grepl('_(R[1-3]{2}|[0-3]{2}|1|TX|TY|TZ)', colnames(read_matrix), ignore.case=TRUE)
 		
@@ -43,18 +43,41 @@ readMotion <- function(file, landmark.names=NULL, multiple.as='array', nrows = -
 
 				# Add column as list element
 				for(non_tm_colname in colnames(read_matrix)[!tm_grepl]) rlist[[non_tm_colname]] <- gsub('^[ ]*|[ ]*$', '', read_matrix[, non_tm_colname])
+
+				return(rlist)
+			}else{
+
+				return(rlist$tm.arr)
 			}
 
-			return(rlist)
-			
-		}else{
-			if(colnames(read_matrix)[1] == 'X') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
+		}else if(colnames(read_matrix)[1] == 'X'){
+
+			read_matrix <- read_matrix[, 2:ncol(read_matrix)]
 			
 			if('time' %in% colnames(read_matrix)){
 				tmta <- time_mat_to_arr(read_matrix)
 			}else{
 				return(mat2arr(read_matrix))
 			}
+
+		}else if(colnames(read_matrix)[1] == 'Frame'){
+
+			# Remove columns with all NA values
+			read_matrix <- read_matrix[, colSums(!is.na(read_matrix)) > 0]
+
+			# Remove first column if frame number
+			if(colnames(read_matrix)[1] == 'Frame') read_matrix <- read_matrix[, 2:ncol(read_matrix)]
+
+			# Convert XYZ matrix to array
+			arr <- mat2arr(read_matrix, pattern='(_x|_y|_z)$')
+
+			# Remove filter frequency from rownames, if present
+			dimnames(arr)[[1]] <- gsub('_[0-9]+Hz', '', dimnames(arr)[[1]])
+	
+			# Sort markers alphabetically by name
+			arr <- arr[sort(dimnames(arr)[[1]]), , ]
+
+			return(arr)
 		}
 	}
 	
