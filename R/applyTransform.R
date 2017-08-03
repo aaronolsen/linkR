@@ -36,7 +36,11 @@ applyTransform <- function(pmat, tarr, assoc = NULL){
 			tcoor_arr <- array(tcoor, dim=c(4, nrow(pmat), dim(tarr)[3]))
 
 			# Swap first two dimensions (transpose each "matrix" within array) and remove 1s
-			return(aperm(tcoor_arr[1:3, , ], perm=c(2,1,3)))
+			if(dim(tcoor_arr)[2] == 1){
+				return(t(tcoor_arr[1:3, 1, ]))
+			}else{
+				return(aperm(tcoor_arr[1:3, , ], perm=c(2,1,3)))
+			}
 
 		}else if(length(dim(pmat)) == 3){
 		
