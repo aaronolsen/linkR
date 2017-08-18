@@ -32,7 +32,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
 
 		# IF JOINT CONSTRAINT IS ALREADY AN ARRAY, MAKE SURE VECTORS ARE UNIT VECTORS
-		if(is.array(joint.cons[[i]]) && length(dim(joint.cons[[i]])) > 2) for(j in 1:dim(joint.cons[[i]])) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
+		if(is.array(joint.cons[[i]]) && length(dim(joint.cons[[i]])) > 2) for(j in 1:dim(joint.cons[[i]])[3]) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
 
 		# MAKE SURE JOINT CONSTRAINTS ARE ARRAY AND MAKE SURE VECTORS ARE UNIT LENGTH
 		if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(1, length(joint.cons[[i]]), 1))
