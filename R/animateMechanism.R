@@ -1,5 +1,5 @@
 animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.body = NULL, 
-	use.ref.as.prev = FALSE, check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
+	joint.compare = NULL, use.ref.as.prev = FALSE, check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
 	check.inter.point.dist = TRUE, print.progress = FALSE){
 
 	if(FALSE){
@@ -71,7 +71,13 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 	# COPY COORDINATES TO TWO SEPARATE JOINT COORDINATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
 	joint_coorn <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter, 2), dimnames=list(joint_names, colnames(mechanism$joint.coor), NULL, NULL))
-	
+
+	# MAKE JOINT COOR COMPARE A SINGLE ITERATION ARRAY IF SINGLE TIME POINT
+	if(!is.null(joint.compare)){
+		if(length(dim(joint.compare)) == 2) joint.compare <- array(joint.compare, dim=c(dim(joint.compare), 1), 
+			dimnames=list(dimnames(joint.compare)[[1]], dimnames(joint.compare)[[2]], NULL))
+	}
+
 	# CREATE MATRIX TO TRACK JOINT STATUS
 	joint_status_init <- matrix('', nrow=n_joints, ncol=2, dimnames=list(joint_names, colnames(mechanism$body.conn.num)))
 	joint_status_init[mechanism$body.conn.num == 1] <- 'f'
@@ -201,7 +207,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 	# ADD INPUT PARAMETERS TO PATHS
 	paths[1:n_inputs] <- input.joint
-	paths_bodies[1:n_inputs] <- input_body
+	paths_bodies[1:n_inputs] <- as.numeric(unlist(input_body))
 
 	#
 	for(i in 1:length(paths)){
@@ -220,7 +226,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	prev_iter <- 1
 	
 	# CREATE ARRAY OF TRANSFORMATION MATRICES FOR EACH BODY AND ITERATION
-	tmarr <- array(diag(4), dim=c(4,4,n_bodies,n_iter))
+	tmarr <- array(diag(4), dim=c(4,4,n_bodies,n_iter), dimnames=list(NULL, NULL, mechanism$body.names, NULL))
 
 	# DEFAULT
 	print_progress_iter <- FALSE
@@ -338,6 +344,13 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 				#cat('\n')
 				#print(path)
 				#print(mechanism$body.conn.num)
+				
+				# Set previous joint position for toggle resolution
+				if(is.null(joint.compare)){
+					joint_prev <- joint_coorn[path, , prev_iter, 1]
+				}else{
+					joint_prev <- joint.compare[path, , iter]
+				}
 
 				# SOLVE OR APPLY INPUT TRANSFORMATIONS
 				solve_joint_path <- solveJointPath(joint.types=mechanism$joint.types[path], 
@@ -346,7 +359,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					input=paths_input[[i]],
 					body.conn=mechanism$body.conn.num[path, ], 
 					joint.names=dimnames(mechanism$joint.coor)[[1]][path],
-					joint.prev=joint_coorn[path, , prev_iter, 1],						#joint.dist=paths_dist[[i]], 
+					joint.prev=joint_prev,						#joint.dist=paths_dist[[i]], 
 					joint.ref=mechanism$joint.coor[path, ], iter=iter, 
 					print.progress=print_progress_iter, indent=indent)
 
@@ -380,6 +393,11 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					
 					# SAVE RESULT
 					joint_coorn <- extend$joint.coor
+
+#if(print.progress && abs(joint_coorn['SH_cau', , 1, 1] - 7.4546) > 0.001){
+#	print(joint_coorn)
+#	Q
+#}
 					joint_consn <- extend$joint.cons
 					joint_status <- extend$joint.status
 					tmarr <- extend$tmarr
