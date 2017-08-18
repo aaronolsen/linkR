@@ -1,5 +1,7 @@
 associatePoints <- function(mechanism, points, body, points.connect = NULL){
 
+	if(nrow(points) == 0) return(mechanism)
+
 	# Get current number of points
 	if(is.null(mechanism$body.points)){
 		num_points <- 0
@@ -43,12 +45,52 @@ associatePoints <- function(mechanism, points, body, points.connect = NULL){
 	}
 
 	## Add points to connect when drawing
-	if(is.null(mechanism$points.connect)){
-		mechanism$points.connect <- points.connect
+	if(!is.null(points.connect)){
+
+		if(is.list(points.connect)){
+
+			add_point_connect <- points.connect
+
+		}else{
+
+			read_lines <- readLines(points.connect)
+			plist_names <- list()
+			for(line_num in 1:length(read_lines)) plist_names[[length(plist_names)+1]] <- strsplit(read_lines[line_num], ',[ ]?')[[1]]
+
+			# Save CT marker names for reference
+			xr_marker_names <- rownames(points)
+
+			# Create path connect list
+			plist_xr <- list()
+			for(i in 1:length(plist_names)){
+				v_xr <- c()
+				for(j in c(1:length(plist_names[[i]]))){
+					v_xr <- c(v_xr, which(xr_marker_names == plist_names[[i]][j]))
+				}
+				plist_xr[[i]] <- v_xr
+			}
+		
+			add_point_connect <- plist_xr
+		}
+
+		if(is.null(mechanism$points.connect)){
+			mechanism$points.connect <- add_point_connect
+		}else{
+			num_points_connect <- length(mechanism$points.connect)
+			for(i in 1:length(add_point_connect)){
+				mechanism$points.connect[[i + num_points_connect]] <- add_point_connect[[i]] + num_points
+			}
+		}
+
 	}else{
-		num_points_connect <- length(mechanism$points.connect)
-		for(i in 1:length(points.connect)){
-			mechanism$points.connect[[i + num_points_connect]] <- points.connect[[i]] + num_points
+
+		if(is.null(mechanism$points.connect)){
+			mechanism$points.connect <- points.connect
+		}else{
+			num_points_connect <- length(mechanism$points.connect)
+			for(i in 1:length(points.connect)){
+				mechanism$points.connect[[i + num_points_connect]] <- points.connect[[i]] + num_points
+			}
 		}
 	}
 
