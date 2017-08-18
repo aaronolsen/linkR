@@ -9,7 +9,15 @@ drawMechanismFit <- function(fit.mechanism, method = "svgViewR", file = NULL, an
 	# Animate mechanism
 	anim_mech <- animateMechanism(fit.mechanism$mechanism, input.param=fit.mechanism$input.param, 
 		use.ref.as.prev=fit.mechanism$use.ref.as.prev, input.joint=fit.mechanism$input.joint,
-		input.body=fit.mechanism$input.body)
+		input.body=fit.mechanism$input.body, joint.compare=fit.mechanism$joint.compare)
+
+#	print(fit.mechanism$mechanism$body.points)
+#	print(fit.mechanism$mechanism$body.assoc)
+#	print(fit.mechanism$mechanism$points.assoc)
+#	print(dim(anim_mech$tmarr))
+#	print(anim_mech$tmarr[, , , 1])
+	#print(dimnames(anim_mech$body.points))
+	#for(i in 1:30) print(distPointToPoint(anim_mech$body.points[c('SuspensoriumL_oper_susp_jt_dor', 'SuspensoriumL_nc_susp_jt_cra'), , i]))
 
 	# Draw mechanism
 	drawMechanism(linkage=anim_mech, method=method, file=file, animate=animate,
