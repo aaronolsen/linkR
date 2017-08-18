@@ -1,6 +1,6 @@
 animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input.joint, 
-	input.body, fit.wts, replace, planar = FALSE, n.input = NULL, cons.fill = NULL, 
-	coor.vectors = NULL, joint.optim = NULL, use.ref.as.prev = FALSE){
+	input.body, fit.wts, replace, joint.compare = NULL, planar = FALSE, n.input = NULL, cons.fill = NULL, 
+	coor.vectors = NULL, joint.optim = NULL, use.ref.as.prev = FALSE, print.progress = FALSE){
 
 	# Replace parameter with optimize parameters
 	if(replace == 'input.param'){
@@ -25,6 +25,9 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 				}else if(nrow(coor.vectors[[i]]) == 2){
 					mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j:(j+1)]*coor.vectors[[i]])
 					j <- j + 2
+				}else if(nrow(coor.vectors[[i]]) == 3){
+					mechanism$joint.coor[i, ] <- mechanism$joint.coor[i, ] + colSums(p[j:(j+2)]*coor.vectors[[i]])
+					j <- j + 3
 				}
 			}
 
@@ -34,7 +37,6 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 			}
 		}
 		
-
 	}else if(replace == 'joint.cons'){
 
 		k <- 1
@@ -57,10 +59,15 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 	
 	# Run mechanism model
 	anim_mech <- suppressWarnings(animateMechanism(mechanism, input.param=input.param, input.joint=input.joint, 
-		input.body=input.body, use.ref.as.prev=use.ref.as.prev, print.progress=FALSE, check.inter.joint.dist=FALSE, 
-		check.joint.cons=FALSE))
+		input.body=input.body, joint.compare=joint.compare, use.ref.as.prev=use.ref.as.prev, 
+		print.progress=print.progress, check.inter.joint.dist=FALSE, check.joint.cons=FALSE))
 	
 	# Compare simulated coordinates to ideal
-	if(dim(anim_mech$body.points)[3] == 1) return(sqrt(mean(fit.wts*(anim_mech$body.points[, , 1] - fit.points)^2)))
-	return(sqrt(mean(fit.wts*(anim_mech$body.points - fit.points)^2)))
+	if(dim(anim_mech$body.points)[3] == 1){
+		return_error <- sqrt(mean(fit.wts*(anim_mech$body.points[, , 1] - fit.points)^2))
+	}else{
+		return_error <- sqrt(mean(fit.wts*(anim_mech$body.points - fit.points)^2))
+	}
+
+	return(return_error)
 }
