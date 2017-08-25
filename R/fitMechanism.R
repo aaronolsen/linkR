@@ -277,7 +277,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			for(iter in 1:n_iter){
 		
 				# Move joint based on fit point motion
-				joint_compare[i, , iter] <- findBestAlignment(fit.points[which_body, , iter], fit_point_joint)$mat['joint.coor', ]
+				joint_compare[i, , iter] <- bestAlign(fit.points[which_body, , iter], fit_point_joint)$mat['joint.coor', ]
 			}
 		}
 	}
@@ -479,7 +479,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	#consensus <- fit.points[, , ref.iter]
 
 	# Align consensus to reference time point
-	#pose_init <- findBestAlignment(fit.points[, , ref.iter], consensus)$mat
+	#pose_init <- bestAlign(fit.points[, , ref.iter], consensus)$mat
 
 	# Set reference pose
 	pose_ref <- fit.points[, , ref.iter]

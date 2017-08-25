@@ -83,7 +83,7 @@ fitJointModel <- function(coor, type, cons = NULL, pose.init = NULL, optim.frame
 
 	# Align consensus to reference time point
 	if(is.null(pose.init)){
-		pose_init <- findBestAlignment(coor[, , ref.iter], ccoor$mean.scaled)$mat
+		pose_init <- bestAlign(coor[, , ref.iter], ccoor$mean.scaled)$mat
 	}else{
 		pose_init <- pose.init
 	}

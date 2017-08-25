@@ -93,7 +93,7 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE, print.progress
 		# Skip if all markers are NA
 		if(sum(is.na(m1)) == length(m1)) next
 
-		align_ct_xr <- findBestAlignment(m1, m2, m3=m3, sign=1)
+		align_ct_xr <- bestAlign(m1, m2, m3=m3, sign=1)
 		ct_mat_align <- align_ct_xr$mat
 		cs_ini_align <- cs_ini
 		for(rowi in seq(1, nrow(m3), by=4)) cs_ini_align[, , ((rowi-1) / 4) + 1] <- align_ct_xr$mc[rowi:(rowi+3), ]
@@ -175,7 +175,7 @@ unify_xromm_ct <- function(ct_mat, xr_arr, print.progress = TRUE, print.progress
 				if(print.progress && iter %in% print.progress.iter) cat(' : transform CT markers to align with XROMM markers\n')
 
 				# Transform CT markers to correspond with XROMM markers
-				align <- findBestAlignment(xr_mat_sub, ct_mat_sub, m3=cs_ini[, , body_name], sign=1)
+				align <- bestAlign(xr_mat_sub, ct_mat_sub, m3=cs_ini[, , body_name], sign=1)
 				ct_mat_sub_t <- align$mat
 
 				# Save transformation matrix
