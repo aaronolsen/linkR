@@ -19,6 +19,9 @@ linkageEA <- function(linkage, input.param, input.joint, input.points, output.po
 	num_points <- dim(link_anim$joint.coor)[1]
 	pt_names <- dimnames(link_anim$joint.coor)[[1]]
 	if(!is.null(linkage$link.points)){
+	
+		if(is.null(dimnames(link_anim$link.points)[[1]])) stop('Coordinates in link.points must be named.')
+	
 		num_points <- num_points + dim(link_anim$link.points)[1]
 		pt_names <- c(pt_names, dimnames(link_anim$link.points)[[1]])
 	}
