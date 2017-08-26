@@ -553,6 +553,8 @@ if(TRUE){
 		# Create vectors for initial and final error
 		input_fit_errors_i <- rep(NA, n_optim)
 		input_fit_errors_f <- rep(NA, n_optim)
+		
+		# Create vector to run
 
 		# Run optimization
 		for(i in 1:n_optim){
@@ -590,8 +592,21 @@ if(TRUE){
 			if(optim_iter == 0 && i < n_optim) input_optim[optim_use[i+1], ] <- input_fit$par
 		}
 		
-		print(input_fit_errors_f)
-		
+		# Check for outlier input parameter fit errors (2x greater than median), likely poor convergence
+		input_error_outliers <- input_fit_errors_f > median(input_fit_errors_f, na.rm=TRUE)*2
+
+		# If any found, replace with closest non-outlier
+		if(any(input_error_outliers)){
+			for(i in which(input_error_outliers)){
+			
+				# Find closest non-outlier
+				i_replace <- which(!input_error_outliers)[which.min(abs(which(!input_error_outliers) - i))]
+
+				# Replace input parameters
+				input_optim[optim_use[i], ] <- input_optim[optim_use[i_replace], ]
+			}
+		}
+
 		#print(input_optim[!is.na(input_optim[, 1]), ])
 		#print(input_optim_bounds['lower', ])
 		#print(input_optim_bounds['upper', ])
