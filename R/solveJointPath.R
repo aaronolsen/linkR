@@ -6,74 +6,111 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 	if(length(joint.types) == 1){
 
 		# SET NULL TRANSFORMATION MATRICES
-		tmat1 <- tmat2 <- tmat3 <- diag(4)
+		tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 
 		# GET JOINT SET TO TRANSFORM
 		jt_set <- which(body.num == body.conn)
 		
+		# Logical if input transformation set
+		tform_set <- FALSE
+
+		if(print.progress) joint_props <- c()
+		
 		# CREATE TRANSFORMATION MATRIX
-		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U')){
+		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR')){
+
+			# Set rotation magnitudes
+			if(joint.types == 'PR'){
+				mags <- input[iter, 3]
+			}else{
+				mags <- input[iter, ]
+			}
 
 			# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
-			if(sum(is.na(input[iter, ])) == ncol(input)) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=TRUE))
+			if(sum(is.na(mags)) == length(mags)) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=TRUE))
 			
+			# Set axes of rotation
+			if(joint.types == 'PR'){
+				AOR <- array(cprod(joint.cons[[1]][1, , iter, jt_set], joint.cons[[1]][2, , iter, jt_set]), dim=c(1,3,1))
+			}else{
+				AOR <- array(joint.cons[[1]][, , iter, ], dim=dim(joint.cons[[1]])[c(1,2,4)])
+			}
+
 			#
 			if(joint.types == 'U'){
 				jt_set <- 1:2
-				joint.cons[[1]][2, , iter, jt_set[2]] <- rotateBody(m=joint.cons[[1]][2, , iter, jt_set[2]], v=joint.cons[[1]][1, , iter, jt_set[1]], a=input[iter, 1])
+				AOR[2, , jt_set[2]] <- rotateBody(m=AOR[2, , jt_set[2]], v=AOR[1, , jt_set[1]], a=mags[1])
 			}else{
-				jt_set <- rep(jt_set, dim(joint.cons[[1]])[1])
+				jt_set <- rep(jt_set, dim(AOR)[1])
 			}
 
 			if(print.progress){
 
-				AORs <- c()
-				for(i in 1:dim(joint.cons[[1]])[1]) AORs <- c(AORs, paste0(round(joint.cons[[1]][i, , iter, jt_set[i]], 3), collapse=','))
-				AOR <- paste0(paste0('AoR', 1:length(AORs), ':', AORs), collapse='; ')
-
-				cat(paste0('{CoR:', paste0(round(joint.coor[, jt_set[1]], 3), collapse=','), '; ', AOR, '; Angle:', round(input[iter, 1], 3),'}\n'))
+				AORs_print <- c()
+				for(i in 1:dim(AOR)[1]) AORs_print <- c(AORs_print, paste0(round(AOR[i, , jt_set[i]], 3), collapse=','))
+				AOR_print <- paste0(paste0('AoR', 1:length(AORs_print), ':', AORs_print), collapse='; ')
+				
+				joint_props <- c(joint_props, paste0('CoR:', paste0(round(joint.coor[, jt_set[1]], 3), collapse=',')))
+				joint_props <- c(joint_props, AOR_print)
+				joint_props <- c(joint_props, paste0('Angle:', paste0(round(mags, 3), collapse=',')))
 			}
 
 			# TRANSLATE TO CENTER OF ROTATION (JOINT)
 			tmat1[1:3, 4] <- joint.coor[, jt_set[1]]
 
 			# LOOP THROUGH EACH COLUMNN OF INPUT PARAMETERS
-			for(i in dim(joint.cons[[1]])[1]:1){
+			for(i in dim(AOR)[1]:1){
 			
 				# SKIP IF NA
-				if(is.na(input[iter, i])) next
+				if(is.na(mags[i])) next
 				
 				# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
-				tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(joint.cons[[1]][i, , iter, jt_set[i]], -input[iter, i])
+				tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(AOR[i, , jt_set[i]], -mags[i])
 			}
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION
 			tmat3[1:3, 4] <- -joint.coor[, jt_set[1]]
 			
-		}else if(joint.types == 'P'){
-
-			if(print.progress) cat('\n')
-
-			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1[1:3, 4] <- colSums(input[iter, ] * joint.cons[[1]][, , iter, jt_set])
-
-		}else if(joint.types == 'L'){
-
-			if(print.progress) cat('\n')
-
-			# TRANSLATE TO CENTER OF ROTATION (JOINT)
-			tmat1[1:3, 4] <- input[iter, 1]*joint.cons[[1]][, , iter, jt_set]
-
-		}else{
-			
-			cat('\n');stop(paste0("Unrecognized joint type '", joint.types, "'"))
+			# Transform found
+			tform_set <- TRUE
 		}
+
+		if(joint.types %in% c('L', 'P', 'PR')){
 		
+			# Set translation magnitudes
+			if(joint.types == 'PR'){
+				mags <- input[iter, 1:2]
+			}else{
+				mags <- input[iter, ]
+			}
+
+			if(print.progress){
+
+				tvecs_print <- c()
+				for(i in 1:dim(joint.cons[[1]])[1]) tvecs_print <- c(tvecs_print, paste0(round(joint.cons[[1]][i, , iter, jt_set], 3), collapse=','))
+				tvec_print <- paste0(paste0('Tvec', 1:length(tvecs_print), ':', tvecs_print), collapse='; ')
+
+				joint_props <- c(joint_props, tvec_print)
+				joint_props <- c(joint_props, paste0('Mag:', paste0(round(mags, 3), collapse=',')))
+			}
+
+			# TRANSLATE
+			tmat4[1:3, 4] <- colSums(mags*joint.cons[[1]][, , iter, jt_set])
+
+			# Transform found
+			tform_set <- TRUE
+		}
+
+		# Error if joint not found
+		if(!tform_set) stop(paste0("\nUnrecognized joint type '", joint.types, "'"))
+		
+		if(print.progress) cat(paste0('{', paste0(joint_props, collapse='; '), '}\n'))
+
 		# CHANGE JOINT STATUS
 		joint.status[unique(jt_set)] <- 'i'
-
+		
 		# COMBINE TRANSFORMATION MATRICES
-		tmat <- tmat1 %*% tmat2 %*% tmat3
+		tmat <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
 		
 		return(list('body.tmat'=list(tmat), 'joint.status'=joint.status))
 
