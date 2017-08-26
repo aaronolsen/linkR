@@ -188,7 +188,7 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 
 			svg.close()
 		}
-	} else if(type %in% c('L', 'P')){
+	} else if(type %in% c('L', 'P', 'PR')){
 	
 		# Vectors
 		vecs <- matrix(NA, n_coor, 3)
@@ -198,7 +198,7 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 
 			if(type == 'L'){
 				fit_vector <- fitShape(t(coor[i, , ]), 'vector')$V
-			}else if(type == 'P'){
+			}else if(type %in% c('P', 'PR')){
 				fit_vector <- fitShape(t(coor[i, , ]), 'plane')$N
 			}
 
@@ -223,7 +223,7 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 		# Set joint constraint
 		if(type == 'L'){
 			joint_cons <- vec
-		}else if(type == 'P'){
+		}else if(type %in% c('P', 'PR')){
 			vec_o <- vorthogonal(vec)
 			joint_cons <- c(vec_o, cprod(vec_o, vec))
 		}
