@@ -444,8 +444,14 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	#tAC <- tAC + proc.time()['user.self'] - tAC1
 	#tAD1 <- proc.time()['user.self']
 	
-	# ****ADD***** CHECK THAT BOTH JOINT COORDINATE SETS ARE THE SAME
+	# Find difference between two joint sets
+	joint_sets_sub <- array(abs(joint_coorn[, , , 1] - joint_coorn[, , , 2]), dim=dim(joint_coorn)[1:3], dimnames=dimnames(joint_coorn)[1:3])
+	joint_sets_sub_apply <- matrix(apply(joint_sets_sub, 3, 'rowSums'), nrow=dim(joint_coorn)[1], ncol=dim(joint_coorn)[3])
 
+	# Find joint positions/iterations that differ
+	joint_sets_diff <- matrix(FALSE, nrow(joint_sets_sub_apply), ncol(joint_sets_sub_apply))
+	joint_sets_diff[mechanism$joint.types %in% c('S', 'R', 'U', 'X'), ] <- joint_sets_sub_apply[mechanism$joint.types %in% c('S', 'R', 'U', 'X'), ] > 1e-5
+	
 	# COMBINE TWO JOINT COORDINATE SETS INTO ONE
 	joint_coor <- joint_coorn[, , , 1]
 	
@@ -455,6 +461,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 	# IF SINGLE ITERATION, CONVERT TO 3 DIM ARRAY
 	if(length(dim(joint_coor)) == 2) joint_coor <- array(joint_coor, dim=c(dim(joint_coor), 1), dimnames=list(dimnames(joint_coor)[[1]], NULL, NULL))
 
+	# Set differing joint positions/iterations as NA
+	for(i in 1:ncol(joint_sets_diff)) joint_coor[joint_sets_diff[, i], , i] <- NA
+	
 	# Take first joint set to create joint constraint arrays for single body
 	joint_cons <- list()
 	for(i in 1:length(joint_consn)){
