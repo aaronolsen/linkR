@@ -60,7 +60,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		joint.cons <- list()
 		for(joint_num in 1:n_joints){
 			if(joint.types[joint_num] %in% c('R', 'L', 'T')) joint.cons[[joint_num]] <- matrix(NA, 1, 3)
-			if(joint.types[joint_num] %in% c('X', 'U', 'P')) joint.cons[[joint_num]] <- matrix(NA, 2, 3)
+			if(joint.types[joint_num] %in% c('X', 'U', 'P', 'PR')) joint.cons[[joint_num]] <- matrix(NA, 2, 3)
 			if(joint.types[joint_num] %in% c('S')) joint.cons[[joint_num]] <- matrix(NA, 3, 3)
 		}
 	}
@@ -326,24 +326,30 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			n_input[i] <- ncol(input.param[[i]])
 		}
 
+		add_names <- paste0(joint.types[input.joint[i]], input.joint[i], '_', 1:n_input[i])
+		input_optim_names <- c(input_optim_names, add_names)
+
 		# Create optimization input parameters
 		input_param_optim[[i]] <- matrix(NA, nrow=n_optim, ncol=n_input[i])
+
+		add_vec <- rep(-0.1, n_input[i])
+		input_bounds_r <- c(-6*pi, 6*pi)
+		input_bounds_t <- c(-max(fit_points_range), max(fit_points_range))
 		
 		# Set input value
 		if(joint.types[input.joint[i]] %in% c('R', 'S', 'U', 'X')){
-			input_value <- -0.1
-			input_bounds <- c(-6*pi, 6*pi)
+			add_bounds <- rbind(rep(input_bounds_r[1], n_input[i]), rep(input_bounds_r[2], n_input[i]))
 		}else if(joint.types[input.joint[i]] %in% c('P')){
-			input_value <- -0.1
-			input_bounds <- c(-max(fit_points_range), max(fit_points_range))
+			add_bounds <- rbind(rep(input_bounds_t[1], n_input[i]), rep(input_bounds_t[2], n_input[i]))
+		}else if(joint.types[input.joint[i]] %in% c('PR')){
+			add_bounds <- rbind(c(rep(input_bounds_t[1], 2), input_bounds_r[1]), c(rep(input_bounds_t[2], 2), input_bounds_r[2]))
 		}else{
 			stop("Unrecognized joint type for setting initial input parameter values.")
 		}
-
+		
 		# Fill vectors and matrices
-		input_optim_vec <- c(input_optim_vec, rep(input_value, n_input[i]))
-		input_optim_names <- c(input_optim_names, paste0(joint.types[input.joint[i]], input.joint[i], '_', 1:n_input[i]))
-		input_optim_bounds <- cbind(input_optim_bounds, rbind(rep(input_bounds[1], n_input[i]), rep(input_bounds[2], n_input[i])))
+		input_optim_vec <- c(input_optim_vec, add_vec)
+		input_optim_bounds <- cbind(input_optim_bounds, add_bounds)
 	}
 	
 	# Convert to matrix with row for each iteration
@@ -535,7 +541,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	#optim_errors <- c(mean(fit_points_range)*1000, mean(fit_points_range)*1000-opt_to_diff*2)
 	optim_errors <- c(10000, 1000)
 
-#if(FALSE){
+if(TRUE){
 	# Cycle optimizing the input parameters, joint constraints and coordinates, and body 
 	#	pose until error changes less than difference threshold between consecutive 
 	# 	optimization steps
@@ -583,6 +589,8 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			# If first cycle, set next input parameters to current values
 			if(optim_iter == 0 && i < n_optim) input_optim[optim_use[i+1], ] <- input_fit$par
 		}
+		
+		print(input_fit_errors_f)
 		
 		#print(input_optim[!is.na(input_optim[, 1]), ])
 		#print(input_optim_bounds['lower', ])
@@ -891,15 +899,17 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		optim_iter <- optim_iter + 1
 	}
 
-#	mechanism_g <<- mechanism
-#	input_param_g <<- input.param
-#	input_optim_g <<- input_optim
-#}else{
+	mechanism_g <<- mechanism
+	input_param_g <<- input.param
+	input_optim_g <<- input_optim
+	input_fit_errors_f_g <<- input_fit_errors_f
+}else{
 
-#	input.param <- input_param_g
-#	mechanism <- mechanism_g
-#	input_optim <- input_optim_g
-#}
+	input.param <- input_param_g
+	mechanism <- mechanism_g
+	input_optim <- input_optim_g
+	input_fit_errors_f <- input_fit_errors_f_g
+}
 
 	## Final optimization across all input parameters (will change slightly since coordinates, constraints, and pose fits have improved
 	if(print.progress) cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Final input parameter optimization...\n'))
@@ -916,12 +926,23 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			input_optim[i, ] <- seq_i
 		}
 	}
+	
+	# Save subset input fit errors
+	input_fit_errors_sub <- mean(input_fit_errors_f, na.rm=TRUE)
 
 	# Create vectors for initial and final error
 	input_fit_errors_i <- rep(NA, n_iter)
 	input_fit_errors_f <- rep(NA, n_iter)
 
+	if(print.progress && n_iter > 50) cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'At iteration: 1'))
+
+	# Create vector for iterations that likely did not converge
+	no_conv <- rep(FALSE, n_iter)
+
+#cat('\n')
+
 	for(iter in 1:n_iter){
+	#for(iter in 192:200){
 
 		# Find initial error
 		if(print.progress) input_fit_errors_i[iter] <- animate_mechanism_error(input_optim[iter, ], 
@@ -930,27 +951,67 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			input.param=input.param, input.joint=input.joint, input.body=input.body, 
 			fit.wts=fit.wts, n.input=n_input, use.ref.as.prev=use.ref.as.prev)
 
-		# Run optimization
-		input_fit <- tryCatch(
-			expr={
-				nlminb(start=input_optim[iter, ], objective=animate_mechanism_error, 
-					lower=input_optim_bounds['lower', ], upper=input_optim_bounds['upper', ], 
-					replace='input.param', joint.compare=joint_compare[, , iter], 
-					fit.points=fit.points[, , iter], 
-					mechanism=mechanism, input.param=input.param, input.joint=input.joint, 
-					input.body=input.body, fit.wts=fit.wts, n.input=n_input, 
-					use.ref.as.prev=use.ref.as.prev)
-			},
-			error=function(cond) {print(cond);return(NULL)},
-			warning=function(cond) {print(cond);return(NULL)}
-		)
+		# Run optimization with varying start parameters
+		n <- 1
+		input_fit <- list('objective'=input_fit_errors_sub*3)
+		add_to_start <- 0
+		while(input_fit$objective > input_fit_errors_sub*2 && n < 11){
+		
+			# Try changing starting parameters if first run exceeds benchmark
+			if(n == 2) add_to_start <- -input_optim[iter, ]*1
+			if(n == 3) add_to_start <- input_optim[iter, ]*0.25
+			if(n == 4) add_to_start <- input_optim[iter, ]*1
+			if(n == 5) add_to_start <- -input_optim[iter, ]*0.5
+			if(n == 6) add_to_start <- -input_optim[iter, ]*0.1
+			if(n == 7) add_to_start <- input_optim[iter, ]*0.5
+			if(n == 8) add_to_start <- input_optim[iter, ]*0.05
+			if(n == 9) add_to_start <- input_optim[iter, ]*0.75
+			if(n == 10) add_to_start <- input_optim[iter, ]*0.1
+			
+			# Run optimization
+			input_fit <- tryCatch(
+				expr={
+					nlminb(start=input_optim[iter, ]+add_to_start, objective=animate_mechanism_error, 
+						lower=input_optim_bounds['lower', ], upper=input_optim_bounds['upper', ], 
+						replace='input.param', joint.compare=joint_compare[, , iter], 
+						fit.points=fit.points[, , iter], 
+						mechanism=mechanism, input.param=input.param, input.joint=input.joint, 
+						input.body=input.body, fit.wts=fit.wts, n.input=n_input, 
+						use.ref.as.prev=use.ref.as.prev)
+				},
+				error=function(cond) {print(cond);return(NULL)},
+				warning=function(cond) {print(cond);return(NULL)}
+			)
+
+			#cat(paste0(iter, ': ', n, ', ', input_fit$objective, ', ', input_fit_errors_sub, '\n'))
+
+			n <- n + 1
+		}
+		
+		# No convergence
+		#if(input_fit$objective > input_fit_errors_sub*2) no_conv[iter] <- TRUE
 
 		# Save error
 		input_fit_errors_f[iter] <- input_fit$objective
 
 		# Save optimized parameters
+		#print(input_fit$objective)
+		#print(input_optim[iter, ])
 		input_optim[iter, ] <- input_fit$par
+		#print(input_optim[iter, ])
+
+		# Save input for next iteration
+		if(iter < n_iter && !((iter+1) %in% optim_use)) input_optim[iter+1, ] <- input_optim[iter, ]
+
+		if(print.progress && iter %% 25 == 0) cat(paste0(',', iter))
 	}
+
+	# Return to any iterations that failed to converge
+	#if(any(no_conv)){
+	#	print(no_conv)
+	#}
+
+	if(print.progress && n_iter > 50) cat('\n')
 
 	# Add input parameters into list
 	n <- 1
