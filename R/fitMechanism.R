@@ -943,7 +943,7 @@ if(TRUE){
 	}
 	
 	# Save subset input fit errors
-	input_fit_errors_sub <- mean(input_fit_errors_f, na.rm=TRUE)
+	input_fit_errors_sub <- mean(input_fit_errors_f, na.rm=TRUE)*2
 
 	# Create vectors for initial and final error
 	input_fit_errors_i <- rep(NA, n_iter)
@@ -970,7 +970,11 @@ if(TRUE){
 		n <- 1
 		input_fit <- list('objective'=input_fit_errors_sub*3)
 		add_to_start <- 0
-		while(input_fit$objective > input_fit_errors_sub*2 && n < 11){
+		converged <- FALSE
+		threshold <- input_fit_errors_sub
+		while(!converged && n < 11){
+		
+			########## FIX to save the minimum
 		
 			# Try changing starting parameters if first run exceeds benchmark
 			if(n == 2) add_to_start <- -input_optim[iter, ]*1
@@ -982,6 +986,9 @@ if(TRUE){
 			if(n == 8) add_to_start <- input_optim[iter, ]*0.05
 			if(n == 9) add_to_start <- input_optim[iter, ]*0.75
 			if(n == 10) add_to_start <- input_optim[iter, ]*0.1
+			
+			# Save starting parameters
+			start_param <- input_optim[iter, ]+add_to_start
 			
 			# Run optimization
 			input_fit <- tryCatch(
@@ -997,15 +1004,20 @@ if(TRUE){
 				error=function(cond) {print(cond);return(NULL)},
 				warning=function(cond) {print(cond);return(NULL)}
 			)
+			
+			# Detect non-convergence 
+			converged <- TRUE
+			if(input_fit$objective > threshold) converged <- FALSE
+			if(sum(abs(start_param - input_fit$par)) < 1e-4) converged <- FALSE
 
-			#cat(paste0(iter, ': ', n, ', ', input_fit$objective, ', ', input_fit_errors_sub, '\n'))
+			#cat(paste0('\t', iter, ' (', n, '): ', round(input_fit$objective, 3), ', ', round(threshold, 3), ', ', converged, '\n'))
+
+			# Change threshold so that error must be lower than initial if no change in parameters
+			if(n == 1 && sum(abs(start_param - input_fit$par)) < 1e-4) threshold <- input_fit$objective
 
 			n <- n + 1
 		}
 		
-		# No convergence
-		#if(input_fit$objective > input_fit_errors_sub*2) no_conv[iter] <- TRUE
-
 		# Save error
 		input_fit_errors_f[iter] <- input_fit$objective
 
@@ -1017,14 +1029,12 @@ if(TRUE){
 
 		# Save input for next iteration
 		if(iter < n_iter && !((iter+1) %in% optim_use)) input_optim[iter+1, ] <- input_optim[iter, ]
+		
+		#if(iter > 15) input_fit_errors_sub <- mean(tail(input_fit_errors_f, 15), na.rm=TRUE)*2
+		if(iter > 15) input_fit_errors_sub <- mean(input_fit_errors_f, na.rm=TRUE)*2
 
 		if(print.progress && iter %% 25 == 0) cat(paste0(',', iter))
 	}
-
-	# Return to any iterations that failed to converge
-	#if(any(no_conv)){
-	#	print(no_conv)
-	#}
 
 	if(print.progress && n_iter > 50) cat('\n')
 
