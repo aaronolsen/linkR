@@ -61,13 +61,17 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 	anim_mech <- suppressWarnings(animateMechanism(mechanism, input.param=input.param, input.joint=input.joint, 
 		input.body=input.body, joint.compare=joint.compare, use.ref.as.prev=use.ref.as.prev, 
 		print.progress=print.progress, check.inter.joint.dist=FALSE, check.joint.cons=FALSE))
-	
+
 	# Compare simulated coordinates to ideal
 	if(dim(anim_mech$body.points)[3] == 1){
 		return_error <- sqrt(mean(fit.wts*(anim_mech$body.points[, , 1] - fit.points)^2))
 	}else{
 		return_error <- sqrt(mean(fit.wts*(anim_mech$body.points - fit.points)^2))
 	}
+
+	# Add NA penalty
+	#if(sum(is.na(anim_mech$joint.coor)) > 0){cat(TRUE, '')}else{cat(FALSE, '')}
+	return_error <- return_error + 0.2*(sum(is.na(anim_mech$joint.coor)) / 3)
 
 	return(return_error)
 }
