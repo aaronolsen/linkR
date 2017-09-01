@@ -23,6 +23,9 @@ associatePoints <- function(mechanism, points, body, points.connect = NULL){
 
 		# Find number corresponding to body name
 		body_num <- which(body == mechanism$body.names)
+		
+		# Check that body is in body names
+		if(length(body_num) == 0) stop(paste0("Body '", body, "' not found in mechanism$body.names"))
 
 		if(length(mechanism$points.assoc[[body_num]]) == 1 && is.na(mechanism$points.assoc[[body_num]][1])){
 
