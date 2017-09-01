@@ -36,13 +36,15 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			}
 		}
 	}
-
-	# FIND JOINTS CONNECTED TO FIXED LINK
-	fixed.joints <- unique(c(joint.conn[joint.conn[, 1] == 1, 2:3]))
+	
+	# FIND JOINTS CONNECTED TO FIXED LINK (INCLUDES OPEN CHAIN WITH SINGLE JOINT CONNECTED TO FIXED LINK)
+	fixed.joints <- which(rowSums(body.conn == 1) > 0)
+	#fixed.joints <- unique(c(joint.conn[joint.conn[, 1] == 1, 2:3]))
 
 	# ADD ROWS FOR JOINTS CONNECTED TO THE FIXED LINK FOR EASIER PATH SEARCHING
 	joint.conn <- rbind(cbind(rep(1,length(fixed.joints)), rep(0,length(fixed.joints)), fixed.joints), joint.conn)
 	colnames(joint.conn) <- c('body.idx', 'joint1', 'joint2')
+	rownames(joint.conn) <- NULL
 
 	## FIND ALL JOINT PATHS
 	# INITIAL PATHS
