@@ -75,7 +75,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			tform_set <- TRUE
 		}
 
-		if(joint.types %in% c('L', 'P', 'PR')){
+		if(joint.types %in% c('L', 'P', 'T', 'PR')){
 		
 			# Set translation magnitudes
 			if(joint.types == 'PR'){
@@ -95,14 +95,14 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			}
 
 			# TRANSLATE
-			tmat4[1:3, 4] <- colSums(mags*joint.cons[[1]][, , iter, jt_set])
+			tmat4[1:3, 4] <- colSums(mags*matrix(joint.cons[[1]][, , iter, jt_set], ncol=3))
 
 			# Transform found
 			tform_set <- TRUE
 		}
 
 		# Error if joint not found
-		if(!tform_set) stop(paste0("\nUnrecognized joint type '", joint.types, "'"))
+		if(!tform_set){cat('\n');stop(paste0("Unrecognized joint type '", joint.types, "'"))}
 		
 		if(print.progress) cat(paste0('{', paste0(joint_props, collapse='; '), '}\n'))
 
