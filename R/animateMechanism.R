@@ -510,6 +510,8 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					
 					# GET DISTANCES FROM EACH JOINT TO R-JOINT AXIS
 					for(joint_num in assoc_joints){
+					
+						if(joint_types[joint_num] %in% c('T')) next
 
 						distances <- rep(NA, length=n_iter)
 
