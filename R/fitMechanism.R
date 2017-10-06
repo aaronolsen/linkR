@@ -1053,7 +1053,8 @@ if(TRUE){
 
 #mechanism <- mechanism_g
 
-	## Standardize joint coordinates equivalent 
+	## Standardize joint coordinates equivalent
+
 	# Slide joint coordinates, when applicable, to closest points between connected bodies
 	if(!planar){
 		for(i in 1:n_joints){
@@ -1064,11 +1065,17 @@ if(TRUE){
 			body1_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 1], ]
 			body2_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 2], ]
 
-			# Find nearest points on connected bodies
-			nearest_pts <- nearestPointsOnBodies(body1_pts, body2_pts)
-		
-			# Find mean point
-			nearest_pt <- colMeans(nearest_pts)
+			if(length(body1_pts) > 0 && length(body2_pts) > 0){
+				# Find nearest points on connected bodies
+				nearest_pts <- nearestPointsOnBodies(body1_pts, body2_pts)
+
+				# Find mean point
+				nearest_pt <- colMeans(nearest_pts)
+			}else if(length(body1_pts) == 0){
+				nearest_pt <- colMeans(body2_pts)
+			}else if(length(body2_pts) == 0){
+				nearest_pt <- colMeans(body1_pts)
+			}
 
 			if(joint.types[i] == 'R'){
 
