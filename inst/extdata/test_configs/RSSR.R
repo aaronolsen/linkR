@@ -14,7 +14,7 @@ joint.conn <- rbind(c(0,1), c(1,2), c(2,3), c(3,0))
 rec1 <- rbind(c(-0.1,-0.1,0), c(-0.1,0.6,0), c(0.1,0.6,0), c(0.1,-0.1,0))
 
 # Define second rectangle
-rec2<- rbind(c(0.9,-0.1,0), c(0.9,1.1,0), c(1.1,1.1,0), c(1.1,-0.1,0))
+rec2 <- rbind(c(0.9,-0.1,0), c(0.9,1.1,0), c(1.1,1.1,0), c(1.1,-0.1,0))
 
 # Define the point coordinates
 link.points <- rbind(rec1, c(0.5,0.75,0), rec2)

@@ -15,8 +15,8 @@ lms <- rbind(
 	)
            
 # Set rownames for landmarks
-rownames(lms) <- c("nc_vc", "nc_su_a_L", "pc_su_L", "ac_hy_L", "hy_mid", "ac_hy_R", 
-	"pc_su_R", "nc_su_a_R", "hy_mid", "lj_sy_inf", "lj_qd_L", "lj_qd_R")
+rownames(lms) <- c('nc_vc', 'nc_su_a_L', 'pc_su_L', 'ac_hy_L', 'hy_mid', 'ac_hy_R', 
+	'pc_su_R', 'nc_su_a_R', 'hy_mid', 'lj_sy_inf', 'lj_qd_L', 'lj_qd_R')
 
 # Assign joint coordinates from landmark matrix (some landmarks need to be repeated in joint assignment)
 joint.coor <- lms[c('nc_vc', 'nc_su_a_L', 'pc_su_L', 'ac_hy_L', 'hy_mid', 'ac_hy_R', 
@@ -24,7 +24,7 @@ joint.coor <- lms[c('nc_vc', 'nc_su_a_L', 'pc_su_L', 'ac_hy_L', 'hy_mid', 'ac_hy
 	'lj_sy_inf', 'lj_qd_R'), ]
 
 # Define joint types
-joint.types <- c("R","R","S","S","P","S","S","R","S","S","P","S","S","S","S")
+joint.types <- c('R','R','S','S','P','S','S','R','S','S','P','S','S','S','S')
 
 # Define joint constraints
 joint.cons <- list(

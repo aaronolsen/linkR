@@ -4,7 +4,7 @@ joint.coor <- rbind(c(-1,1,0), c(0,1,1), c(0,1,-1), c(0,0,1.5), c(0,-1,0.1),
 	c(1,-0.5,-0.1), c(0.5,0,-1.5), c(0,-1,0), c(1,-0.5,0))
 
 # Define joint types
-joint.types <- c("R","R","R","S","S","P","S","S","S","S","P","S","S","S","S")
+joint.types <- c('R','R','R','S','S','P','S','S','S','S','P','S','S','S','S')
 
 # Define joint constraints
 joint.cons <- list(c(0,0,1), c(1,0,0), c(1,0,0), NA, NA, c(0,0,1), NA, NA, NA, NA, 
@@ -24,7 +24,8 @@ link.assoc <- c(rep(1,3),2,2,3,3)
 # Define input parameters
 n_iter <- 50
 input.param <- list(seq(0*(pi/180), 10*(pi/180), length=n_iter),
-	matrix(c(-1,0,0), nrow=n_iter, ncol=3, byrow=TRUE)*matrix(seq(0, 1, length=n_iter), nrow=n_iter, ncol=3))
+	matrix(c(-1,0,0), nrow=n_iter, ncol=3, byrow=TRUE)*matrix(seq(0, 1, length=n_iter), 
+	nrow=n_iter, ncol=3))
 
 # Define input joint(s)
 input.joint <- c(1,6)

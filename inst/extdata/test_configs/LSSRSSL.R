@@ -3,7 +3,7 @@ joint.coor <- rbind(c(-0.5,0.5,0), c(-0.5,0.6,0), c(0.3,0.5,0), c(0.5,0,0),
 	c(0.7,0.5,0), c(1.5,0.9,0), c(1.5,1,0))
 
 # Define joint types
-joint.types <- c("L", "S", "S", "R", "S", "S", "L")
+joint.types <- c('L', 'S', 'S', 'R', 'S', 'S', 'L')
 
 # Define joint constraints
 joint.cons <- list(c(1,0,0), NA, NA, c(0,0,-1), NA, NA, c(0,0,1))

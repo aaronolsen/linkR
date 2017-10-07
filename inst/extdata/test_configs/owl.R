@@ -10,8 +10,8 @@ joint.coor <- lms[c('nc_qd_l_R', 'ju_qd_R', 'ju_ub_R', 'nc_ub_R', 'pt_qd_R',
 	'nc_ub_L', 'pt_qd_L', 'pa_pt_L', 'pa_pt_L', 'pa_pt_L', 'pa_ub_L'), ]
 
 # Define joint types
-joint.types <- c("R", "S", "S", "R", "S", "S", "P", "S", "S",
-	"R", "S", "S", "R", "S", "S", "P", "S", "S")
+joint.types <- c('R', 'S', 'S', 'R', 'S', 'S', 'P', 'S', 'S',
+	'R', 'S', 'S', 'R', 'S', 'S', 'P', 'S', 'S')
 
 # Define joint constraints
 joint.cons <- list(
