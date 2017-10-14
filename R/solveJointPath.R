@@ -15,9 +15,9 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 		tform_set <- FALSE
 
 		if(print.progress) joint_props <- c()
-		
+
 		# CREATE TRANSFORMATION MATRIX
-		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR')){
+		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'V')){
 
 			# Set rotation magnitudes
 			if(joint.types == 'PR'){
@@ -37,9 +37,16 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			}
 
 			#
-			if(joint.types == 'U'){
+			if(joint.types %in% c('U', 'V')){
+
 				jt_set <- 1:2
-				AOR[2, , jt_set[2]] <- rotateBody(m=AOR[2, , jt_set[2]], v=AOR[1, , jt_set[1]], a=mags[1])
+
+				# Apply first axis rotation to second axis of U-joint and second and third axis of V-joint
+				AOR[2:dim(AOR)[1], , jt_set[2]] <- rotateBody(m=AOR[2:dim(AOR)[1], , jt_set[2]], v=AOR[1, , jt_set[1]], a=mags[1])
+
+				# Apply second axis rotation to third axis of V-joint
+				if(joint.types == 'V') AOR[3, , jt_set[2]] <- rotateBody(m=AOR[3, , jt_set[2]], v=AOR[2, , jt_set[2]], a=mags[2])
+
 			}else{
 				jt_set <- rep(jt_set, dim(AOR)[1])
 			}
@@ -47,7 +54,10 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			if(print.progress){
 
 				AORs_print <- c()
-				for(i in 1:dim(AOR)[1]) AORs_print <- c(AORs_print, paste0(round(AOR[i, , jt_set[i]], 3), collapse=','))
+				for(i in 1:dim(AOR)[1]){
+					if(i == 1){ jt_set_i <- 1 }else{ jt_set_i <- 2 }
+					AORs_print <- c(AORs_print, paste0(round(AOR[i, , jt_set_i], 3), collapse=','))
+				}
 				AOR_print <- paste0(paste0('AoR', 1:length(AORs_print), ':', AORs_print), collapse='; ')
 				
 				joint_props <- c(joint_props, paste0('CoR:', paste0(round(joint.coor[, jt_set[1]], 3), collapse=',')))
@@ -64,8 +74,11 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 				# SKIP IF NA
 				if(is.na(mags[i])) next
 				
+				# Set joint set
+				if(i == 1){ jt_set_i <- 1 }else{ jt_set_i <- 2 }
+
 				# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
-				tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(AOR[i, , jt_set[i]], -mags[i])
+				tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(AOR[i, , jt_set_i], -mags[i])
 			}
 
 			# TRANSLATE BACK FROM CENTER OF ROTATION

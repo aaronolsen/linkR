@@ -63,12 +63,15 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		joint_consn[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter, 2))
 		
 		# If U-joint, make sure only corresponding axis is in each set
-		if(mechanism$joint.types[i] == 'U'){
+		if(mechanism$joint.types[i] %in% c('U', 'V')){
 			joint_consn[[i]][1, , , 2] <- NA
 			joint_consn[[i]][2, , , 1] <- NA
 		}
-	}
 
+		# Keep 3rd axis only with second body/joint set
+		if(mechanism$joint.types[i] %in% c('V')) joint_consn[[i]][3, , , 1] <- NA
+	}
+	
 	# COPY COORDINATES TO TWO SEPARATE JOINT COORDINATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
 	joint_coorn <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter, 2), dimnames=list(joint_names, colnames(mechanism$joint.coor), NULL, NULL))
 
@@ -394,10 +397,6 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 					# SAVE RESULT
 					joint_coorn <- extend$joint.coor
 
-#if(print.progress && abs(joint_coorn['SH_cau', , 1, 1] - 7.4546) > 0.001){
-#	print(joint_coorn)
-#	Q
-#}
 					joint_consn <- extend$joint.cons
 					joint_status <- extend$joint.status
 					tmarr <- extend$tmarr
@@ -450,7 +449,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 	# Find joint positions/iterations that differ
 	joint_sets_diff <- matrix(FALSE, nrow(joint_sets_sub_apply), ncol(joint_sets_sub_apply))
-	joint_sets_diff[mechanism$joint.types %in% c('S', 'R', 'U', 'X'), ] <- joint_sets_sub_apply[mechanism$joint.types %in% c('S', 'R', 'U', 'X'), ] > 1e-5
+	joint_sets_diff[mechanism$joint.types %in% c('S', 'R', 'U', 'X', 'V'), ] <- joint_sets_sub_apply[mechanism$joint.types %in% c('S', 'R', 'U', 'X', 'V'), ] > 1e-5
 	
 	# COMBINE TWO JOINT COORDINATE SETS INTO ONE
 	joint_coor <- joint_coorn[, , , 1]
@@ -471,7 +470,15 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		if(length(dim(joint_consn[[i]][, , , 1])) == 2){
 			joint_cons[[i]] <- array(joint_consn[[i]][, , , 1], dim=c(1,3,n_iter))
 		}else{
+
 			joint_cons[[i]] <- joint_consn[[i]][, , , 1]
+
+			if(!is.matrix(joint_cons[[i]])) next
+
+			# Fill in any NA values from other body joint set
+			if(any(is.na(joint_cons[[i]][, 1, 1]))){
+				joint_cons[[i]][is.na(joint_cons[[i]][, 1, 1]), , ] <- joint_consn[[i]][is.na(joint_cons[[i]][, 1, 1]), , , 2]
+			}
 		}
 	}
 

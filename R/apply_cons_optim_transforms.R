@@ -20,7 +20,7 @@ apply_cons_optim_transforms <- function(p, cons, type, dof){
 	if(type == 'R'){
 		cons_out[4:6] <- cons[4:6] %*% rotationMatrixZYX(p[4:6])
 	}
-	if(type == 'U'){
+	if(type %in% c('U', 'V')){
 		cons_out[4:6] <- cons[4:6] %*% rotationMatrixZYX(p[4:6])
 		cons_out[7:9] <- (cons[7:9] %*% rotationMatrixZYX(p[4:6])) %*% tMatrixEP(cons_out[4:6], p[7])
 	}
