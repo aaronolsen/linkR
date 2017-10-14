@@ -36,18 +36,33 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 					p=mechanism$joint.coor[1, ], n=mechanism$joint.cons[[i]][, , 1])
 			}
 		}
-		
+
 	}else if(replace == 'joint.cons'){
 
 		k <- 1
 		n <- 1
 		for(i in 1:length(mechanism$joint.cons)){
+			tform1 <- diag(3)
+			tform2 <- diag(3)
 			for(j in 1:nrow(mechanism$joint.cons[[i]])){
 				if(cons.fill[k] == 'v'){
+					tform1 <- tMatrixEP(v=cprod(mechanism$joint.cons[[i]][j, , 1], p[n:(n+2)]), a=avec(mechanism$joint.cons[[i]][j, , 1], p[n:(n+2)]))
 					mechanism$joint.cons[[i]][j, , 1] <- p[n:(n+2)]
 					n <- n + 3
 				}else if(cons.fill[k] == 'vo'){
-					mechanism$joint.cons[[i]][j, , 1] <- rotateBody(m=mechanism$joint.cons[[i]][j, , 1], v=mechanism$joint.cons[[i]][j-1, , 1], a=p[n])
+					if(j == 2){
+						after_tform <- mechanism$joint.cons[[i]][j, , 1] %*% tform1
+						after_tform <- after_tform %*% tMatrixEP(v=mechanism$joint.cons[[i]][j-1, , 1], a=p[n])
+						tform2 <- tMatrixEP(v=cprod(mechanism$joint.cons[[i]][j, , 1], after_tform), a=avec(mechanism$joint.cons[[i]][j, , 1], after_tform))
+					}else if(j == 3){
+						after_tform <- mechanism$joint.cons[[i]][j, , 1] %*% tform2
+						after_tform <- after_tform %*% tMatrixEP(v=mechanism$joint.cons[[i]][j-1, , 1], a=p[n])
+						#tform2 <- tMatrixEP(v=cprod(mechanism$joint.cons[[i]][j, , 1], after_tform), a=avec(mechanism$joint.cons[[i]][j, , 1], after_tform))
+					}
+					mechanism$joint.cons[[i]][j, , 1] <- after_tform
+
+					#mechanism$joint.cons[[i]][j, , 1] <- mechanism$joint.cons[[i]][j, , 1] %*% tform1
+					#mechanism$joint.cons[[i]][j, , 1] <- mechanism$joint.cons[[i]][j, , 1] %*% tMatrixEP(v=mechanism$joint.cons[[i]][j-1, , 1], a=p[n])
 					n <- n + 1
 				}else if(cons.fill[k] == 'cprod'){
 					mechanism$joint.cons[[i]][j, , 1] <- cprod(mechanism$joint.cons[[i]][j-2, , 1], mechanism$joint.cons[[i]][j-1, , 1])
@@ -56,7 +71,7 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 			}
 		}
 	}
-	
+
 	# Run mechanism model
 	anim_mech <- suppressWarnings(animateMechanism(mechanism, input.param=input.param, input.joint=input.joint, 
 		input.body=input.body, joint.compare=joint.compare, use.ref.as.prev=use.ref.as.prev, 
