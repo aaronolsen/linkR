@@ -17,7 +17,7 @@ intersectCircleLine <- function(circle, l1, l2){
 		# CHECK THAT LINE IS PARALLEL TO CROSS PRODUCT OF CIRCLE N VECTOR AND VECTOR TO LINE
 		ang_line <- abs(avec(l2-l1, cprod(circle$N, mid_point-circle$C)))
 
-		if(ang_line > 1e-8) stop("Line input to intersectCircleLine() must be parallel to circle plane.")
+		if(min(abs(ang_line), abs(ang_line-pi)) > 1e-8) stop("Line input to intersectCircleLine() must be parallel to circle plane.")
 	}
 	
 	# CHECK THAT LINE OVERLAPS WITH CIRCLE
