@@ -9,10 +9,14 @@ avec <- function(u, v, axis=NULL, about.axis=FALSE, max.pi=FALSE){
 	vu <- uvector(v)
 	
 	c <- sum(uu*vu) / sqrt(sum(uu*uu)) * sqrt(sum(vu*vu))
+
 	if(round(abs(c), digits=12) == 1){
 		angle <- 0
+
+		# Check for opposite direction
+		if(abs(sum(uu+vu)) < 1e-9) angle <- pi
+
 	}else{
-		
 		if(max.pi){
 			angle <- min(acos(c), pi-acos(c))
 		}else{
