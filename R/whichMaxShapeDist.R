@@ -15,6 +15,9 @@ whichMaxShapeDist <- function(shapes, max.index = dim(shapes)[3], method = c('pr
 	# Get percent variance explained along each axis
 	percent.var <- (resEig$values / sum(resEig$values))*100
 	
+	# Check for set of identical shapes
+	if(abs(resEig$values[1]) < 1e-10) return(seq(1,dim(shapes)[3],length=max.index))
+	
 	# Determine which columns to use
 	cols_use <- (1:ncol(scores))[percent.var > min.per.var]
 
