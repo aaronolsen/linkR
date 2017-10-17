@@ -63,13 +63,13 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		joint_consn[[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter, 2))
 		
 		# If U-joint, make sure only corresponding axis is in each set
-		if(mechanism$joint.types[i] %in% c('U', 'V')){
+		if(mechanism$joint.types[i] %in% c('U', 'O')){
 			joint_consn[[i]][1, , , 2] <- NA
 			joint_consn[[i]][2, , , 1] <- NA
 		}
 
 		# Keep 3rd axis only with second body/joint set
-		if(mechanism$joint.types[i] %in% c('V')) joint_consn[[i]][3, , , 1] <- NA
+		if(mechanism$joint.types[i] %in% c('O')) joint_consn[[i]][3, , , 1] <- NA
 	}
 	
 	# COPY COORDINATES TO TWO SEPARATE JOINT COORDINATE ARRAYS (EACH JOINT MOVED WITH BOTH BODIES)
@@ -449,7 +449,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 
 	# Find joint positions/iterations that differ
 	joint_sets_diff <- matrix(FALSE, nrow(joint_sets_sub_apply), ncol(joint_sets_sub_apply))
-	joint_sets_diff[mechanism$joint.types %in% c('S', 'R', 'U', 'X', 'V'), ] <- joint_sets_sub_apply[mechanism$joint.types %in% c('S', 'R', 'U', 'X', 'V'), ] > 1e-5
+	joint_sets_diff[mechanism$joint.types %in% c('S', 'R', 'U', 'X', 'O'), ] <- joint_sets_sub_apply[mechanism$joint.types %in% c('S', 'R', 'U', 'X', 'O'), ] > 1e-5
 	
 	# COMBINE TWO JOINT COORDINATE SETS INTO ONE
 	joint_coor <- joint_coorn[, , , 1]

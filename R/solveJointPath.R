@@ -17,7 +17,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 		if(print.progress) joint_props <- c()
 
 		# CREATE TRANSFORMATION MATRIX
-		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'V')){
+		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'O')){
 
 			# Set rotation magnitudes
 			if(joint.types == 'PR'){
@@ -37,7 +37,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			}
 
 			#
-			if(joint.types %in% c('U', 'V')){
+			if(joint.types %in% c('U', 'O')){
 
 				jt_set <- 1:2
 
@@ -45,7 +45,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 				AOR[2:dim(AOR)[1], , jt_set[2]] <- rotateBody(m=AOR[2:dim(AOR)[1], , jt_set[2]], v=AOR[1, , jt_set[1]], a=mags[1])
 
 				# Apply second axis rotation to third axis of V-joint
-				if(joint.types == 'V') AOR[3, , jt_set[2]] <- rotateBody(m=AOR[3, , jt_set[2]], v=AOR[2, , jt_set[2]], a=mags[2])
+				if(joint.types == 'O') AOR[3, , jt_set[2]] <- rotateBody(m=AOR[3, , jt_set[2]], v=AOR[2, , jt_set[2]], a=mags[2])
 
 			}else{
 				jt_set <- rep(jt_set, dim(AOR)[1])
