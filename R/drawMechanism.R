@@ -4,7 +4,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 	joint.col.stroke="black", joint.cex=1.5, joint.lwd=2,
 	point.col.fill="black", point.col.stroke="black", point.cex=1, point.lwd=2,
 	path.col.fill=NA, path.opacity.fill=1, path.opacity.stroke=1, path.col.stroke="black", 
-	path.lwd = 1, add = FALSE, debug = FALSE, ...){
+	path.lwd = 1, draw.trajectory = FALSE, add = FALSE, debug = FALSE, ...){
 
 	#if(is.null(file) && method == "svgViewR") stop("To plot a linkage using the svgViewR method, 'file' must be non-NULL.")
 	if(is.null(file)) method <- "plot"
@@ -49,7 +49,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 	cs_xyz <- mean(distPointToPoint(xyz, colMeans(xyz, na.rm=TRUE)), na.rm=TRUE)
 
 	# SET JOINT CONSTRAINT ARROW PROPERTIES
-	arrow_len <- cs_xyz*0.25
+	arrow_len <- cs_xyz*0.5
 	arrowhead_len <- cs_xyz*0.03
 
 	col_cons <- c('purple', 'hotpink')
@@ -209,10 +209,14 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 
 				if(debug){
 					for(k in seq(1, n_vectors, by=2)){
-						svg.arrows(x=cons_vec1[[i]][k:(k+1), 1:3, ], len=arrowhead_len, col='red', 
-							lwd=2, layer='Joint constraints', z.index=1)
-						svg.arrows(x=cons_vec2[[i]][k:(k+1), 1:3, ], len=2*arrowhead_len, col='green', 
-							lwd=3, layer='Joint constraints', z.index=1)
+						if(k == 1){ col1 <- 'pink'; lwd1 <- 2; col2 <- 'springgreen'; lwd2 <- 2 }
+						if(k == 3){ col1 <- 'red'; lwd1 <- 3; col2 <- 'green'; lwd2 <- 3 }
+						if(k == 5){ col1 <- 'darkred'; lwd1 <- 4; col2 <- 'darkgreen'; lwd2 <- 4 }
+
+						svg.arrows(x=cons_vec1[[i]][k:(k+1), 1:3, ], len=arrowhead_len, col=col1, 
+							lwd=lwd1, layer='Joint constraints', z.index=1)
+						svg.arrows(x=cons_vec2[[i]][k:(k+1), 1:3, ], len=2*arrowhead_len, col=col2, 
+							lwd=lwd2, layer='Joint constraints', z.index=1)
 					}
 				}else{
 
@@ -258,7 +262,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 					# SKIP LINES AMONG JOINTS CONNECTED TO GROUND
 					#if(linkage$joint.conn[i, 'body.idx'] == 1) next
 					if(linkage$joint.conn[i, 'joint1'] == 0 || linkage$joint.conn[i, 'joint2'] == 0) next
-					#if(linkage$joint.conn[i, 'joint1'] == 1 || linkage$joint.conn[i, 'joint2'] == 1) next
+					if(linkage$joint.conn[i, 'joint1'] == 1 || linkage$joint.conn[i, 'joint2'] == 1) next
 
 					# ADD PATHS
 					svg.pathsC(c(linkage$joint.conn[i, 'joint1'], linkage$joint.conn[i, 'joint2']), 
@@ -304,7 +308,7 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 						col.stroke=point.col.stroke, cex=point.cex, lwd=point.lwd, layer='Points')
 				}
 			}
-
+			
 			# DRAW PATHS CONNECTING JOINTS
 			if(!is.null(points.connect)){
 
@@ -330,11 +334,18 @@ drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = T
 					}
 				}
 			}
+			
+			# DRAW LINES TRACING POINT TRAJECTORIES
+			if(draw.trajectory){
+				for(i in 1:dim(body.points)[2]){
+					svg.lines(t(body.points[i, , ]), layer='Points', col=path.col.stroke)
+				}
+			}
 		}
-
+		
 		# DRAW FRAME
 		svg.frame(x=xyz)
-		
+
 		svg.close()
 	}
 	

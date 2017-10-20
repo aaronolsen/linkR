@@ -4,7 +4,7 @@ drawMechanismFit <- function(fit.mechanism, method = "svgViewR", file = NULL, an
 	joint.col.stroke="black", joint.cex=1.5, joint.lwd=2,
 	point.col.fill="black", point.col.stroke="black", point.cex=1, point.lwd=2,
 	path.col.fill=NA, path.opacity.fill=1, path.opacity.stroke=1, path.col.stroke="black", 
-	path.lwd = 1, add = FALSE, debug = FALSE, ...){
+	path.lwd = 1, draw.trajectory = FALSE, add = FALSE, debug = FALSE, ...){
 
 	# Animate mechanism
 	anim_mech <- animateMechanism(fit.mechanism$mechanism, input.param=fit.mechanism$input.param, 
@@ -26,10 +26,18 @@ drawMechanismFit <- function(fit.mechanism, method = "svgViewR", file = NULL, an
 		joint.col.stroke=joint.col.stroke, joint.cex=joint.cex, joint.lwd=joint.lwd,
 		point.col.fill=point.col.fill, point.col.stroke=point.col.stroke, point.cex=point.cex, point.lwd=point.lwd,
 		path.col.fill=path.col.fill, path.opacity.fill=path.opacity.fill, path.opacity.stroke=path.opacity.stroke, 
-		path.col.stroke=path.col.stroke, path.lwd=path.lwd, add=add, debug=debug)
+		path.col.stroke=path.col.stroke, path.lwd=path.lwd, draw.trajectory=draw.trajectory, 
+		add=add, debug=debug)
 
 	#
 	svg.points(fit.mechanism$fit.points, col='purple', cex=2, file=file)
+
+	#
+	if(draw.trajectory && !is.null(fit.mechanism$fit.points)){
+		for(i in 1:dim(fit.mechanism$fit.points)[2]){
+			svg.lines(t(fit.mechanism$fit.points[i, , ]), layer='Points', col='purple', file=file)
+		}
+	}
 
 	list(
 		'animate'=anim_mech
