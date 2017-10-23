@@ -1,14 +1,18 @@
 animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input.joint, 
-	input.body, fit.wts, replace, joint.compare = NULL, planar = FALSE, n.input = NULL, cons.fill = NULL, 
-	coor.vectors = NULL, joint.optim = NULL, use.ref.as.prev = FALSE, print.progress = FALSE){
+	input.body, fit.wts, replace, direct.input = NULL, joint.compare = NULL, planar = FALSE, 
+	cons.fill = NULL, coor.vectors = NULL, joint.optim = NULL, 
+	use.ref.as.prev = FALSE, input.param.fill = NULL, iter = NULL, print.progress = FALSE){
 
 	# Replace parameter with optimize parameters
 	if(replace == 'input.param'){
-		n <- 1
-		for(i in 1:length(input.param)){
-			input.param[[i]] <- matrix(p[n:(n + n.input[i] - 1)], nrow=1, ncol=n.input[i])
-			n <- n + n.input[i]
+
+		input_param <- list()
+		for(i in 1:length(input.param.fill)){
+			input_param[[i]] <- matrix(input.param[[i]][iter, ], nrow=1)
+			input_param[[i]][, input.param.fill[[i]][['list.idx']]] <- matrix(p[input.param.fill[[i]][['col.idx']]], nrow=1)
 		}
+		input.param <- input_param
+
 	}else if(replace == 'joint.coor'){
 
 		#mechanism$joint.coor <- mechanism$joint.coor + matrix(p, mechanism$num.joints, 3, byrow=TRUE)
@@ -47,7 +51,7 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 			for(j in 1:nrow(mechanism$joint.cons[[i]])){
 				if(cons.fill[k] == 'v'){
 					tform1 <- tMatrixEP(v=cprod(mechanism$joint.cons[[i]][j, , 1], p[n:(n+2)]), a=avec(mechanism$joint.cons[[i]][j, , 1], p[n:(n+2)]))
-					mechanism$joint.cons[[i]][j, , 1] <- p[n:(n+2)]
+					mechanism$joint.cons[[i]][j, , 1] <- uvector(p[n:(n+2)])
 					n <- n + 3
 				}else if(cons.fill[k] == 'vo'){
 					if(j == 2){
@@ -71,6 +75,22 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 			}
 		}
 	}
+	
+	# Replace any input parameters with direct calculation
+	if(!is.null(direct.input) && any(direct.input)){
+
+		# Get input parameters
+		for(i in which(direct.input)){
+			input.param[[i]] <- findJointInputParam(type=mechanism$joint.type[i], 
+				coor=mechanism$joint.coor[i,], cons=mechanism$joint.cons[[i]][, , 1], ref=mechanism$body.points, 
+				poses=fit.points)
+		}
+	}
+	
+	if(print.progress){
+		#cat('\n')
+		#print(mechanism$joint.cons[[1]])
+	}
 
 	# Run mechanism model
 	anim_mech <- suppressWarnings(animateMechanism(mechanism, input.param=input.param, input.joint=input.joint, 
@@ -83,7 +103,7 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param, input
 	}else{
 		return_error <- sqrt(mean(fit.wts*(anim_mech$body.points - fit.points)^2))
 	}
-
+	
 	# Add NA penalty
 	#if(sum(is.na(anim_mech$joint.coor)) > 0){cat(TRUE, '')}else{cat(FALSE, '')}
 	return_error <- return_error + 0.2*(sum(is.na(anim_mech$joint.coor)) / 3)
