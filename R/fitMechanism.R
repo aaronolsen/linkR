@@ -1131,6 +1131,12 @@ if(TRUE){
 			input.param=input_param, input.joint=input.joint, input.body=input.body, 
 			fit.wts=fit.wts, use.ref.as.prev=use.ref.as.prev, 
 			input.param.fill=input_param_fill, iter=iter)
+		
+		# Set iteration limit
+		it_limit <- 11
+
+		# Create vector to store errors
+		obj_vec <- rep(NA, it_limit)
 
 		# Run optimization with varying start parameters
 		n <- 1
@@ -1138,7 +1144,7 @@ if(TRUE){
 		add_to_start <- 0
 		converged <- FALSE
 		threshold <- input_fit_errors_sub
-		while(!converged && n < 11){
+		while(!converged && n < it_limit){
 		
 			########## FIX to save the minimum
 		
@@ -1155,11 +1161,11 @@ if(TRUE){
 			
 			# Save starting parameters
 			start_param <- input_optim[iter, ]+add_to_start
-			
+
 			# Run optimization
 			input_fit <- tryCatch(
 				expr={
-					nlminb(start=input_optim[iter, ]+add_to_start, objective=animate_mechanism_error, 
+					nlminb(start=start_param, objective=animate_mechanism_error, 
 						lower=input_optim_bounds['lower', ], upper=input_optim_bounds['upper', ], 
 						replace='input.param', joint.compare=joint_compare[, , iter], 
 						fit.points=fit.points[, , iter], 
@@ -1171,12 +1177,16 @@ if(TRUE){
 				warning=function(cond) {print(cond);return(NULL)}
 			)
 			
+			#
+			obj_vec[n] <- input_fit$objective
+			
 			# Detect non-convergence 
 			converged <- TRUE
 			if(input_fit$objective > threshold) converged <- FALSE
 			if(sum(abs(start_param - input_fit$par)) < 1e-4) converged <- FALSE
+			if(n > 3 && sd(obj_vec, na.rm=TRUE) < 1e-10) converged <- TRUE
 
-			#cat(paste0('\t', iter, ' (', n, '): ', round(input_fit$objective, 3), ', ', round(threshold, 3), ', ', converged, '\n'))
+			#if(iter < 30) cat(paste0('\t', iter, ' (', n, '): ', round(input_fit$objective, 4), ', ', round(threshold, 4), ', ', converged, paste0(round(obj_vec, 5), collapse=','), '\n'))
 
 			# Change threshold so that error must be lower than initial if no change in parameters
 			if(n == 1 && sum(abs(start_param - input_fit$par)) < 1e-4) threshold <- input_fit$objective
