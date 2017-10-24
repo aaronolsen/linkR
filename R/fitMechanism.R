@@ -609,7 +609,8 @@ if(TRUE){
 	# Cycle optimizing the input parameters, joint constraints and coordinates, and body 
 	#	pose until error changes less than difference threshold between consecutive 
 	# 	optimization steps
-	while(abs(diff(tail(optim_errors, 2)) / optim_errors[length(optim_errors)-1])*100 > control$optim.to.percent && optim_iter < control$optim.iter.max){
+	optim_iter_max <- control$optim.iter.max
+	while(optim_iter < optim_iter_max){
 	
 		if(print.progress) cat(paste0(paste0(rep(indent, print.level+2), collapse=''), optim_iter+1, ') Errors: '))
 
@@ -622,7 +623,7 @@ if(TRUE){
 		if(any(direct.input) && optim_iter %in% seq(1,control$optim.iter.max,by=2)){direct_input <- TRUE}else{direct_input <- FALSE}
 		#direct_input <- FALSE
 
-		if(any(direct_input) && optim_iter == 0){
+		if(direct_input){	#  && optim_iter == 0
 
 			# Get input parameters
 			for(i in which(direct_input)){
@@ -1065,19 +1066,42 @@ if(TRUE){
 		# Set change type
 		if(percent_error_change < 0){ change_types[optim_iter+1] <- 'decrease' }else{ change_types[optim_iter+1] <- 'increase' }
 		
-		turning_off <- ''
-		if(sum(change_types == 'increase', na.rm=TRUE) > 3 && any(direct.input)){
-			direct.input <- FALSE*direct.input
-			turning_off <- ', turning off direct.input'
+		inc_iter_max <- ''
+		if(any(direct.input) && !direct_input && optim_iter == control$optim.iter.max-1){
+			optim_iter_max <- control$optim.iter.max + 1
+			inc_iter_max <- ', increasing iteration max to end on direct input'
 		}
 
-		if(print.progress && optim_iter > 0) cat(paste0(' (', round(abs(percent_error_change)*100, 2), '% ', change_types[optim_iter+1], ')', turning_off))
+		turning_off <- ''
+		if(sum(change_types == 'increase', na.rm=TRUE) > 5 && any(direct.input)){
+			#direct.input <- FALSE*direct.input
+			#turning_off <- ', turning off direct.input'
+		}
 
+		if(print.progress && optim_iter > 0) cat(paste0(' (', round(abs(percent_error_change)*100, 2), '% ', change_types[optim_iter+1], ')', turning_off, inc_iter_max))
 		if(print.progress) cat('\n')
+
+		# Stop if optim.to.percent threshold is reached - special cases for direct input since percent change bounces around much more
+		if(any(direct.input)){
+			if(direct_input){
+				if(optim_iter > 10){
+					optim_to_percent_test <- abs(percent_error_change)*100 < control$optim.to.percent
+				}else{
+					optim_to_percent_test <- FALSE
+				}
+			}else{
+				optim_to_percent_test <- FALSE
+			}
+		}else{
+			optim_to_percent_test <- abs(percent_error_change)*100 < control$optim.to.percent
+		}
+
+		# If near perfect fit stop - for perfect input testing
+		if(optim_to_percent_test) break
 
 		# If near perfect fit stop - for perfect input testing
 		if(final_fit_error < control$optim.error.stop) break
-
+		
 		# Advance iteration tracker
 		optim_iter <- optim_iter + 1
 	}
@@ -1086,12 +1110,14 @@ if(TRUE){
 	input_param_g <<- input_param
 	input_optim_g <<- input_optim
 	input_fit_errors_f_g <<- input_fit_errors_f
+	optim_errors_g <<- optim_errors
 }else{
 
 	input.param <- input_param_g
 	mechanism <- mechanism_g
 	input_optim <- input_optim_g
 	input_fit_errors_f <- input_fit_errors_f_g
+	optim_errors <- optim_errors_g
 }
 
 	## Final optimization across all input parameters (will change slightly since coordinates, constraints, and pose fits have improved
@@ -1302,6 +1328,8 @@ if(TRUE){
 		'rmse'=input_fit_errors_f,
 		'input.joint'=input.joint, 
 		'input.body'=input.body,
-		'use.ref.as.prev'=use.ref.as.prev
+		'use.ref.as.prev'=use.ref.as.prev,
+		'optim.errors'=optim_errors[3:length(optim_errors)],
+		'run.time'=proc_time
 	)
 }
