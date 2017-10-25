@@ -1,6 +1,6 @@
 fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.param, 
 	input.joint = NULL, input.body = NULL, joint.coor = NULL, joint.cons = NULL, 
-	joint.optim = rep(TRUE, nrow(joint.coor)), joint.optim.iter = NULL, fit.wts = NULL, joint.names = NULL, 
+	joint.optim = rep(TRUE, nrow(joint.coor)), fit.wts = NULL, joint.names = NULL, 
 	planar = FALSE, fixed.body = 'Fixed', coor.vectors = NULL, use.ref.as.prev = FALSE, 
 	print.progress = FALSE, control = NULL, print.level = 0){
 
@@ -146,7 +146,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		if(joint.types[joint_num] %in% c('U', 'X', 'O')) init_fit_type <- 'R'
 		
 		# Get initial joint constraint estimate
-		fit_joint_cons <- fitJointConstraint(coor=fit_points, type=init_fit_type, print.progress=FALSE)
+		fit_joint_cons <- fitJointConstraint(coor=fit_points, type=init_fit_type, smooth=TRUE, print.progress=FALSE)
 
 		# Set center of rotation
 		if(joint.types[joint_num] %in% c('R', 'S', 'X', 'U', 'O'))
@@ -445,6 +445,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		}
 	}
 	
+	# These are values that are *added* to joint.coor
 	coor_optim <- c()
 	for(i in joints_optim){
 	
@@ -463,6 +464,30 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			}else{
 				coor_optim <- c(coor_optim, rep(0,3))
 			}
+		}
+	}
+
+	# Print joint coordinate optimization parameters
+	if(print.progress){
+		cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'Joint coordinate optimization:\n'))
+		for(j in 1:n_joints){
+			cat(paste0(paste0(rep(indent, print.level+3), collapse=''), joint.names[j], ': '))
+			if(j %in% joints_optim){
+				cat(paste0('Adding values to {', paste0(round(mechanism$joint.coor[j, ], 3), collapse=','), '}'))
+				if(coor_vectors_input[j]){
+					cat(paste0(' along input vectors {', paste0(round(coor.vectors[[j]], 3), collapse=','), '}'))
+				}else if(joint.types[j] == 'R'){
+					cat(paste0(' along vectors in plane perpendicular to ', joint.names[j], ' axis'))
+				}else if(joint.types[j] == 'P'){
+					cat(paste0(' along vector perpendicular to ', joint.names[j], ' axis'))
+				}else{
+					cat(paste0(' along x, y, and z-axes'))
+				}
+				cat(paste0(' with bounds of +/- ', round(control$joint.coor.bounds, 3), ' (per optim iter)'))
+			}else{
+				cat(paste0('Using {', paste0(round(mechanism$joint.coor[j, ], 3), collapse=','), '}'))
+			}
+			cat('\n')
 		}
 	}
 
@@ -802,7 +827,8 @@ if(TRUE){
 					}else if(joint.types[j] == 'P'){
 						coor_vectors[[j]] <- mechanism$joint.cons[[j]][, , 1]
 					}else{
-						coor_vectors[[j]] <- diag(3)[1:2, ]
+						#coor_vectors[[j]] <- diag(3)[1:2, ]
+						coor_vectors[[j]] <- diag(3)
 					}
 				}
 
@@ -890,6 +916,9 @@ if(TRUE){
 			
 			# No need to update coor_optim because joint coordinates are updated and coor_optim restarts at 0
 		}
+		
+		#cat('\n')
+		#print(mechanism$joint.coor)
 
 		## Optimize joint constraints
 		if(!planar && optim_joint_cons){
@@ -1060,9 +1089,17 @@ if(TRUE){
 		# Save error after optimization
 		optim_errors <- c(optim_errors, final_fit_error)
 
-		# Get percent change
-		percent_error_change <- diff(tail(optim_errors, 2)) / optim_errors[length(optim_errors)-1]
-		
+		# Get percent change in every other optim iter
+		every_other <- ''
+		if(any(direct.input) && optim_iter > 5){
+			optim_errors_eo3 <- optim_errors[seq(length(optim_errors)-2, length(optim_errors), by=2)]
+			percent_error_change <- mean(diff(optim_errors_eo3)) / mean(optim_errors_eo3)
+			if(optim_iter == 6) every_other <- ', now using mean of last 2 every other'
+		}else{
+			# Get percent change
+			percent_error_change <- diff(tail(optim_errors, 2)) / optim_errors[length(optim_errors)-1]
+		}
+
 		# Set change type
 		if(percent_error_change < 0){ change_types[optim_iter+1] <- 'decrease' }else{ change_types[optim_iter+1] <- 'increase' }
 		
@@ -1073,12 +1110,12 @@ if(TRUE){
 		}
 
 		turning_off <- ''
-		if(sum(change_types == 'increase', na.rm=TRUE) > 5 && any(direct.input)){
+		if(sum(change_types == 'increase', na.rm=TRUE) > 4 && any(direct.input)){
 			#direct.input <- FALSE*direct.input
 			#turning_off <- ', turning off direct.input'
 		}
 
-		if(print.progress && optim_iter > 0) cat(paste0(' (', round(abs(percent_error_change)*100, 2), '% ', change_types[optim_iter+1], ')', turning_off, inc_iter_max))
+		if(print.progress && optim_iter > 0) cat(paste0(' (', round(abs(percent_error_change)*100, 2), '% ', change_types[optim_iter+1], every_other, ')', turning_off, inc_iter_max))
 		if(print.progress) cat('\n')
 
 		# Stop if optim.to.percent threshold is reached - special cases for direct input since percent change bounces around much more
@@ -1281,6 +1318,7 @@ if(TRUE){
 		for(i in 1:n_joints){
 
 			if(!joint.types[i] %in% c('R')) next
+			if(!i %in% joints_optim) next
 		
 			# Get points of bodies connected by joint
 			body1_pts <- mechanism$body.points[mechanism$body.assoc == mechanism$body.conn.num[i, 1], ]
