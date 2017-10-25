@@ -1,7 +1,7 @@
-pointMinDistLines <- function(l1, l2){
+pointMinDistLines <- function(l1, l2, wts = rep(1,nrow(l1))){
 
 	# Finds the position of a point at a minimum distance from several lines
-	dist_point_to_line_error
+	#dist_point_to_line_error
 	start <- colMeans(l1)
 	lower <- apply(rbind(l1,l2), 2, 'min')
 	upper <- apply(rbind(l1,l2), 2, 'max')
@@ -9,7 +9,7 @@ pointMinDistLines <- function(l1, l2){
 	min_dist_solve <- tryCatch(
 		expr={
 			nlminb(start=start, objective=dist_point_to_line_error, 
-				lower=lower, upper=upper, l1=l1, l2=l2)
+				lower=lower, upper=upper, l1=l1, l2=l2, wts=wts)
 		},
 		error=function(cond) {print(cond);return(NULL)},
 		warning=function(cond) {print(cond);return(NULL)}
