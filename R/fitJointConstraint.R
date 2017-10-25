@@ -1,14 +1,45 @@
-fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.t.axis='min', 
-	print.progress = FALSE){
+fitJointConstraint <- function(coor, type, control = NULL, smooth = TRUE, fixed = NULL, 
+	select.t.axis='min', print.progress = FALSE){
 
 	# Set default controls
+	control_default <- list(
+		'max.disp'=100,										# Number of time points used in max dispersion sampling
+		'smooth.span'=round((18/dim(coor)[3]) + 0.01, 3)	# Decrease number before /dim() for higher precision smoothing - smoothing is scale-invariant (increasing coor by *1000 has no effect)
+	)
+
+	# Overwrite default controls with inputs, if applicable
 	if(is.null(control)){
-		control <- list(
-			'subsample.method'='Evenly spaced',		# or 'Maximum dispersion'
-			'max.disp.prop.R'=0.2,					# Proportion of time points used in max dispersion sampling
-			'max.disp.prop.S'=0.2,
-			'max.disp.prop.U'=0.2
-		)
+		control_new <- control_default
+	}else{
+		control_new <- control_default
+		for(i in 1:length(control))
+			if(!is.null(control[[names(control)[i]]])) control_new[[names(control)[i]]] <- control[[names(control)[i]]]
+	}
+	control <- control_new
+
+	#layout(cbind(1:3))
+
+	## Apply smoothing
+	if(smooth){
+		for(i in 1:dim(coor)[1]){
+			for(j in 1:dim(coor)[2]){
+	
+				# Create data frame
+				data_frame <- data.frame(y=coor[i,j,], x=1:dim(coor)[3])
+
+				# Smooth - higher span value corresponds to smoother fit
+				loess_fit <- loess(y ~ x, data=data_frame, span=control$smooth.span)
+
+				# Create smoothed points
+				smoothed <- predict(loess_fit, data_frame)
+
+				#plot(x=1:dim(coor)[3], y=coor[i,j,], main=paste0(i, ' (span: ', control$smooth.span, ')'), xlab='Time', ylab='Position', col=gray(0.7))
+				#points(x=1:dim(coor)[3], smoothed, type='l', col='blue')
+
+				# Replace unsmoothed with smoothed coordinates
+				coor[i,j,] <- smoothed
+			}
+		}
 	}
 
 	# If fixed coordinate names are provided, get mobile coordinates relative to fixed
@@ -235,18 +266,8 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 		rads <- rep(NA, n_coor)
 		AoRs <- matrix(NA, n_coor, 3)
 		
-		#
-		if(type == 'S'){
-			#print(coor)
-		}
-		
-		#
-		if(type == 'S') max_disp_prop <- control$max.disp.prop.S
-		if(type == 'R') max_disp_prop <- control$max.disp.prop.R
-		if(type == 'U') max_disp_prop <- control$max.disp.prop.U
-
 		# Use n% most dispersed points, in order of dispersion
-		sub_max <- round(max_disp_prop*dim(coor)[3])
+		sub_max <- min(dim(coor)[3], control$max.disp)
 		max_disp <- whichMaxDisperse(t(coor[which.max(Csizes_time), , ]), n=sub_max)
 
 		# Set as subset
@@ -278,22 +299,27 @@ fitJointConstraint <- function(coor, type, control = NULL, fixed = NULL, select.
 		# Find CoR
 		# CoR can be any point on AoR so find average CoR by finding a point in space at minimum distance from all AoRs
 		# If all the AoRs intersect, this will be the intersection point of all the AoRs
-		min_cor <- pointMinDistLines(inst_cor, inst_cor+inst_aor)$p
-		
+		min_cor <- pointMinDistLines(inst_cor, inst_cor+inst_aor, wts=angles)$p
+
 		CoR <- min_cor
 		AoR <- avg_aor
 
 		if(FALSE){
+
 			svg.new('Test2.html')
 			svg.frame(coor)
 			cols <- c('red', 'green', 'blue')
+
 			for(i in 1:dim(coor)[1]) svg.points(t(coor[i, , ]), col.stroke=cols[i], opacity.fill=0.2, opacity.stroke=0.2)
-			for(i in 1:dim(coor_s)[1]) svg.pointsC(t(coor_s[i, , ]), col.stroke.C=cols[i])
-			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(inst_cor[i, ]-uvector(inst_aor[i, ]), inst_cor[i, ]+1*uvector(inst_aor[i, ])), col='purple')
-			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(CoR, CoR+100*angles[i]*uvector(inst_aor[i, ])), col='purple')
-			svg.arrows(rbind(CoR, CoR+10*avg_aor), col='blue')
-			svg.points(min_cor, col='blue', cex=5)
+			#for(i in 1:dim(coor_s)[1]) svg.pointsC(t(coor_s[i, , ]), col.stroke.C=cols[i])
+
+			for(i in 1:nrow(inst_cor)) svg.arrows(rbind(inst_cor[i, ]-angles[i]*uvector(inst_aor[i, ]), inst_cor[i, ]+angles[i]*uvector(inst_aor[i, ])), col='purple')
+			#for(i in 1:nrow(inst_cor)) svg.arrows(rbind(CoR, CoR+1*angles[i]*uvector(inst_aor[i, ])), col='purple')
+
+			#svg.arrows(rbind(CoR, CoR+10*avg_aor), col='blue')
+			#svg.points(min_cor, col='blue', cex=5)
 			#svg.points(c(0.3, 0.5, 0.4), col='green', cex=5)
+
 			svg.close()
 		}
 
