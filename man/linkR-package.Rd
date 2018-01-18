@@ -1,5 +1,6 @@
 \name{linkR-package}
 \alias{linkR-package}
+\alias{linkR}
 
 \alias{angleOnCircleFromPoint}
 \alias{applySolveChain}
