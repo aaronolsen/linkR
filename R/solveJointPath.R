@@ -130,6 +130,8 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 	# SOLVE
 	}else{
 
+		tmat_body1 <- NULL
+
 		# SET TRANSFORM INDICATOR
 		trfm_vec <- rep('', length(joint.types))
 		#trfm_vec[rowSums(joint.status == '') > 0] <- '^'
@@ -166,16 +168,6 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 				))
 		}
 
-		# PRINT PATH DETAILS
-		if(print.progress){
-			name_vec <- joint.names
-			name_wt <- paste0(paste0(name_vec, trfm_vec), collapse='-')
-			#cat(paste0(type_str, ' '))
-#			cat(paste0('Solve path (', name_wt, ')'))
-			cat(paste0(paste0(rep(indent, 4), collapse=''), 'Solve path ', name_wt, ''))
-			cat('\n')
-		}
-
 		if(type_str == 'S-R*-S'){
 
 			# NEED INPUT RESOLVE
@@ -184,6 +176,15 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 		# IDENTIFY J2 SET TRANSFORMED WITH JOINT 1 AND 3
 		J2_J1_set <- which(body.conn[2, ] != body.num[2])
 		J2_J3_set <- which(body.conn[2, ] == body.num[2])
+
+		# PRINT PATH DETAILS
+		if(print.progress){
+			name_vec <- joint.names
+			name_wt <- paste0(paste0(name_vec, trfm_vec), collapse='-')
+			#cat(paste0(type_str, ' '))
+#			cat(paste0('Solve path (', name_wt, ')'))
+			cat(paste0(paste0(rep(indent, 4), collapse=''), 'Try solving path ', name_wt, ''))
+		}
 
 		if(type_str %in% c('L-S*-S', 'S-S*-S')){
 
@@ -198,6 +199,8 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 		}
 
 		if(type_str == 'S-S*-S'){
+
+			if(print.progress) cat(' by circle on sphere from point')
 
 			#if(print.progress) print(input)
 
@@ -246,6 +249,8 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 
 
 		if(type_str %in% c('S-S*-R', 'R-R*-R')){
+
+			if(print.progress) cat(' by point on circle at distance from point')
 
 			## FIND JOINT POSITION THAT SOLVES CONSTRAINT
 			# DEFINE CIRCLE FOR OUTPUT LINK (NEED TO REDEFINE CENTER BECAUSE CIRCLE CENTER MAY NOT BE SAME AS JOINT)
@@ -347,6 +352,8 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 
 		if(type_str == 'L-S*-S'){
 		
+			if(print.progress) cat(' by intersection of sphere and line')
+
 			# SET NULL TRANSFORMATION MATRICES
 			tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
 			
@@ -388,8 +395,6 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			
 			# UPDATE JOINT STATUS
 			joint.status[2, ] <- 's'
-
-			return(list('body.tmat'=list(tmat_body1, tmat_body2), 'joint.status'=joint.status))
 		}
 
 		if(type_str == 'S-S-S-S*'){
@@ -399,7 +404,15 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			# DISTANCE EQUAL TO LENGTH OF SECOND BODY
 			# ALSO ROTATE SECOND BODY ABOUT BRIDGE JOINT TOO
 		}
-	}
 
-	return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=FALSE))
+		if(print.progress){
+			cat('\n')
+		}
+
+		if(!is.null(tmat_body1)){
+			return(list('body.tmat'=list(tmat_body1, tmat_body2), 'joint.status'=joint.status))
+		}else{
+			return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=FALSE))
+		}
+	}
 }
