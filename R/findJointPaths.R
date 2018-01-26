@@ -93,7 +93,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			if(length(joints_conn) == 0) next
 
 			# TRYING WITHOUT FOR NOW - SHOULD REFINE TO LIMIT NUMBER OF LOOPS WITHIN LINK
-			if(FALSE){
+			if(TRUE){
 
 				if(length(paths[[i]]) > 1 && paths[[i]][length(paths[[i]])] != 0){
 				
@@ -120,7 +120,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 
 					# IF ALL CONNECTING JOINTS WERE ELIMINATED BECAUSE THEY WERE IN THE SAME LINK, ADD NA TO FLAG PATH FOR REMOVAL
 					if(length(joints_conn) == 0){
-						paths[[i]] <- c(paths[[i]], NA)
+						#paths[[i]] <- c(paths[[i]], NA)
 						next
 					}
 				}
@@ -159,17 +159,22 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 	# ADD REVERSE SOLVABLE PATHS
 	for(i in 1:length(solvable.paths)) solvable.paths <- c(solvable.paths, paste0(rev(strsplit(solvable.paths[i], '-')[[1]]), collapse='-'))
 	solvable.paths <- unique(solvable.paths)
+	
+	# Remove paths with NA - may need to put this later?
+	#paths <- paths[unlist(lapply(lapply(paths, 'is.na'), 'sum')) == 0]
 
 	path_frags <- c()
 	path_frag_list <- list()
-	for(path in paths){
+	for(path_num in 1:length(paths)){
+	
+		path <- paths[[path_num]]
 
 		# IF OPEN CHAIN SAVE BUT DO NOT BREAK INTO FRAGMENTS
-		if(path[1] == 0 && path[length(path)] != 0){
+		if(path[1] == 0 && tail(path, 1) != 0){
 			path_frag_list[[length(path_frag_list) + 1]] <- path
 			next
 		}
-
+		
 		for(frag_len in frag_len_min:min(length(path), frag_len_max)){
 			for(i in 1:(length(path)-frag_len+1)){
 				
@@ -207,7 +212,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 	for(i in 1:length(paths)){
 
 		# REMOVE PATHS WITH NA VALUE
-		if(sum(is.na(paths[[i]])) > 0){paths_str[i] <- NA; next}
+		if(sum(is.na(paths[[i]])) > 0 && !is_open[i]){paths_str[i] <- NA; next}
 
 		# REMOVE PATHS THAT END IN NON-FIXED JOINT THAT IS CONNECTED TO TWO OR MORE OTHER JOINTS (FALSE OPEN CHAIN)
 		if(paths[[i]][length(paths[[i]])] > 0){
@@ -232,7 +237,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			
 			next
 		}
-
+		
 		if(FALSE){
 
 			# REMOVE PATHS THAT DOUBLE BACK ON THE SAME LINK
