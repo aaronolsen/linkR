@@ -3,13 +3,18 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 	indent = '', indent.level=1, print.progress = FALSE){
 
 	if(print.progress){
-		cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation\n'))
-		cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Apply to body: '))
+		#cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation\n'))
+		cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'To body: '))
 		cat(paste0(paste0(sort(body.names[body.num]), collapse=', '), '\n'))
 		apply_to_joints <- c()
 	}
 
 	if(length(status.to) == 1) status.to <- matrix('c', nrow(joint.status), ncol(joint.status))
+
+	# ***** FIX: CONSIDER ADDING THIRD JOINT SET TO ACCOMMODATE AXES/VECTORS IN JOINT
+	# THAT ARE ASSOCIATED WITH AN INTERNAL/INVISIBLE BODY WITHIN THE JOINT AND NOT 
+	# BODY 1 OR 2. ITS NOT CLEAR HOW THIS WOULD AFFECT TRANSFORMATION APPLIED TO
+	# AN OPEN CHAIN
 
 	# GET JOINTS ASSOCIATED WITH BODY
 	for(jt_set in 1:2){
@@ -56,7 +61,7 @@ extendTransformation <- function(tmarr, body.num, iter, joints.transform, joint.
 	}
 	
 	if(print.progress){
-		cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Apply to joint(s): '))
+		cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'To joint(s): '))
 		cat(paste0(paste0(sort(apply_to_joints), collapse=', '), '\n'))
 	}
 
