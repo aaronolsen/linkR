@@ -406,3 +406,64 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 	mechanism
 }
+
+print.mechanism <- function(x, ...){
+
+	print(names(x))
+	print(x)
+	
+	return(1)
+	#print(x$body.joints)
+
+	# Start return string
+	rc <- ''
+
+	rc <- c(rc, paste0('Mechanism\n'))
+	rc <- c(rc, paste0('\tNumber of joints: ', x$num.joints, '\n'))
+	rc <- c(rc, paste0('\tNumber of bodies: ', x$num.bodies, '\n'))
+
+	## Joints
+	# Create dataframe for joints
+	joint_df_colnames <- c('Name', 'Type')
+	joint_df <- data.frame('Name'=x$joint.names, 'Type'=paste0('     ', x$joint.types), 
+		'Body.1'=paste0('  ', x$body.conn[,1], ' (', x$body.conn.num[,1], ')'),
+		'Body.2'=paste0('  ', x$body.conn[,2], ' (', x$body.conn.num[,2], ')'),
+		'Position'=paste0('  {', apply(signif(x$joint.coor, 3), 1, 'paste0', collapse=','), '}'))
+	#print(joint_df)
+	rc <- c(rc, paste0('\tMechanism joints\n\t\t', paste0(capture.output(print(joint_df)), collapse='\n\t\t'), '\n'))
+
+
+	## Closed paths
+	if(!is.null(x$paths.closed)){
+		# Set path closed joint name strings
+		pc_names <- rep(NA, length(x$paths.closed))
+		for(path_num in 1:length(x$paths.closed)) pc_names[path_num] <- paste0(x$joint.names[x$paths.closed[[path_num]]], collapse=',')
+
+		# Set path closed joint type strings
+		pc_types <- rep(NA, length(x$paths.closed))
+		for(path_num in 1:length(x$paths.closed)) pc_types[path_num] <- paste0(x$joint.types[x$paths.closed[[path_num]]], collapse='-')
+
+		# Set path closed body names
+		pc_body_names <- rep(NA, length(x$paths.closed))
+		for(path_num in 1:length(x$paths.closed)) pc_body_names[path_num] <- paste0(x$body.names[x$paths.closed.bodies[[path_num]]], collapse=',')
+
+		# Set path closed body names
+		pc_body_num <- rep(NA, length(x$paths.closed))
+		for(path_num in 1:length(x$paths.closed)) pc_body_num[path_num] <- paste0(x$paths.closed.bodies[[path_num]], collapse=',')
+
+		path_df <- data.frame('Indices'=paste0('    ', unlist(lapply(x$paths.closed, 'paste0', collapse=','))),
+			'Names'=paste0('   ', pc_names), 'Types'=paste0('   ', pc_types),
+			'Body.names'=paste0('       ', pc_body_names), 'Body.indices'=paste0('           ', pc_body_num)
+			)
+		rc <- c(rc, paste0('\tClosed joint paths\n\t\t', paste0(capture.output(print(path_df)), collapse='\n\t\t'), '\n'))
+	}else{
+		rc <- c(rc, paste0('\tClosed joint paths: none\n'))
+	}
+	
+	## Open paths
+	if(!is.null(x$paths.open)){
+		rc <- c(rc, paste0('\tOpen joint paths!!!\n'))
+	}
+
+	cat(rc, sep='')
+}
