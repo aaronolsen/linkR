@@ -128,10 +128,32 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		}
 	}
 
-	# Find "sole joints" (joints that are the only joint connected to a particular body)
+	## Find "sole joints" (joints that are the only joint connected to a particular body)
 	sole_joints <- c()
+
+	# Get bodies that are in body connection matrix just once
 	not_in_joint_conn <- which(table(body_conn_num) == 1)
-	for(i in 1:nrow(body_conn_num)) if(body_conn_num[i,1] %in% not_in_joint_conn || body_conn_num[i,2] %in% not_in_joint_conn) sole_joints <- c(sole_joints, i)
+
+	# Remove fixed body
+	not_in_joint_conn <- not_in_joint_conn[!not_in_joint_conn == 1]
+
+	# Get joints connected to body
+	if(length(not_in_joint_conn) > 0){
+		for(i in 1:nrow(body_conn_num)){
+			if(body_conn_num[i,1] %in% not_in_joint_conn || body_conn_num[i,2] %in% not_in_joint_conn) sole_joints <- c(sole_joints, i)
+		}
+	}
+
+	if(print.progress){
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'Sole joints (joints that are the only joint connected to a particular body):'))
+		if(length(sole_joints) == 0){
+			cat(' none\n')
+		}else{
+			sole_joints_names <- c()
+			for(j in 1:length(sole_joints)) sole_joints_names <- c(sole_joints_names, paste0(rownames(joint.coor)[sole_joints[j]], '(', sole_joints[j], ')'))
+			cat(paste0(' ', paste0(sole_joints_names, collapse=', '), '\n'))
+		}
+	}
 
 	# IF PATH FINDING IS ON
 	if(find.paths){
@@ -141,6 +163,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 		# GET LIST OF ALL CLOSED LOOPS
 		find_joint_paths <- findJointPaths(body_conn_num, joint.types, solvable_paths, sole_joints)
+		#print(find_joint_paths)
 
 		# FIND DISTANCES BETWEEN JOINTS IN PATHS
 		if(is.null(find_joint_paths$paths.open)){
@@ -226,14 +249,17 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(!is.null(paths_open)){
 			
 			# CREATE EMPTY LIST
-			body_open_desc <- list()
+			body_open_desc <- as.list(rep(NA, num_bodies))
 
 			# GET ALL OPEN JOINTS
 			joints_open <- unique(unlist(paths_open))
-			
+
+			# Get bodies in closed chains
+			bodies_in_closed <- unique(unlist(paths_closed_bodies))
+
 			# 
 			for(body_num in 1:num_bodies){
-				
+			
 				# Get joints associated with body
 				joints_assoc <- body_joints[[body_num]]
 				
@@ -265,7 +291,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 				}
 
 				# Find bodies associated with joints
-				bodies_assoc <- NULL
+				bodies_assoc <- NA
 				if(length(path_joints) > 0){
 				
 					# Associated bodies
@@ -275,17 +301,26 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 					bodies_assoc <- bodies_assoc[bodies_assoc != body_num]
 					
 					#
-					if(is.na(bodies_assoc[1])) bodies_assoc <- NULL
+					if(is.na(bodies_assoc[1])) bodies_assoc <- NA
 				
 					#cat(paste0('\tAll associated descendant bodies: ', paste0(body.names[bodies_assoc], collapse=','), '\n'))
+				}
+				
+				if(!is.na(bodies_assoc[1])){
+
+					# Check if each body is in a closed chain
+					in_bodies_in_closed <- apply(matrix(bodies_assoc, nrow=1, ncol=length(bodies_assoc)), 2, '%in%', bodies_in_closed)
+
+					# Set to NA if any of the bodies are also in a closed chain
+					if(any(in_bodies_in_closed) && body_num != 1) bodies_assoc <- NA
 				}
 
 				body_open_desc[[body_num]] <- bodies_assoc
 			}
-		}
 
-		# Set names
-		names(body_open_desc) <- body.names
+			# Set names
+			names(body_open_desc) <- body.names
+		}
 
 		joint_desc_open <- NULL
 		body_transform <- NULL
@@ -547,7 +582,7 @@ print.mechanism <- function(x, ...){
 
 		for(i in 1:length(x$body.open.desc)){
 
-			if(is.null(x$body.open.desc[[i]])) next
+			if(is.na(x$body.open.desc[[i]][1])) next
 				# cat(paste0(paste0(rep('\t', 2), collapse=''), i, ' (', rownames(x$joint.coor)[i], '): none\n')) ; next}
 			
 			body_transform_names <- c()
