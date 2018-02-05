@@ -1,4 +1,4 @@
-print_joint_status <- function(mechanism, indent){
+print_joint_status <- function(mechanism, indent, indent.level=4){
 
 	dframe <- data.frame(
 		'jointed'=mechanism[['status']][['jointed']],
@@ -8,8 +8,8 @@ print_joint_status <- function(mechanism, indent){
 		'transformed-2'=mechanism[['status']][['transformed']][,2]
 		)
 
-	indent_str1 <- paste0(rep(indent, 4), collapse='')
-	indent_str2 <- paste0(rep(indent, 5), collapse='')
+	indent_str1 <- paste0(rep(indent, indent.level), collapse='')
+	indent_str2 <- paste0(rep(indent, indent.level+1), collapse='')
 	cat(paste0(indent_str1, 'Joint status:\n'))
 	cat(paste0(indent_str2, paste0(capture.output(print(dframe)), collapse=paste0('\n', indent_str2)), '\n'))
 

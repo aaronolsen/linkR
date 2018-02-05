@@ -1,4 +1,5 @@
-getKnownTransformation <- function(mechanism, input.param, joint, body, iter, print.progress, indent){
+getKnownTransformation <- function(mechanism, input.param, joint, body, iter, 
+	print.progress = FALSE, indent = '\t', indent.level=3){
 
 	#if(print.progress) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformation', ))
 
@@ -26,9 +27,10 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter, pr
 			}
 		}
 		
-		cat(paste0(paste0(rep(indent, 3), collapse=''), 'getKnownTransformation()\n'))
+		cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'getKnownTransformation(), '))
 		if(kn_jt_type %in% c('R', 'U', 'S', 'O', 'X')){
-			cat(paste0(paste0(rep(indent, 4), collapse=''), 'Center: ', paste0(signif(kn_jt_center, 3), collapse=','), '; '))
+			#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Center: ', paste0(signif(kn_jt_center, 3), collapse=','), '; '))
+			cat(paste0('Center: ', paste0(signif(kn_jt_center, 3), collapse=','), '; '))
 		}
 		cat(paste0(paste0(axes_c, collapse='; '), '; '))
 		if(length(input.param[iter, ]) == 1){
