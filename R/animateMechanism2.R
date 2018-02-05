@@ -29,6 +29,7 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 	# Convert joint constraints
 	mechanism[['joint.cons.anim']] <- list()
 	for(i in 1:length(mechanism$joint.cons)){
+
 		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
 		mechanism[['joint.cons.anim']][[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter, 2))
 		
@@ -43,7 +44,6 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 	}
 	
 	# Convert joint coordinates
-	mechanism[['joint.coor.anim']] <- list()
 	mechanism[['joint.coor.anim']] <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter, 2), 
 		dimnames=list(mechanism$joint.names, colnames(mechanism$joint.coor), NULL, NULL))
 
@@ -166,8 +166,12 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 	}
 
 	# Create array of transformation matrices for each body and iteration
-	mechanism[['body.tmat']] <- array(diag(4), dim=c(4,4,mechanism[['num.bodies']], n_iter), 
+	mechanism[['tmat']] <- array(diag(4), dim=c(4,4,mechanism[['num.bodies']], n_iter), 
 		dimnames=list(NULL, NULL, mechanism[['body.names']], NULL))
+
+	# Create array of last transformations for applying across joints
+	#mechanism[['last.tmat']] <- array(diag(4), dim=c(4,4,mechanism[['num.bodies']], n_iter), 
+	#	dimnames=list(NULL, NULL, mechanism[['body.names']], NULL))
 
 	# Create initial joint status
 	status_init <- list(
@@ -198,7 +202,8 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 
 			# *** Make sure joint is not disjointed
 			# Resolve disjoint at input joint (does nothing if jointed)
-			# resolveDisjoints(mechanism, joint=kn_jt_idx, recursive=FALSE)
+			# mechanism <- resolveDisjoints(mechanism, iter=iter, joint=kn_jt_idx, recursive=FALSE, 
+			#	print.progress=print_progress_iter, indent=indent)
 			
 			# Print known transformation header (transformation number, body, joint)
 			if(print_progress_iter){
@@ -212,7 +217,7 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 			# Get transformation to apply to input body at input joint
 			kn_tmat <- getKnownTransformation(mechanism=mechanism, input.param=input.param[[kn_idx]], 
 				joint=kn_jt_idx, body=input.body[kn_idx], iter=iter, print.progress=print_progress_iter, 
-				indent=indent)
+				indent=indent, indent.level=3)
 			
 			# U-joint and other joints where different axes are associated with different bodies
 			# should be split into two transformations. Same input joint but different bodies. 
@@ -220,8 +225,9 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 			# for the second transformation.			
 
 			# Transformation body
-			mechanism <- transformBody(mechanism, status.solved.to=1, body=input.body[kn_idx], 
-				tmat=kn_tmat, iter=iter, print.progress=print_progress_iter, indent=indent)
+			mechanism <- transformBody(mechanism, body=input.body[kn_idx], tmat=kn_tmat, iter=iter, 
+				at.joint=kn_jt_idx, status.solved.to=1, print.progress=print_progress_iter, 
+				indent=indent, indent.level=3)
 
 			# Print statuses
 			if(print_progress_iter) print_joint_status(mechanism, indent)
@@ -229,9 +235,31 @@ animateMechanism2 <- function(mechanism, input.param, input.joint = NULL, input.
 		}
 
 		# Resolve any U,T disjoints recursively until all are U,U or T,T
+		mechanism <- resolveDisjoints(mechanism, iter=iter, recursive=TRUE, 
+			print.progress=print_progress_iter, indent=indent, indent.level=2)
 	}
 
-return(1)
+	## Apply body transformations to body points
+	if(!is.null(mechanism[['body.points']])){
+
+		# Create array from body point matrix
+		mechanism[['body.points.anim']] <- array(mechanism[['body.points']], dim=c(dim(mechanism[['body.points']]), n_iter), 
+			dimnames=list(rownames(mechanism[['body.points']]), NULL, NULL))
+
+		# For each body
+		for(body_num in 1:length(mechanism[['points.assoc']])){
+
+			if(is.na(mechanism[['points.assoc']][1])) next
+			
+			# Apply transformation
+			mechanism[['body.points.anim']][mechanism[['points.assoc']][[body_num]], , ] <- 
+				applyTransform(mechanism[['body.points']][mechanism[['points.assoc']][[body_num]], ], 
+					mechanism[['tmat']][, , body_num, ])
+		}
+	}
+
+
+return(mechanism)
 	
 	# CREATE LIST OF INPUT PARAMETERS BY JOINT
 	joint.input <- setNames(as.list(rep(NA, mechanism[['num.joints']])), mechanism$joint.names)
