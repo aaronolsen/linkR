@@ -32,11 +32,16 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
 
 		# IF JOINT CONSTRAINT IS ALREADY AN ARRAY, MAKE SURE VECTORS ARE UNIT VECTORS
-		if(is.array(joint.cons[[i]]) && length(dim(joint.cons[[i]])) > 2) for(j in 1:dim(joint.cons[[i]])[3]) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
+		if(is.array(joint.cons[[i]]) && length(dim(joint.cons[[i]])) > 2){
+			#if(dim(joint.cons[[i]][, , j])[3] == 1) joint.cons[[i]] <- array(joint.cons[[i]][, , j], dim=c(dim(joint.cons[[i]])[1:2], 2))
+			for(j in 1:dim(joint.cons[[i]])[3]) joint.cons[[i]][, , j] <- uvector(joint.cons[[i]][, , j])
+		}
 
 		# MAKE SURE JOINT CONSTRAINTS ARE ARRAY AND MAKE SURE VECTORS ARE UNIT LENGTH
-		if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(1, length(joint.cons[[i]]), 1))
-		if(is.matrix(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(dim(joint.cons[[i]]), 1))
+		#if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(1, length(joint.cons[[i]]), 2))
+		#if(is.matrix(joint.cons[[i]])) joint.cons[[i]] <- array(uvector(joint.cons[[i]]), dim=c(dim(joint.cons[[i]]), 2))
+		if(is.vector(joint.cons[[i]])) joint.cons[[i]] <- matrix(uvector(joint.cons[[i]]), nrow=1, ncol=3)
+		if(is.matrix(joint.cons[[i]])) joint.cons[[i]] <- matrix(uvector(joint.cons[[i]]), nrow=dim(joint.cons[[i]]), ncol=3)
 	}
 
 	# ADD ROWNAMES TO JOINTS (NAME BASED ON JOINT TYPE AND ORDER IN INPUT SEQUENCE)
@@ -153,6 +158,27 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 			for(j in 1:length(sole_joints)) sole_joints_names <- c(sole_joints_names, paste0(rownames(joint.coor)[sole_joints[j]], '(', sole_joints[j], ')'))
 			cat(paste0(' ', paste0(sole_joints_names, collapse=', '), '\n'))
 		}
+	}
+
+
+	# Set joints transformed by each body transformation
+	joint_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
+	joint_set_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
+
+	# Fill list
+	for(body_num in 1:num_bodies){
+		bc_rows <- which(rowSums(body_conn_num == body_num) > 0)
+		jt_t_v <- c()
+		jt_s_t_v <- c()
+		for(i in 1:length(bc_rows)){
+			set_match <- which(body_conn_num[bc_rows[i], ] == body_num)
+			jt_t_v <- c(jt_t_v, bc_rows[i])
+			jt_s_t_v <- c(jt_s_t_v, set_match)
+		}
+		names(jt_t_v) <- NULL
+		names(jt_s_t_v) <- NULL
+		joint_transform[[body_num]] <- jt_t_v
+		joint_set_transform[[body_num]] <- jt_s_t_v
 	}
 
 	# IF PATH FINDING IS ON
@@ -496,6 +522,8 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'paths.closed.bodies' = paths_closed_bodies,
 		'joint.desc.open'=joint_desc_open,
 		'joints.open' = joints_open,
+		'joint.transform' = joint_transform,
+		'joint.set.transform' = joint_set_transform,
 		'joint.names' = rownames(joint.coor),
 		'joint.conn' = find_joint_paths$joint.conn,
 #		'joints.tform' = joints_tform,
@@ -530,8 +558,8 @@ print.mechanism <- function(x, ...){
 	rc <- ''
 
 	rc <- c(rc, paste0('Mechanism\n'))
-	rc <- c(rc, paste0('\tNumber of joints: ', x$num.joints, '\n'))
-	rc <- c(rc, paste0('\tNumber of bodies: ', x$num.bodies, '\n'))
+	rc <- c(rc, paste0('\tNumber of joints (num.joints): ', x$num.joints, '\n'))
+	rc <- c(rc, paste0('\tNumber of bodies (num.bodies): ', x$num.bodies, '\n'))
 
 	## Joints
 	# Create dataframe for joints
@@ -541,8 +569,13 @@ print.mechanism <- function(x, ...){
 		'Body.2'=paste0('  ', x$body.conn[,2], ' (', x$body.conn.num[,2], ')'),
 		'Position'=paste0('  {', apply(signif(x$joint.coor, 3), 1, 'paste0', collapse=','), '}'))
 	#print(joint_df)
-	rc <- c(rc, paste0('\tMechanism joints\n\t\t', paste0(capture.output(print(joint_df)), collapse='\n\t\t'), '\n'))
+	rc <- c(rc, paste0('\tMechanism joints:\n\t\t', paste0(capture.output(print(joint_df)), collapse='\n\t\t'), '\n'))
 
+	## Fixed joints
+	rc <- c(rc, paste0('\tFixed joints (fixed.joints):\n'))
+	for(i in 1:length(x[['fixed.joints']])){
+		rc <- c(rc, paste0('\t\t ', x$joint.names[x[['fixed.joints']][i]], ' (', x[['fixed.joints']][i], ')\n'))
+	}
 
 	## Closed paths
 	if(!is.null(x$paths.closed)){
@@ -566,9 +599,9 @@ print.mechanism <- function(x, ...){
 			'Names'=paste0('   ', pc_names), 'Types'=paste0('   ', pc_types),
 			'Body.names'=paste0('       ', pc_body_names), 'Body.indices'=paste0('           ', pc_body_num)
 			)
-		rc <- c(rc, paste0('\tClosed joint paths\n\t\t', paste0(capture.output(print(path_df)), collapse='\n\t\t'), '\n'))
+		rc <- c(rc, paste0('\tClosed joint paths (paths.closed)\n\t\t', paste0(capture.output(print(path_df)), collapse='\n\t\t'), '\n'))
 	}else{
-		rc <- c(rc, paste0('\tClosed joint paths: none\n'))
+		rc <- c(rc, paste0('\tClosed joint paths (paths.closed): none\n'))
 	}
 	
 	## Open paths
@@ -594,6 +627,24 @@ print.mechanism <- function(x, ...){
 		}
 	}else{
 		rc <- c(rc, paste0('\tOpen chains: none\n'))
+	}
+
+	rc <- c(rc, paste0('\tNumber of points associated with bodies: '))
+	if(!is.null(x[['body.points']])){
+
+		rc <- c(rc, paste0(nrow(x[['body.points']]), '\n'))
+
+		# For each body
+		for(body_num in 1:length(x[['points.assoc']])){
+
+			if(is.na(x[['points.assoc']][1])) next
+			
+			# Apply transformation
+			rc <- c(rc, paste0('\t\t', x[['body.names']][body_num], ' (', body_num, '): ', length(x[['points.assoc']][[body_num]]), '\n'))
+		}
+
+	}else{
+		rc <- c(rc, paste0('0\n'))
 	}
 
 	cat(rc, sep='')
