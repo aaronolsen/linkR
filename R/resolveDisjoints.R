@@ -3,26 +3,38 @@ resolveDisjoints <- function(mechanism, iter, joint = NULL, recursive = FALSE, p
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'resolveDisjoints()\n'))
 
 	# Set max number of recursive loops
-	if(recursive){ n_max <- 5 }else{ n_max <- 1 }
+	if(recursive){ n_max <- 6 }else{ n_max <- 1 }
 
-	#if(print.progress) print(mechanism[['status']])
+	#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 
 	n <- 0
 	while(n < n_max){
 
-		# Find any disjointed joints
-		disjointeds <- which(!mechanism[['status']][['jointed']])
+		if(!is.null(joint)){
 
-		# If no disjointed joints stop
-		if(!any(disjointeds)) break
+			# Set disjointed joint
+			disjointeds <- joint
+
+		}else{
+
+			# Find any disjointed joints
+			disjointeds <- which(!mechanism[['status']][['jointed']])
+
+			# If no disjointed joints stop
+			if(!any(disjointeds)) break
+		}
 		
+		any_disjointed <- FALSE
 		for(disjointed in disjointeds){
 
 			# Find transformed joint sets
 			jt_set_t <- which(mechanism[['status']][['transformed']][disjointed, ])
 		
-			# If both are transformed skip
+			# If both are transformed, skip
 			if(length(jt_set_t) == 2) next
+
+			# If either set is fixed, skip
+			if(any(mechanism[['status']][['solved']][disjointed, ] == 2)) next
 
 			# Find untransformed joint sets
 			jt_set_u <- which(!mechanism[['status']][['transformed']][disjointed, ])
@@ -31,9 +43,16 @@ resolveDisjoints <- function(mechanism, iter, joint = NULL, recursive = FALSE, p
 			body_t <- mechanism[['body.conn.num']][disjointed, jt_set_t]
 			body_u <- mechanism[['body.conn.num']][disjointed, jt_set_u]
 
-			if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
-				'Resolve disjoint across joint \'', mechanism[['joint.names']][disjointed], 
-				'\' (', disjointed, ')\n'))
+			if(print.progress){
+				if(n == n_max-1){
+					n_print <- 'max'
+				}else{
+					n_print <- n
+				}
+				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
+					'Resolve disjoint across joint \'', mechanism[['joint.names']][disjointed], 
+					'\' (', disjointed, '), n=', n, '\n'))
+			}
 
 			# Transformation body
 			mechanism <- transformBody(mechanism, status.solved.to=NULL, body=body_u, 
@@ -43,26 +62,19 @@ resolveDisjoints <- function(mechanism, iter, joint = NULL, recursive = FALSE, p
 			# Change status
 			mechanism[['status']][['jointed']][disjointed] <- TRUE
 			mechanism[['status']][['transformed']][disjointed, ] <- FALSE
+			
+			# Mark if a joint is disjointed
+			any_disjointed <- TRUE
 
-			# Apply transformation 'across' joint 
-			if(print.progress){
-				#print(disjointed)
-				#print(jt_set_t)
-				#print(body_t)
-				#print(body_u)
-			}
-
-			if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
+			#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 		
 			break
 		}
 		
-		#break
+		if(!any_disjointed) break
 
 		n <- n + 1
 	}
-
-	# Search for disjointed joints
 
 	mechanism
 }
