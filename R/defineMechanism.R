@@ -189,7 +189,6 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 		# GET LIST OF ALL CLOSED LOOPS
 		find_joint_paths <- findJointPaths(body_conn_num, joint.types, solvable_paths, sole_joints)
-		#print(find_joint_paths)
 
 		# FIND DISTANCES BETWEEN JOINTS IN PATHS
 		if(is.null(find_joint_paths$paths.open)){
@@ -209,10 +208,12 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		if(is.null(find_joint_paths$paths.closed)){
 			paths_closed_dist <- NULL
 			paths_closed_bodies <- NULL
+			paths_closed_set <- NULL
 		}else{
 
 			paths_closed_dist <- as.list(rep(NA, length(find_joint_paths$paths.closed)))
 			paths_closed_bodies <- as.list(rep(NA, length(find_joint_paths$paths.closed)))
+			paths_closed_set <- as.list(rep(NA, length(find_joint_paths$paths.closed)))
 
 			for(i in 1:length(paths_closed_dist)){
 
@@ -220,6 +221,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 
 				if(length(joints_path) == 0){
 					paths_closed_dist[[i]] <- NA
+					paths_closed_set[[i]] <- NA
 				}else{
 
 					# SET BODIES BETWEEN CONSECUTIVE JOINTS IN PATHS
@@ -229,6 +231,30 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 						body_vec <- c(body_vec, find_joint_paths$joint.conn[row_match == 2, 'body.idx'])
 					}
 					paths_closed_bodies[[i]] <- setNames(body_vec, NULL)
+
+					# Create object
+					paths_closed_set[[i]] <- matrix(NA, length(find_joint_paths$paths.closed[[i]]), ncol=2)
+
+					# Find joint set order for path
+					for(j in 1:length(joints_path)){
+						
+						if(j == 1){
+							if(body_conn_num[joints_path[j], 1] == paths_closed_bodies[[i]][j]){
+								paths_closed_set[[i]][j,] <- c(2,1)
+							}else{
+								paths_closed_set[[i]][j,] <- c(1,2)
+							}
+						}else if(j < length(joints_path)){
+							paths_closed_set[[i]][j,1] <- which(body_conn_num[joints_path[j], ] == paths_closed_bodies[[i]][j-1])
+							paths_closed_set[[i]][j,2] <- which(body_conn_num[joints_path[j], ] == paths_closed_bodies[[i]][j])
+						}else{
+							if(body_conn_num[joints_path[j], 1] == paths_closed_bodies[[i]][j-1]){
+								paths_closed_set[[i]][j,] <- c(1,2)
+							}else{
+								paths_closed_set[[i]][j,] <- c(2,1)
+							}
+						}
+					}
 			
 					# FIND DISTANCES BETWEEN JOINTS IN PATHS
 					paths_closed_dist[[i]] <- distPointToPoint(joint.coor[joints_path, ])
@@ -520,6 +546,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'paths.open.dist' = paths_open_dist,
 		'paths.closed.dist' = paths_closed_dist,
 		'paths.closed.bodies' = paths_closed_bodies,
+		'paths.closed.set'=paths_closed_set,
 		'joint.desc.open'=joint_desc_open,
 		'joints.open' = joints_open,
 		'joint.transform' = joint_transform,
@@ -534,6 +561,8 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'body.transform'=body_transform,
 		'body.open.desc'=body_open_desc,
 		'fixed.joints' = find_joint_paths$fixed.joints,
+		'num.paths.closed' = length(find_joint_paths$paths.closed),
+		'num.paths.open' = length(find_joint_paths$paths.open),
 		'num.joints' = n_joints,
 		'num.bodies' = num_bodies,
 		'body.points' = NULL,
@@ -595,9 +624,14 @@ print.mechanism <- function(x, ...){
 		pc_body_num <- rep(NA, length(x$paths.closed))
 		for(path_num in 1:length(x$paths.closed)) pc_body_num[path_num] <- paste0(x$paths.closed.bodies[[path_num]], collapse=',')
 
+		# Set closed path joint sets (order in which joint sets proceed through path)
+		pc_path_set <- rep(NA, length(x$paths.closed))
+		for(path_num in 1:length(x$paths.closed)) pc_path_set[path_num] <- paste0(paste0(x$paths.closed.set[[path_num]][,1], x$paths.closed.set[[path_num]][,2]), collapse='-')
+
 		path_df <- data.frame('Indices'=paste0('    ', unlist(lapply(x$paths.closed, 'paste0', collapse=','))),
 			'Names'=paste0('   ', pc_names), 'Types'=paste0('   ', pc_types),
-			'Body.names'=paste0('       ', pc_body_names), 'Body.indices'=paste0('           ', pc_body_num)
+			'Body.names'=paste0('       ', pc_body_names), 'Body.indices'=paste0('           ', pc_body_num),
+			'Path.set'=paste0('   ', pc_path_set)
 			)
 		rc <- c(rc, paste0('\tClosed joint paths (paths.closed)\n\t\t', paste0(capture.output(print(path_df)), collapse='\n\t\t'), '\n'))
 	}else{
