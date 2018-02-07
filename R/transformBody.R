@@ -22,6 +22,8 @@ transformBody <- function(mechanism, body, tmat, iter, status.solved.to = NULL,
 		# Add joint to list of transformed joints
 		if(print.progress) apply_to_joints <- c(apply_to_joints, paste0(mechanism[['joint.names']][body_joints], '(', body_joints, ')-', jt_set))
 
+		#if(print.progress) print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
+
 		for(i in 1:length(body_joints)){
 			
 			# Get joint index
@@ -66,7 +68,9 @@ transformBody <- function(mechanism, body, tmat, iter, status.solved.to = NULL,
 
 		if(print.progress){
 			#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Transform body \'', mechanism[['body.names']][body], '\' (', body, ') and associated joints: ', paste0(apply_to_joints, collapse=', ')))
-			cat(paste0('\'', mechanism[['body.names']][body], '\' (', body, ') and associated joints: ', paste0(apply_to_joints, collapse=', ')))
+			cat(paste0('\'', mechanism[['body.names']][body], '\' (', body, ') & associated joints: ', paste0(apply_to_joints, collapse=', ')))
+			if(!is.null(at.joint)) cat(paste0(' at joint ', mechanism[['joint.names']][at.joint], '(', at.joint, ')'))
+			#print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
 		}
 	}
 
