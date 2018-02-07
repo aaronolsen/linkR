@@ -1,6 +1,7 @@
-resolveDisjoints <- function(mechanism, iter, joint = NULL, recursive = FALSE, print.progress = FALSE, indent = '\t', indent.level=3){
+extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive = FALSE, 
+	print.progress = FALSE, indent = '\t', indent.level=3){
 
-	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'resolveDisjoints()\n'))
+	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation()\n'))
 
 	# Set max number of recursive loops
 	if(recursive){ n_max <- 6 }else{ n_max <- 1 }
@@ -27,6 +28,9 @@ resolveDisjoints <- function(mechanism, iter, joint = NULL, recursive = FALSE, p
 		any_disjointed <- FALSE
 		for(disjointed in disjointeds){
 
+			# If not disjointed, skip
+			if(mechanism[['status']][['jointed']][disjointed]) next
+
 			# Find transformed joint sets
 			jt_set_t <- which(mechanism[['status']][['transformed']][disjointed, ])
 		
@@ -40,23 +44,20 @@ resolveDisjoints <- function(mechanism, iter, joint = NULL, recursive = FALSE, p
 			jt_set_u <- which(!mechanism[['status']][['transformed']][disjointed, ])
 
 			# Find transformed and untransformed bodies
-			body_t <- mechanism[['body.conn.num']][disjointed, jt_set_t]
+			#body_t <- mechanism[['body.conn.num']][disjointed, jt_set_t]
 			body_u <- mechanism[['body.conn.num']][disjointed, jt_set_u]
 
 			if(print.progress){
-				if(n == n_max-1){
-					n_print <- 'max'
-				}else{
-					n_print <- n
-				}
+				if(n == n_max-1){ n_print <- 'max' }else{ n_print <- n }
 				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
-					'Resolve disjoint across joint \'', mechanism[['joint.names']][disjointed], 
-					'\' (', disjointed, '), n=', n, '\n'))
+					'Extend transformation across joint \'', mechanism[['joint.names']][disjointed], 
+					'\' (', disjointed, '), n=', n_print, '\n'))
 			}
 
 			# Transformation body
 			mechanism <- transformBody(mechanism, status.solved.to=NULL, body=body_u, 
-				tmat=mechanism[['tmat']][, , body_t, iter], iter=iter, print.progress=print.progress, 
+				tmat=tmat, at.joint=disjointed, 
+				iter=iter, print.progress=print.progress, 
 				indent=indent, indent.level=indent.level+2)
 			
 			# Change status
