@@ -671,7 +671,7 @@ print.mechanism <- function(x, ...){
 		# For each body
 		for(body_num in 1:length(x[['points.assoc']])){
 
-			if(is.na(x[['points.assoc']][1])) next
+			if(is.na(x[['points.assoc']][[body_num]][1])) next
 			
 			# Apply transformation
 			rc <- c(rc, paste0('\t\t', x[['body.names']][body_num], ' (', body_num, '): ', length(x[['points.assoc']][[body_num]]), '\n'))
