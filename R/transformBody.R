@@ -1,13 +1,15 @@
-transformBody <- function(mechanism, body, tmat, iter, status.solved.to = NULL, 
-	at.joint = NULL, print.progress = FALSE, indent = '\t', indent.level = 3){
+transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, status.solved.to = NULL, 
+	status.jointed.to = NULL, at.joint = NULL, print.progress = FALSE, indent = '\t', indent.level = 3){
 
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'transformBody() '))
 
-	# Save transformation as last transformation
-	#mechanism[['last.tmat']][, , body, iter] <- tmat
-
-	# Apply transformation to current body transformation
-	mechanism[['tmat']][, , body, iter] <- tmat %*% mechanism[['tmat']][, , body, iter]
+	if(replace){
+		# Replace any transformations with current
+		mechanism[['tmat']][, , body, iter] <- tmat
+	}else{
+		# Apply transformation to current body transformation
+		mechanism[['tmat']][, , body, iter] <- tmat %*% mechanism[['tmat']][, , body, iter]
+	}
 
 	# Find associated joints and sets
 	body_joints <- mechanism[['joint.transform']][[body]]
@@ -33,6 +35,15 @@ transformBody <- function(mechanism, body, tmat, iter, status.solved.to = NULL,
 			if(!jt_idx %in% at.joint){
 				mechanism[['status']][['jointed']][jt_idx] <- FALSE
 				mechanism[['status']][['transformed']][jt_idx, jt_set[i]] <- TRUE
+			}else{
+				if(!is.null(status.jointed.to)){
+					if(status.jointed.to){
+						mechanism[['status']][['jointed']][jt_idx] <- TRUE
+						mechanism[['status']][['transformed']][jt_idx, ] <- FALSE
+					}else{
+						# Not sure if this condition is possible/necessary
+					}
+				}
 			}
 
 			# Set joint solved status
