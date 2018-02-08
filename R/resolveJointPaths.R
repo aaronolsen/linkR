@@ -8,62 +8,44 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 	}
 
 	# Set max number of recursive loops
-	n_max <- 10
+	ct_max <- 10
 
 	#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 
-	n <- 0
-	while(n < n_max){
+	ct <- 0
+	while(ct < ct_max){
 	
 		# Keep track if path was solved
 		path_solved <- FALSE
 	
 		# For each path
-		for(i in 1:mechanism[['num.paths.closed']]){
+		i <- 1
+		while(i <= mechanism[['num.paths.closed']]){
 	
 			# Get joint indices
 			joint_idx <- mechanism[['paths.closed']][[i]]
 			
-			# Get path length
-			path_length <- length(joint_idx)
-
-			# Get joint types
-			joint_types <- mechanism[['joint.types']][joint_idx]
-
-			# Get whether joints are jointed
-			joint_jointed <- rep('D', path_length)
-			joint_jointed[mechanism[['status']][['jointed']][joint_idx]] <- 'J'
-	
 			# Get whether halves are solved
 			joint_sets <- mechanism[['paths.closed.set']][[i]]
 
-			# Get whether joint is solved/fixed
-			joint_solved_set1 <- joint_solved_set2 <- rep('N', path_length)
-			for(j in 1:length(joint_idx)){
-				if(mechanism[['status']][['solved']][joint_idx[j], joint_sets[j,1]] > 0) joint_solved_set1[j] <- 'S'
-				if(mechanism[['status']][['solved']][joint_idx[j], joint_sets[j,2]] > 0) joint_solved_set2[j] <- 'S'
-			}
-
 			# Create string
-			path_str <- paste0(joint_types, '(', joint_jointed, joint_solved_set1, joint_solved_set2 ,')', collapse='-')
+			path_strings <- createJointPathString(mechanism, joint_idx, i, print.progress)
+			path_str <- path_strings[['test']]
 	
 			# **** Check string against solvable path strings
-			solvable <- ifelse(path_str %in% c('R(JSN)-R(JNN)-R(DNS)'), TRUE, FALSE)
+			solvable <- ifelse(path_str %in% c('R(JSN)-R(JNN)-R(DNS)', 'R(JSN)-R(DNN)-R(DNS)'), TRUE, FALSE)
 	
 			if(print.progress){
-
-				if(n == n_max-1){ n_print <- 'max' }else{ n_print <- n }
-
-				path_str_print <- paste0(mechanism[['joint.names']][joint_idx], '(', joint_jointed, joint_solved_set1, joint_solved_set2 ,')', collapse='-')
+				if(ct == ct_max-1){ ct_print <- 'max' }else{ ct_print <- ct }
 				if(solvable){
-					cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Solving path:  ', path_str_print, ', n=', n_print, '\n'))
+					cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Solving path:  ', path_strings[['print']], ', n=', i, ', ct=', ct_print, '\n'))
 				}else{
-					#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Skipping path: ', path_str_print, ', n=', n_print, '\n'))
+					#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Skipping path: ', path_strings[['print']], ', n=', ct_print, '\n'))
 				}
 			}
 
 			# If not solvable, skip
-			if(!solvable) next
+			if(!solvable){ i <- i + 1; next }
 
 			# Get path bodies
 			path_bodies <- mechanism[['paths.closed.bodies']][[i]]
@@ -71,8 +53,36 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			# Get original distances between joints in path (used for solving some paths)
 			path_dists <- mechanism[['paths.closed.dist']][[i]]
 
+			if(path_str %in% 'R(JSN)-R(DNN)-R(DNS)'){
+
+				#if(print.progress) print_joint_status(mechanism, indent)
+
+				if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+					'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[2]], 
+					' (', joint_idx[2], ')\n'))
+
+				# Apply transformation of first body to second body to rejoin the bodies
+				mechanism <- transformBody(mechanism, body=path_bodies[2], 
+					tmat=mechanism[['tmat']][, , path_bodies[1], iter], iter=iter, 
+					at.joint=joint_idx[2], replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
+					print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+
+				# Extend transformation
+				mechanism <- extendTransformation2(mechanism, tmat=mechanism[['tmat']][, , path_bodies[1], iter], 
+					body.excl=path_bodies[1], iter=iter, recursive=TRUE, replace=TRUE, print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				#if(print.progress) print_joint_status(mechanism, indent)
+				#path_strings <- createJointPathString(mechanism, joint_idx, i, print.progress)
+				#print(path_strings)
+
+				#path_solved <- TRUE
+				next
+			}
+
 			#
 			if(path_str %in% c('R(JSN)-R(JNN)-R(DNS)')){
+				#break
 	
 				# Get line length
 				line_len <- path_dists[1]
@@ -91,11 +101,12 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				if(print.progress){
 					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
 						#paste0('By point on circle at distance from point\n', paste0(rep(indent, indent.level+2), collapse=''), 
-						'Finding point on circle with center {', paste0(signif(circle_center, 3), collapse=','), 
-						'}, ', 'radius \'', signif(circle_rad, 3), '\', & normal {' , 
-						paste0(signif(circle_norm, 3), collapse=','), '}', ' at distance \'', 
-						signif(line_len, 3), '\' from point {', paste0(signif(line_point, 3), collapse=','), 
-						'} & closest to point {', paste0(signif(line_point_prev, 3), collapse=','), '}\n')
+						'Finding ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], 
+						') on circle with center at ', mechanism[['joint.names']][joint_idx[3]], 
+						'(', joint_idx[3], '), ', 'radius=', signif(circle_rad, 3), ', and normal={' , 
+						paste0(signif(circle_norm, 3), collapse=','), '}', ' at distance=', 
+						signif(line_len, 3), ' from ', mechanism[['joint.names']][joint_idx[1]], 
+						'(', joint_idx[1], ') and closest to point {', paste0(signif(line_point_prev, 3), collapse=','), '}\n')
 					cat(solve_str)
 				}
 
@@ -132,9 +143,9 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					tmat=tmat_B, iter=iter, at.joint=joint_idx[1], status.solved.to=1, print.progress=print.progress, 
 					indent=indent, indent.level=indent.level+2)
 
-				# Extend transformation
+				# Extend transformations across second joint and throughout
 				mechanism <- extendTransformation2(mechanism, tmat=tmat_B, iter=iter, recursive=TRUE, 
-					print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
 
 				# Get vectors and axis to find second body transformation
 				V_pre <- mechanism[['joint.coor.anim']][joint_idx[3], , iter, joint_sets[3,1]] - J2_solve
@@ -149,23 +160,35 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				tmat_B <- tmat_B_1 %*% tmat_B_2 %*% tmat_B_3
 
 				# Solve body 2
-				mechanism <- transformBody(mechanism, body=path_bodies[2], 
-					tmat=tmat_B, iter=iter, at.joint=joint_idx[2], status.solved.to=1, print.progress=print.progress, 
+				mechanism <- transformBody(mechanism, body=path_bodies[2], tmat=tmat_B, 
+					iter=iter, at.joint=joint_idx[2], status.solved.to=1, print.progress=print.progress, 
 					indent=indent, indent.level=indent.level+2)
+
+				# Set last joint as jointed
+				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
 
 				# Extend transformation
 				mechanism <- extendTransformation2(mechanism, tmat=tmat_B, iter=iter, recursive=TRUE, 
-					print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+					body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
 			}
 
+			# Extend solved status through mechanism
+			mechanism <- extendSolvedStatus(mechanism, print.progress=print.progress, 
+				indent=indent, indent.level=indent.level+2)
+
+			if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
+
 			path_solved <- TRUE
+			i <- i + 1
 		}
 		
 		# If no path was solved, break
 		if(!path_solved) break
 		
 		# Advance count
-		n <- n + 1
+		ct <- ct + 1
 	}
 
 	#if(print.progress) print_joint_status(mechanism, indent)
