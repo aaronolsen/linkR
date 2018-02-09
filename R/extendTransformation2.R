@@ -1,11 +1,13 @@
 extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive = FALSE, 
-	body.excl = NULL, replace = FALSE, print.progress = FALSE, indent = '\t', indent.level=3){
+	body.excl = NULL, replace = FALSE, reverse = FALSE, print.progress = FALSE, indent = '\t', indent.level=3){
 
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation()\n'))
 
 	# Set max number of recursive loops
 	if(recursive){ ct_max <- 6 }else{ ct_max <- 1 }
 
+	#
+	local_transformed <- matrix(FALSE, nrow=mechanism[['num.joints']], ncol=2)
 	#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 
 	ct <- 0
@@ -18,6 +20,9 @@ extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive
 
 			# Set disjointed joint
 			disjointeds <- joint
+			
+			# Set joint to NULL for next run
+			joint <- NULL
 
 		}else{
 
@@ -69,11 +74,17 @@ extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive
 					# If joint is not solved, skip
 					if(sum(mechanism[['status']][['solved']][body_joints[i], ] > 0) < 2) next
 				
-					# If fixed joint, then will leave disjointed
+					# If disjoints fixed joint then do no transform - not sure if this is needed
+					# May help algorithm by having a particular joint type consistently not disjointed?
 					if(body_joints[i] %in% mechanism[['fixed.joints']]){
 						will_disjoint_solved_joint <- TRUE
 						break
 					}
+					
+					#if(!is.null(joint.preserve) && body_joints[i] %in% joint.preserve){
+					#	will_disjoint_solved_joint <- TRUE
+					#	break
+					#}
 					
 					# If joint is fixed, then will leave disjointed because body across joint cannot move
 					if(any(mechanism[['status']][['solved']][body_joints[i], ] == 2)){
@@ -103,21 +114,37 @@ extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive
 					'\' (', disjointed, '), ct=', ct_print, '\n'))
 			}
 
+			# Get transformed state before transformBody()
+			transformed_pre <- mechanism[['status']][['transformed']]
+
 			# Transformation body
 			mechanism <- transformBody(mechanism, status.solved.to=NULL, body=body_u, 
-				tmat=tmat, at.joint=disjointed, replace=replace, 
+				tmat=tmat, at.joint=disjointed, replace=replace, reverse=reverse, 
 				iter=iter, print.progress=print.progress, 
 				indent=indent, indent.level=indent.level+2)
-			
-			# Change status
+
 			mechanism[['status']][['jointed']][disjointed] <- TRUE
 			mechanism[['status']][['transformed']][disjointed, ] <- FALSE
 			
+			# Update local transformed states
+			local_transformed[(mechanism[['status']][['transformed']] - transformed_pre) == TRUE] <- TRUE
+			
+			# Find any joints where both sets have been transformed locally (within extendTransformation)
+			both_sets_transformed <- which(rowSums(local_transformed) == 2)
+			
+			# Set these as jointed (since same transformation has been applied to both sets, joint will be jointed again)
+			if(length(both_sets_transformed) > 0){
+				mechanism[['status']][['jointed']][both_sets_transformed] <- TRUE
+				mechanism[['status']][['transformed']][both_sets_transformed, ] <- FALSE
+			}
+			
+			# Change status
 			# Mark if a joint is disjointed
 			any_disjointed <- TRUE
 
 			#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 		
+			# Once disjointed joint is found break to repeat outer loop
 			break
 		}
 		
