@@ -1,4 +1,4 @@
-transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, status.solved.to = NULL, 
+transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse = FALSE, status.solved.to = NULL, 
 	status.jointed.to = NULL, at.joint = NULL, print.progress = FALSE, indent = '\t', indent.level = 3){
 
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'transformBody() '))
@@ -7,22 +7,21 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, status.s
 		# Replace any transformations with current
 		mechanism[['tmat']][, , body, iter] <- tmat
 	}else{
-		# Apply transformation to current body transformation
-		mechanism[['tmat']][, , body, iter] <- tmat %*% mechanism[['tmat']][, , body, iter]
+		if(reverse){
+			# Apply transformation to current body transformation
+			mechanism[['tmat']][, , body, iter] <- mechanism[['tmat']][, , body, iter] %*% tmat
+		}else{
+			# Apply transformation to current body transformation
+			mechanism[['tmat']][, , body, iter] <- tmat %*% mechanism[['tmat']][, , body, iter]
+		}
 	}
 
 	# Find associated joints and sets
 	body_joints <- mechanism[['joint.transform']][[body]]
 	jt_set <- mechanism[['joint.set.transform']][[body]]
 	
-	#
-	if(print.progress) apply_to_joints <- c()
-
 	# Check if joints
 	if(length(body_joints) > 0){
-
-		# Add joint to list of transformed joints
-		if(print.progress) apply_to_joints <- c(apply_to_joints, paste0(mechanism[['joint.names']][body_joints], '(', body_joints, ')-', jt_set))
 
 		#if(print.progress) print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
 
@@ -75,6 +74,16 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, status.s
 			
 			# Move back to origin
 			mechanism[['joint.cons.anim']][[jt_idx]][, , iter, jt_set] <- cons_point_trfm - cons_origin_trfm
+		}
+
+		if(print.progress){
+
+			# Joints transform
+			joints_transform <- body_joints[body_joints != at.joint]
+			jt_set_transform <- jt_set[body_joints != at.joint]
+
+			# Add joint to list of transformed joints
+			apply_to_joints <- paste0(mechanism[['joint.names']][joints_transform], '(', joints_transform, ')-', jt_set_transform)
 		}
 
 		if(print.progress){
