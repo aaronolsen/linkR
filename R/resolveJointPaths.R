@@ -27,20 +27,24 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			
 			# Get whether halves are solved
 			joint_sets <- mechanism[['paths.closed.set']][[i]]
+			
+			# Skip if any joints are already solved
+			if(any(rowSums(mechanism[['status']][['solved']][joint_idx, ] > 0) > 1)){ i <- i + 1; next }
 
 			# Create string
 			path_strings <- createJointPathString(mechanism, joint_idx, i, print.progress)
 			path_str <- path_strings[['test']]
 	
 			# **** Check string against solvable path strings
-			solvable <- ifelse(path_str %in% c('R(JSN)-R(JNN)-R(DNS)', 'R(JSN)-R(DNN)-R(DNS)'), TRUE, FALSE)
+			solvable <- ifelse(path_str %in% c('R(JSN)-R(JNN)-R(DNS)', 'R(JSN)-R(DNN)-R(DNS)', 
+				'R(DSN)-R(JNN)-R(DNS)', 'R(JSN)-R(DNN)-R(JNS)', 'R(DSN)-R(DNN)-R(DNS)'), TRUE, FALSE)
 	
 			if(print.progress){
 				if(ct == ct_max-1){ ct_print <- 'max' }else{ ct_print <- ct }
 				if(solvable){
 					cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Solving path:  ', path_strings[['print']], ', n=', i, ', ct=', ct_print, '\n'))
 				}else{
-					#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Skipping path: ', path_strings[['print']], ', n=', ct_print, '\n'))
+					cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Skipping path: ', path_strings[['print']], ', n=', ct_print, '\n'))
 				}
 			}
 
@@ -53,7 +57,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			# Get original distances between joints in path (used for solving some paths)
 			path_dists <- mechanism[['paths.closed.dist']][[i]]
 
-			if(path_str %in% 'R(JSN)-R(DNN)-R(DNS)'){
+			if(path_str %in% c('R(JSN)-R(DNN)-R(DNS)', 'R(JSN)-R(DNN)-R(JNS)')){
 
 				#if(print.progress) print_joint_status(mechanism, indent)
 
@@ -61,22 +65,56 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[2]], 
 					' (', joint_idx[2], ')\n'))
 
+				# Find inverse transformation that returns body to initial pose
+				itmat <- solve(mechanism[['tmat']][, , path_bodies[2], iter])
+				
+				# Get combined transformation of returning body to initial pose and adding transformation of joined body
+				# This will 
+				# **** not sure of order here!
+				etmat <- mechanism[['tmat']][, , path_bodies[1], iter] %*% itmat
+
 				# Apply transformation of first body to second body to rejoin the bodies
 				mechanism <- transformBody(mechanism, body=path_bodies[2], 
 					tmat=mechanism[['tmat']][, , path_bodies[1], iter], iter=iter, 
 					at.joint=joint_idx[2], replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
 					print.progress=print.progress, indent=indent, indent.level=indent.level+2)
 
-				# Extend transformation
-				mechanism <- extendTransformation2(mechanism, tmat=mechanism[['tmat']][, , path_bodies[1], iter], 
-					body.excl=path_bodies[1], iter=iter, recursive=TRUE, replace=TRUE, print.progress=print.progress, indent=indent, 
+				# Extend transformation (removes any transformation of path_bodies[2] and then applies new transformation that joins joint 2)
+				mechanism <- extendTransformation2(mechanism, tmat=etmat, 
+					body.excl=path_bodies[1], iter=iter, recursive=TRUE, print.progress=print.progress, indent=indent, 
 					indent.level=indent.level+2)
 
-				#if(print.progress) print_joint_status(mechanism, indent)
-				#path_strings <- createJointPathString(mechanism, joint_idx, i, print.progress)
-				#print(path_strings)
+				next
+			}
 
-				#path_solved <- TRUE
+			if(path_str %in% c('R(DSN)-R(JNN)-R(DNS)', 'R(DSN)-R(DNN)-R(DNS)')){
+
+				#if(print.progress) print_joint_status(mechanism, indent)
+
+				if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+					'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[1]], 
+					' (', joint_idx[1], ')\n'))
+
+				# Find body across first joint
+				body_0 <- mechanism[['body.conn.num']][joint_idx[1], ]
+				body_0 <- body_0[body_0 != path_bodies[1]]
+
+				# Find inverse transformation that returns body to initial pose
+				itmat <- solve(mechanism[['tmat']][, , path_bodies[1], iter])
+				etmat <- mechanism[['tmat']][, , body_0, iter] %*% itmat
+
+				# Apply transformation of first body to second body to rejoin the bodies
+				mechanism <- transformBody(mechanism, body=path_bodies[1], 
+					tmat=mechanism[['tmat']][, , body_0, iter], iter=iter, 
+					at.joint=joint_idx[1], replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
+					print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+
+				# Extend transformation
+				mechanism <- extendTransformation2(mechanism, tmat=etmat, 
+					body.excl=path_bodies[1], iter=iter, recursive=TRUE, print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				#break
 				next
 			}
 
