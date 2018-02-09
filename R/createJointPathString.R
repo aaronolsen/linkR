@@ -16,8 +16,8 @@ createJointPathString <- function(mechanism, joints, path, print.progress = FALS
 	# Get whether joint is solved/fixed
 	joint_solved_set1 <- joint_solved_set2 <- rep('N', path_length)
 	for(j in 1:length(joints)){
-		if(mechanism[['status']][['solved']][joints[j], joint_sets[j,1]] > 0) joint_solved_set1[j] <- 'S'
-		if(mechanism[['status']][['solved']][joints[j], joint_sets[j,2]] > 0) joint_solved_set2[j] <- 'S'
+		if(mechanism[['status']][['solved']][joints[j], joint_sets[j,1]] > 1) joint_solved_set1[j] <- 'S'
+		if(mechanism[['status']][['solved']][joints[j], joint_sets[j,2]] > 1) joint_solved_set2[j] <- 'S'
 	}
 
 	# Create string
