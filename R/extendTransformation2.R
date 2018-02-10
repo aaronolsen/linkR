@@ -1,4 +1,4 @@
-extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive = FALSE, 
+extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, body = NULL, recursive = FALSE, 
 	body.excl = NULL, replace = FALSE, reverse = FALSE, print.progress = FALSE, indent = '\t', indent.level=3){
 
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation()\n'))
@@ -32,27 +32,63 @@ extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, recursive
 			# If no disjointed joints stop
 			if(!any(disjointeds)) break
 		}
-		
+
 		any_disjointed <- FALSE
 		for(disjointed in disjointeds){
 			
 			# If fixed joint, skip
-			if(disjointed %in% mechanism[['fixed.joints']]) next
+			#if(disjointed %in% mechanism[['fixed.joints']]) next
 
-			# Find transformed joint sets
-			jt_set_t <- which(mechanism[['status']][['transformed']][disjointed, ])
+			if(is.null(body)){
+
+				# Find transformed joint sets
+				jt_set_t <- which(mechanism[['status']][['transformed']][disjointed, ])
 		
-			# If both are transformed, skip
-			if(length(jt_set_t) == 2) next
+				# If both are transformed, skip
+				if(length(jt_set_t) == 2) next
 
-			# If either set is fixed, skip
-			#if(any(mechanism[['status']][['solved']][disjointed, ] == 2)) next
+				# If either set is fixed, skip
+				#if(any(mechanism[['status']][['solved']][disjointed, ] == 2)) next
 
-			# Find untransformed joint sets
-			jt_set_u <- which(!mechanism[['status']][['transformed']][disjointed, ])
+				# Find untransformed joint sets
+				jt_set_u <- which(!mechanism[['status']][['transformed']][disjointed, ])
 
-			# Find untransformed body
-			body_u <- mechanism[['body.conn.num']][disjointed, jt_set_u]
+				# Find untransformed body
+				body_u <- mechanism[['body.conn.num']][disjointed, jt_set_u]
+
+			}else{
+
+				# Set untransformed body			
+				body_u <- body
+				
+				# Find body across joint
+				body_0 <- mechanism[['body.conn.num']][disjointed, ]
+				body_0 <- body_0[body_0 != body]
+
+				# Set transformation for all other bodies
+				tmat <- mechanism[['tmat']][, , body_0, iter] %*% solve(mechanism[['tmat']][, , body, iter])
+
+				# Apply transformation of first body to second body to rejoin the bodies
+				mechanism <- transformBody(mechanism, body=body, 
+					tmat=mechanism[['tmat']][, , body_0, iter], iter=iter, 
+					at.joint=disjointed, replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
+					print.progress=print.progress, indent=indent, indent.level=indent.level)
+				
+				# Set original body to be excluded from subsequent transformations
+				#body.excl <- body
+
+				# Set to NULL for next run
+				body <- NULL
+				
+				# Set to TRUE so routine wont stop if recursive
+				any_disjointed <- TRUE
+				
+				# Start new cycle so that body is not transformed twice
+				next
+			}
+
+			# If fixed body, skip (do not want to transform fixed body)
+			if(body_u == 1) next
 
 			# Skip if body is in body exclude list			
 			if(!is.null(body.excl) && body_u %in% body.excl) next
