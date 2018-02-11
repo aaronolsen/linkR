@@ -1,6 +1,6 @@
 solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  body.num, 
 	input, body.conn, joint.names, joint.prev, joint.ref, iter = 1, print.progress = FALSE, 
-	indent = ''){
+	indent = '', indent.level = 4){
 
 	# INPUT
 	if(length(joint.types) == 1){
@@ -157,7 +157,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 				joint.names=joint.names[length(joint.cons):1], 
 				joint.prev=joint.prev[nrow(joint.prev):1, ], 
 				joint.ref=joint.ref[nrow(joint.ref):1, ], 
-				iter=iter, print.progress=print.progress, indent=indent)
+				iter=iter, print.progress=print.progress, indent=indent, indent.level=indent.level)
 			
 			if(is.null(solve_joint_path$body.tmat)) return(list('body.tmat'=NULL,'joint.status'=NULL,'solution'=solve_joint_path$solution))
 			
@@ -183,7 +183,7 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			name_wt <- paste0(paste0(name_vec, trfm_vec), collapse='-')
 			#cat(paste0(type_str, ' '))
 #			cat(paste0('Solve path (', name_wt, ')'))
-			cat(paste0(paste0(rep(indent, 4), collapse=''), 'Try solving path ', name_wt, ''))
+			cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'Solving path ', name_wt, ''))
 		}
 
 		if(type_str %in% c('L-S*-S', 'S-S*-S')){
