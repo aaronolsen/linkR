@@ -20,8 +20,6 @@ avec <- function(u, v, axis=NULL, about.axis=FALSE, max.pi=FALSE){
 
 	}else{
 		if(max.pi){
-			print(acos(c))
-			print(pi-acos(c))
 			angle <- min(acos(c), pi-acos(c))
 		}else{
 			angle <- acos(c)
