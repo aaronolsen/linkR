@@ -1,91 +1,81 @@
-extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, body = NULL, recursive = FALSE, 
-	body.excl = NULL, replace = FALSE, reverse = FALSE, print.progress = FALSE, indent = '\t', indent.level=3){
+extendTransformation2 <- function(mechanism, iter, tmat = NULL, joint = NULL, body = NULL, 
+	recursive = FALSE, body.excl = NULL, replace = FALSE, reverse = FALSE, status.solved.to = NULL, 
+	print.progress = FALSE, indent = '\t', indent.level=3){
 
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation()\n'))
 
 	# Set max number of recursive loops
-	if(recursive){ ct_max <- 6 }else{ ct_max <- 1 }
+	if(recursive){ ct_max <- 100 }else{ ct_max <- 1 }
 
-	#
+	# Find any already disjointed joints (transformations shouldn't be extended across these joints 
+	# because it would be different than the original transformation that caused the joint to be disjointed
+	joint.excl <- which(!mechanism[['status']][['jointed']])
+
+	# Input joint is jointed and tmat is given; transform input body with tmat, then extend transformation across disjointed joints
+	if(mechanism[['status']][['jointed']][joint] && !is.null(tmat)){
+
+		# Transform body
+		mechanism <- transformBody(mechanism, body=body, tmat=tmat, iter=iter, at.joint=joint, 
+			status.solved.to=status.solved.to, print.progress=print.progress, 
+			indent=indent, indent.level=indent.level)
+	}
+
+	# Input joint is disjointed and no tmat is given; find transformation that restores disjointed joint
+	# and then find tmat to apply to all subsequently disjointed joints
+	if(!mechanism[['status']][['jointed']][joint] && is.null(tmat)){
+
+		# Find body across joint
+		body_0 <- mechanism[['body.conn.num']][joint, ]
+		body_0 <- body_0[body_0 != body]
+
+		# Set transformation for all other bodies
+		tmat <- mechanism[['tmat']][, , body_0, iter] %*% solve(mechanism[['tmat']][, , body, iter])
+
+		# Apply transformation of first body to second body to rejoin the bodies
+		mechanism <- transformBody(mechanism, body=body, 
+			tmat=mechanism[['tmat']][, , body_0, iter], iter=iter, 
+			at.joint=joint, replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
+			print.progress=print.progress, indent=indent, indent.level=indent.level)
+	}
+	
+	# Set initial matrix of transformed joints
 	local_transformed <- matrix(FALSE, nrow=mechanism[['num.joints']], ncol=2)
-	#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 
 	ct <- 0
 	while(ct < ct_max){
 
-		if(!is.null(joint)){
+		# Find any disjointed joints
+		disjointeds <- which(!mechanism[['status']][['jointed']])
+		
+		# Remove excluded joints
+		disjointeds <- disjointeds[!disjointeds %in% joint.excl]
 
-			# If not disjointed, skip
-			if(mechanism[['status']][['jointed']][joint]) break
+		# If no disjointed joints stop
+		if(!any(disjointeds)) break
 
-			# Set disjointed joint
-			disjointeds <- joint
-			
-			# Set joint to NULL for next run
-			joint <- NULL
+		# Start check whether any joint has been joined (to know when to stop cycles)
+		any_joined <- FALSE
 
-		}else{
-
-			# Find any disjointed joints
-			disjointeds <- which(!mechanism[['status']][['jointed']])
-
-			# If no disjointed joints stop
-			if(!any(disjointeds)) break
-		}
-
-		any_disjointed <- FALSE
+		# Loop through disjointed joints
 		for(disjointed in disjointeds){
 			
 			# If fixed joint, skip
 			#if(disjointed %in% mechanism[['fixed.joints']]) next
 
-			if(is.null(body)){
+			# Find transformed joint sets
+			jt_set_t <- which(mechanism[['status']][['transformed']][disjointed, ])
+	
+			# If both are transformed, skip
+			if(length(jt_set_t) == 2) next
 
-				# Find transformed joint sets
-				jt_set_t <- which(mechanism[['status']][['transformed']][disjointed, ])
-		
-				# If both are transformed, skip
-				if(length(jt_set_t) == 2) next
+			# If either set is fixed, skip
+			#if(any(mechanism[['status']][['solved']][disjointed, ] == 2)) next
 
-				# If either set is fixed, skip
-				#if(any(mechanism[['status']][['solved']][disjointed, ] == 2)) next
+			# Find untransformed joint sets
+			jt_set_u <- which(!mechanism[['status']][['transformed']][disjointed, ])
 
-				# Find untransformed joint sets
-				jt_set_u <- which(!mechanism[['status']][['transformed']][disjointed, ])
-
-				# Find untransformed body
-				body_u <- mechanism[['body.conn.num']][disjointed, jt_set_u]
-
-			}else{
-
-				# Set untransformed body			
-				body_u <- body
-				
-				# Find body across joint
-				body_0 <- mechanism[['body.conn.num']][disjointed, ]
-				body_0 <- body_0[body_0 != body]
-
-				# Set transformation for all other bodies
-				tmat <- mechanism[['tmat']][, , body_0, iter] %*% solve(mechanism[['tmat']][, , body, iter])
-
-				# Apply transformation of first body to second body to rejoin the bodies
-				mechanism <- transformBody(mechanism, body=body, 
-					tmat=mechanism[['tmat']][, , body_0, iter], iter=iter, 
-					at.joint=disjointed, replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
-					print.progress=print.progress, indent=indent, indent.level=indent.level)
-				
-				# Set original body to be excluded from subsequent transformations
-				#body.excl <- body
-
-				# Set to NULL for next run
-				body <- NULL
-				
-				# Set to TRUE so routine wont stop if recursive
-				any_disjointed <- TRUE
-				
-				# Start new cycle so that body is not transformed twice
-				next
-			}
+			# Find untransformed body
+			body_u <- mechanism[['body.conn.num']][disjointed, jt_set_u]
 
 			# If fixed body, skip (do not want to transform fixed body)
 			if(body_u == 1) next
@@ -174,17 +164,16 @@ extendTransformation2 <- function(mechanism, tmat, iter, joint = NULL, body = NU
 				mechanism[['status']][['transformed']][both_sets_transformed, ] <- FALSE
 			}
 			
-			# Change status
-			# Mark if a joint is disjointed
-			any_disjointed <- TRUE
+			# Mark that a joint has been joined
+			any_joined <- TRUE
 
 			#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 		
-			# Once disjointed joint is found break to repeat outer loop
+			# Once disjointed joint is found break to find new set of disjointed joints
 			break
 		}
 		
-		if(!any_disjointed) break
+		if(!any_joined) break
 
 		ct <- ct + 1
 	}	
