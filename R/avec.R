@@ -14,10 +14,14 @@ avec <- function(u, v, axis=NULL, about.axis=FALSE, max.pi=FALSE){
 		angle <- 0
 
 		# Check for opposite direction
-		if(abs(sum(uu+vu)) < 1e-9) angle <- pi
+		if(sum(abs(c(uu[1]+vu[1], uu[2]+vu[2], uu[3]+vu[3]))) < 1e-9){
+			angle <- pi
+		}
 
 	}else{
 		if(max.pi){
+			print(acos(c))
+			print(pi-acos(c))
 			angle <- min(acos(c), pi-acos(c))
 		}else{
 			angle <- acos(c)
