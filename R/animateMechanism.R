@@ -192,31 +192,33 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		# Reset joint status to initial state
 		mechanism[['status']] <- status_init
 
+		if(print_progress_iter){
+			cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformations\n'))
+		}
+
 		for(kn_idx in 1:length(input.joint)){
 		
 			kn_jt_idx <- input.joint[kn_idx]
 
-			# Resolve disjoints
-			# Resolve disjoint at input joint if disjointed
-			# Extend transformation across input joint and then subtracting that transformation 
-			# from any subsequently disjointed joints so that any previous transformations are kept
-			mechanism <- extendTransformation2(mechanism, joint=kn_jt_idx, body=input.body[kn_idx],
-				body.excl=input.body[kn_idx], iter=iter, recursive=TRUE, print.progress=print_progress_iter, indent=indent, 
-				indent.level=2)
-
 			# Print known transformation header (transformation number, body, joint)
 			if(print_progress_iter){
-				cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformation', 
-					' (', tolower(as.roman(kn_idx)), ') to body \'', 
+				cat(paste0(paste0(rep(indent, 3), collapse=''), kn_idx, ') Apply transformation to body \'', 
 					mechanism$body.names[input.body[kn_idx]], '\' (', input.body[kn_idx], ') at joint \'', 
 					dimnames(mechanism$joint.coor)[[1]][kn_jt_idx], '\' (', kn_jt_idx, 
 					') of type \'', mechanism$joint.types[kn_jt_idx], '\'\n'))
 			}
 
+			# Resolve disjoint at input joint if disjointed
+			# Extend transformation across input joint and then subtracting that transformation 
+			# from any subsequently disjointed joints so that any previous transformations are kept
+			mechanism <- extendTransformation2(mechanism, joint=kn_jt_idx, body=input.body[kn_idx],
+				body.excl=input.body[kn_idx], iter=iter, recursive=TRUE, print.progress=print_progress_iter, indent=indent, 
+				indent.level=4)
+
 			# Get transformation to apply to input body at input joint
 			kn_tmat <- getKnownTransformation(mechanism=mechanism, input.param=input.param[[kn_idx]], 
 				joint=kn_jt_idx, body=input.body[kn_idx], iter=iter, print.progress=print_progress_iter, 
-				indent=indent, indent.level=3)
+				indent=indent, indent.level=4)
 			
 			# **** U-joint and other joints where different axes are associated with different bodies
 			# should be split into two transformations. Same input joint but different bodies. 
@@ -226,13 +228,13 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# Transform body and extend transformation
 			mechanism <- extendTransformation2(mechanism, body=input.body[kn_idx], tmat=kn_tmat, 
 				iter=iter, recursive=TRUE, joint=kn_jt_idx, status.solved.to=1, body.excl=input.body[kn_idx], 
-				print.progress=print_progress_iter, indent=indent, indent.level=2)
+				print.progress=print_progress_iter, indent=indent, indent.level=4)
 				
 			# Extend solved status through mechanism
 			mechanism <- extendSolvedStatus(mechanism, print.progress=print_progress_iter, 
-				indent=indent, indent.level=3)
+				indent=indent, indent.level=4)
 
-			if(print_progress_iter) print_joint_status(mechanism, indent)
+			#if(print_progress_iter) print_joint_status(mechanism, indent)
 
 			#break
 
@@ -243,14 +245,14 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 		#next
 
 		# Print statuses
-		if(print_progress_iter) print_joint_status(mechanism, indent, indent.level=2)
+		#if(print_progress_iter) print_joint_status(mechanism, indent, indent.level=2)
 
 		# Try solving joint paths
 		mechanism <- resolveJointPaths(mechanism, iter=iter, print.progress=print_progress_iter, 
 			indent=indent, indent.level=2)
 
 		# Print statuses
-		if(print_progress_iter) print_joint_status(mechanism, indent)
+		if(print_progress_iter) print_joint_status(mechanism, indent, indent.level=2)
 	}
 
 	## Apply body transformations to body points
