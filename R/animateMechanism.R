@@ -211,7 +211,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# Resolve disjoint at input joint if disjointed
 			# Extend transformation across input joint and then subtracting that transformation 
 			# from any subsequently disjointed joints so that any previous transformations are kept
-			mechanism <- extendTransformation2(mechanism, joint=kn_jt_idx, body=input.body[kn_idx],
+			mechanism <- extendTransformation(mechanism, joint=kn_jt_idx, body=input.body[kn_idx],
 				body.excl=input.body[kn_idx], iter=iter, recursive=TRUE, print.progress=print_progress_iter, indent=indent, 
 				indent.level=4)
 
@@ -226,7 +226,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			# for the second transformation.			
 
 			# Transform body and extend transformation
-			mechanism <- extendTransformation2(mechanism, body=input.body[kn_idx], tmat=kn_tmat, 
+			mechanism <- extendTransformation(mechanism, body=input.body[kn_idx], tmat=kn_tmat, 
 				iter=iter, recursive=TRUE, joint=kn_jt_idx, status.solved.to=1, body.excl=input.body[kn_idx], 
 				print.progress=print_progress_iter, indent=indent, indent.level=4)
 				

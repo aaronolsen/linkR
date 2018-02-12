@@ -95,7 +95,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[2]], ' (', joint_idx[2], ')\n'))
 
 					# Find transformation to restore disjointed joint and then extend across any subsequent disjoints
-					mechanism <- extendTransformation2(mechanism, joint=joint_idx[2], body=path_bodies[2],
+					mechanism <- extendTransformation(mechanism, joint=joint_idx[2], body=path_bodies[2],
 						body.excl=path_bodies[1], iter=iter, recursive=TRUE, print.progress=print.progress, indent=indent, 
 						indent.level=indent.level+2)
 
@@ -108,7 +108,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[1]], ' (', joint_idx[1], ')\n'))
 
 					# Find transformation to restore disjointed joint and then extend across any subsequent disjoints
-					mechanism <- extendTransformation2(mechanism, joint=joint_idx[1], body=path_bodies[1],
+					mechanism <- extendTransformation(mechanism, joint=joint_idx[1], body=path_bodies[1],
 						body.excl=path_bodies[1], iter=iter, recursive=TRUE, print.progress=print.progress, indent=indent, 
 						indent.level=indent.level+2)
 				
@@ -179,7 +179,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				tmat_B <- tmat_B_3 %*% tmat_B_2 %*% tmat_B_1
 		
 				# Transform first body and extend transformation
-				mechanism <- extendTransformation2(mechanism, body=path_bodies[1], joint=joint_idx[1], 
+				mechanism <- extendTransformation(mechanism, body=path_bodies[1], joint=joint_idx[1], 
 					status.solved.to=1, tmat=tmat_B, iter=iter, recursive=TRUE, 
 					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
 
@@ -196,7 +196,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				tmat_B <- tmat_B_1 %*% tmat_B_2 %*% tmat_B_3
 
 				# Transform second body and extend transformation
-				mechanism <- extendTransformation2(mechanism, body=path_bodies[2], tmat=tmat_B, 
+				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=tmat_B, 
 					iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=1, 
 					body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
 					indent.level=indent.level+2)
