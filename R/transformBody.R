@@ -88,8 +88,9 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 
 		if(print.progress){
 			#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Transform body \'', mechanism[['body.names']][body], '\' (', body, ') and associated joints: ', paste0(apply_to_joints, collapse=', ')))
-			cat(paste0('\'', mechanism[['body.names']][body], '\' (', body, ') & associated joints: ', paste0(apply_to_joints, collapse=', ')))
+			cat(paste0('\'', mechanism[['body.names']][body], '\' (', body, ')'))
 			if(!is.null(at.joint)) cat(paste0(' at joint ', mechanism[['joint.names']][at.joint], '(', at.joint, ')'))
+			cat(paste0(' and associated joints: ', paste0(apply_to_joints, collapse=', ')))
 			#print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
 		}
 	}
