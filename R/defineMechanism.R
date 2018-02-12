@@ -1,5 +1,7 @@
-defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixed.body = 'Fixed', 
-	find.paths = TRUE, print.progress = FALSE){
+defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, input.joint, 
+	input.body, fixed.body = 'Fixed', find.paths = TRUE, print.progress = FALSE){
+
+	if(is.null(input.joint))
 
 	if(print.progress) cat('defineMechanism()\n')
 	indent <- '  '
@@ -133,56 +135,59 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		}
 	}
 
-	## Find "sole joints" (joints that are the only joint connected to a particular body)
-	sole_joints <- c()
+	# Get joints connected to each joint
+	joint_conn <- list()
+	for(i in 1:nrow(body_conn_num)){
 
-	# Get bodies that are in body connection matrix just once
-	not_in_joint_conn <- which(table(body_conn_num) == 1)
-
-	# Remove fixed body
-	not_in_joint_conn <- not_in_joint_conn[!not_in_joint_conn == 1]
-
-	# Get joints connected to body
-	if(length(not_in_joint_conn) > 0){
-		for(i in 1:nrow(body_conn_num)){
-			if(body_conn_num[i,1] %in% not_in_joint_conn || body_conn_num[i,2] %in% not_in_joint_conn) sole_joints <- c(sole_joints, i)
-		}
+		# Find bodies connected by joint
+		body1 <- body_conn_num[i, 1]
+		body2 <- body_conn_num[i, 2]
+		
+		# Get all joints connected to bodies
+		joint_conn_all <- sort(unique(c(which(rowSums(body_conn_num == body1) > 0), which(rowSums(body_conn_num == body2) > 0))))
+		
+		# Save joints except current joint
+		joint_conn[[i]] <- joint_conn_all[joint_conn_all != i]
 	}
+	
+	# Find fixed joints
+	fixed_joints <- which(rowSums(body_conn_num == 1) > 0)
+	
+	# Find open joints (joints that are connected to fixed link through a single joint)
+	open_joints <- findOpenJoints(joint_conn, body_conn_num, fixed_joints, indent=indent, 
+		indent.level=1, print.progress=FALSE)
 
+	# Print open joints
 	if(print.progress){
-		cat(paste0(paste0(rep(indent, 1), collapse=''), 'Sole joints (joints that are the only joint connected to a particular body):'))
-		if(length(sole_joints) == 0){
-			cat(' none\n')
-		}else{
-			sole_joints_names <- c()
-			for(j in 1:length(sole_joints)) sole_joints_names <- c(sole_joints_names, paste0(rownames(joint.coor)[sole_joints[j]], '(', sole_joints[j], ')'))
-			cat(paste0(' ', paste0(sole_joints_names, collapse=', '), '\n'))
-		}
+		cat(paste0(paste0(rep(indent, 1), collapse=''), 'open.joints: '))
+		joints_names <- c()
+		for(j in 1:length(open_joints)) joints_names <- c(joints_names, paste0(rownames(joint.coor)[open_joints[j]], '(', open_joints[j], ')'))
+		cat(paste0(paste0(joints_names, collapse=', '), '\n'))
 	}
-
-
-	# Set joints transformed by each body transformation
-	joint_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
-	joint_set_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
-
-	# Fill list
-	for(body_num in 1:num_bodies){
-		bc_rows <- which(rowSums(body_conn_num == body_num) > 0)
-		jt_t_v <- c()
-		jt_s_t_v <- c()
-		for(i in 1:length(bc_rows)){
-			set_match <- which(body_conn_num[bc_rows[i], ] == body_num)
-			jt_t_v <- c(jt_t_v, bc_rows[i])
-			jt_s_t_v <- c(jt_s_t_v, set_match)
-		}
-		names(jt_t_v) <- NULL
-		names(jt_s_t_v) <- NULL
-		joint_transform[[body_num]] <- jt_t_v
-		joint_set_transform[[body_num]] <- jt_s_t_v
-	}
-
+	
 	# IF PATH FINDING IS ON
+	find.paths <- FALSE
 	if(find.paths){
+
+		# Set joints transformed by each body transformation
+		joint_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
+		joint_set_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
+
+		# Fill list
+		for(body_num in 1:num_bodies){
+			bc_rows <- which(rowSums(body_conn_num == body_num) > 0)
+			jt_t_v <- c()
+			jt_s_t_v <- c()
+			for(i in 1:length(bc_rows)){
+				set_match <- which(body_conn_num[bc_rows[i], ] == body_num)
+				jt_t_v <- c(jt_t_v, bc_rows[i])
+				jt_s_t_v <- c(jt_s_t_v, set_match)
+			}
+			names(jt_t_v) <- NULL
+			names(jt_s_t_v) <- NULL
+			joint_transform[[body_num]] <- jt_t_v
+			joint_set_transform[[body_num]] <- jt_s_t_v
+		}
 
 		# SET SOLVABLE FRAGMENTS
 		solvable_paths <- c('R-S-S', 'R-R-L', 'R-R-R', 'S-R-S', 'S-S-L', 'S-S-S') #, 'S-S-S', 'S-S-S-S'
@@ -532,9 +537,13 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		paths_open_dist <- NULL
 		paths_closed_dist <- NULL
 		paths_closed_bodies <- NULL
+		paths_closed_set <- NULL
+		body_open_desc <- NULL
 		joint_desc_open <- NULL
 		joints_open <- NULL
 		body_transform <- NULL
+		joint_transform <- NULL
+		joint_set_transform <- NULL
 	}
 
 	mechanism <- list(
@@ -548,7 +557,6 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'paths.closed.bodies' = paths_closed_bodies,
 		'paths.closed.set'=paths_closed_set,
 		'joint.desc.open'=joint_desc_open,
-		'joints.open' = joints_open,
 		'joint.transform' = joint_transform,
 		'joint.set.transform' = joint_set_transform,
 		'joint.names' = rownames(joint.coor),
@@ -560,7 +568,8 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, fixe
 		'body.names' = body.names,
 		'body.transform'=body_transform,
 		'body.open.desc'=body_open_desc,
-		'fixed.joints' = find_joint_paths$fixed.joints,
+		'fixed.joints' = fixed_joints,
+		'open.joints' = open_joints,
 		'num.paths.closed' = length(find_joint_paths$paths.closed),
 		'num.paths.open' = length(find_joint_paths$paths.open),
 		'num.joints' = n_joints,
@@ -601,9 +610,19 @@ print.mechanism <- function(x, ...){
 	rc <- c(rc, paste0('\tMechanism joints:\n\t\t', paste0(capture.output(print(joint_df)), collapse='\n\t\t'), '\n'))
 
 	## Fixed joints
-	rc <- c(rc, paste0('\tFixed joints (fixed.joints):\n'))
-	for(i in 1:length(x[['fixed.joints']])){
-		rc <- c(rc, paste0('\t\t ', x$joint.names[x[['fixed.joints']][i]], ' (', x[['fixed.joints']][i], ')\n'))
+	rc <- c(rc, paste0('\tFixed joints (fixed.joints): '))
+	joints_names <- c()
+	for(i in 1:length(x[['fixed.joints']])) joints_names <- c(joints_names, paste0(x$joint.names[x[['fixed.joints']][i]], '(', x[['fixed.joints']][i], ')'))
+	rc <- c(rc, paste0(paste0(joints_names, collapse=', '), '\n'))
+
+	## Open joints
+	rc <- c(rc, paste0('\tOpen joints (open.joints): '))
+	if(!is.null(x[['open.joints']])){
+		joints_names <- c()
+		for(i in 1:length(x[['open.joints']])) joints_names <- c(joints_names, paste0(x$joint.names[x[['open.joints']][i]], '(', x[['open.joints']][i], ')'))
+		rc <- c(rc, paste0(paste0(joints_names, collapse=', '), '\n'))
+	}else{
+		rc <- c(rc, 'none\n')
 	}
 
 	## Closed paths
