@@ -5,7 +5,7 @@ extendTransformation2 <- function(mechanism, iter, tmat = NULL, joint = NULL, bo
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'extendTransformation()\n'))
 
 	# Set max number of recursive loops
-	if(recursive){ ct_max <- 100 }else{ ct_max <- 1 }
+	if(recursive){ ct_max <- 100 }else{ ct_max <- 2 }
 
 	# Find any already disjointed joints (transformations shouldn't be extended across these joints 
 	# because it would be different than the original transformation that caused the joint to be disjointed
@@ -14,15 +14,18 @@ extendTransformation2 <- function(mechanism, iter, tmat = NULL, joint = NULL, bo
 	# Input joint is jointed and tmat is given; transform input body with tmat, then extend transformation across disjointed joints
 	if(mechanism[['status']][['jointed']][joint] && !is.null(tmat)){
 
+		if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), '0) '))
+
 		# Transform body
 		mechanism <- transformBody(mechanism, body=body, tmat=tmat, iter=iter, at.joint=joint, 
-			status.solved.to=status.solved.to, print.progress=print.progress, 
-			indent=indent, indent.level=indent.level)
+			status.solved.to=status.solved.to, print.progress=print.progress, indent.level=0)
 	}
 
 	# Input joint is disjointed and no tmat is given; find transformation that restores disjointed joint
 	# and then find tmat to apply to all subsequently disjointed joints
 	if(!mechanism[['status']][['jointed']][joint] && is.null(tmat)){
+
+		if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), '0) '))
 
 		# Find body across joint
 		body_0 <- mechanism[['body.conn.num']][joint, ]
@@ -35,13 +38,13 @@ extendTransformation2 <- function(mechanism, iter, tmat = NULL, joint = NULL, bo
 		mechanism <- transformBody(mechanism, body=body, 
 			tmat=mechanism[['tmat']][, , body_0, iter], iter=iter, 
 			at.joint=joint, replace=TRUE, status.solved.to=0, status.jointed.to=TRUE, 
-			print.progress=print.progress, indent=indent, indent.level=indent.level)
+			print.progress=print.progress, indent.level=0)
 	}
 	
 	# Set initial matrix of transformed joints
 	local_transformed <- matrix(FALSE, nrow=mechanism[['num.joints']], ncol=2)
 
-	ct <- 0
+	ct <- 1
 	while(ct < ct_max){
 
 		# Find any disjointed joints
@@ -133,21 +136,19 @@ extendTransformation2 <- function(mechanism, iter, tmat = NULL, joint = NULL, bo
 			# Transformation will leave solve joint disjointed - do no proceed
 			if(will_disjoint_solved_joint) next
 
-			if(print.progress){
-				if(ct == ct_max-1){ ct_print <- 'max' }else{ ct_print <- ct }
-				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
-					'Extend transformation across joint \'', mechanism[['joint.names']][disjointed], 
-					'\' (', disjointed, '), ct=', ct_print, '\n'))
-			}
-
 			# Get transformed state before transformBody()
 			transformed_pre <- mechanism[['status']][['transformed']]
+
+			if(print.progress){
+				if(ct == ct_max-1){ ct_print <- 'max' }else{ ct_print <- ct }
+				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), ct_print, ') '))
+			}
 
 			# Transformation body
 			mechanism <- transformBody(mechanism, status.solved.to=NULL, body=body_u, 
 				tmat=tmat, at.joint=disjointed, replace=replace, reverse=reverse, 
 				iter=iter, print.progress=print.progress, 
-				indent=indent, indent.level=indent.level+2)
+				indent.level=0)
 
 			mechanism[['status']][['jointed']][disjointed] <- TRUE
 			mechanism[['status']][['transformed']][disjointed, ] <- FALSE
