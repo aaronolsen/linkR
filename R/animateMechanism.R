@@ -1,9 +1,10 @@
-animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.body = NULL, 
-	joint.compare = NULL, use.ref.as.prev = FALSE, check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
-	check.inter.point.dist = TRUE, print.progress = FALSE, print.progress.iter = 2){
+animateMechanism <- function(mechanism, input.param, 
+	joint.compare = NULL, use.ref.as.prev = FALSE, 
+	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
+	check.inter.point.dist = TRUE, print.progress = FALSE, print.progress.iter = 1:2){
 
 	if(print.progress) cat(paste0('animateMechanism()\n'))
-
+	
 	# Convert input.param into list of matrices for consistency across mechanisms with differing degrees of freedom
 	if(class(input.param) == 'numeric') input.param <- list(matrix(input.param, nrow=length(input.param), ncol=1))
 	if(class(input.param) == 'matrix') input.param <- list(input.param)
@@ -53,19 +54,9 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			dimnames=list(dimnames(joint.compare)[[1]], dimnames(joint.compare)[[2]], NULL))
 	}
 
-	# Set input.joint if NULL and a single joint
-	if(is.null(input.joint)){
-		if(mechanism[['num.joints']] > 1) stop("If the mechanism has more than one joint 'input.joint' must be specified.")
-		input.joint <- 1
-	}
-
-	# If input.joint is non-numeric, convert to numeric
-	if(!is.numeric(input.joint[1])){
-		if(sum(!input.joint %in% mechanism$joint.names) > 0) stop("'input.joint' names do not match joint names.")
-		input_joint_num <- rep(NA, length(input.joint))
-		for(i in 1:length(input.joint)) input_joint_num[i] <- which(mechanism$joint.names == input.joint[i])
-		input.joint <- input_joint_num
-	}
+	# Get input joint(s) and body/bodies from mechanism
+	input.joint <- mechanism[['input.joint']]
+	input.body <- mechanism[['input.body']]
 
 	# Check that number of input parameters matches input.joint length
 	if(n_inputs != length(input.joint)) stop(paste0("The length of input.param (", n_inputs, ") must match the number of input.joint (", length(input.joint), ")."))
@@ -239,7 +230,7 @@ animateMechanism <- function(mechanism, input.param, input.joint = NULL, input.b
 			#break
 
 			# Print statuses
-			#if(print_progress_iter) print_joint_status(mechanism, indent)
+			if(print_progress_iter) print_joint_status(mechanism, indent)
 		}
 		
 		#next
