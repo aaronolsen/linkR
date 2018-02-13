@@ -3,10 +3,16 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 
 	#if(print.progress) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformation', ))
 
-	# Get joint parameters
-	kn_jt_center <- mechanism[['joint.coor.anim']][joint, , iter, 1]
+	# Get joint type
 	kn_jt_type <- mechanism$joint.types[joint]
-	kn_jt_axes <- array(mechanism[['joint.cons.anim']][[joint]][, , iter, ], dim=c(dim(mechanism[['joint.cons.anim']][[joint]])[1:2], 2))
+
+	# Apply current transformation to get current joint coordinate and constraint vectors
+	joint_current <- applyJointTransform(mechanism, joint=joint, iter=iter)
+	kn_jt_center <- joint_current$coor[,,1]
+	kn_jt_axes <- joint_current$cons[[1]]
+
+	#kn_jt_center <- mechanism[['joint.coor.anim']][joint, , iter, 1]
+	#kn_jt_axes <- array(mechanism[['joint.cons.anim']][[joint]][, , iter, ], dim=c(dim(mechanism[['joint.cons.anim']][[joint]])[1:2], 2))
 
 	# Print known parameters
 	if(print.progress){
@@ -47,24 +53,21 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 	# Get joint set index of current/transformed (first) and neighboring body (second)
 	jt_set <- which(body == mechanism[['body.conn.num']][joint, ])
 	
-	#
-	joint_cons <- mechanism[['joint.cons.anim']][[joint]]
-
 	# Set initial value of whether transformation was found
 	tform_set <- FALSE
 
 	# Create transformation matrix
 	if(kn_jt_type %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'O')){
 
-	# Set magnitudes
-	if(kn_jt_type == 'PR'){
-		mags <- input.param[iter, 3]
-	}else{
-		mags <- input.param[iter, ]
-	}
+		# Set magnitudes
+		if(kn_jt_type == 'PR'){
+			mags <- input.param[iter, 3]
+		}else{
+			mags <- input.param[iter, ]
+		}
 
-	# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
-	if(sum(is.na(mags)) == length(mags)) return(NULL)
+		# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
+		if(sum(is.na(mags)) == length(mags)) return(NULL)
 
 		# Set axes of rotation
 		if(kn_jt_type == 'PR'){
