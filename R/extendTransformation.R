@@ -109,12 +109,7 @@ extendTransformation <- function(mechanism, iter, tmat = NULL, joint = NULL, bod
 						will_disjoint_solved_joint <- TRUE
 						break
 					}
-					
-					#if(!is.null(joint.preserve) && body_joints[i] %in% joint.preserve){
-					#	will_disjoint_solved_joint <- TRUE
-					#	break
-					#}
-					
+
 					# If joint is fixed, then will leave disjointed because body across joint cannot move
 					if(any(mechanism[['status']][['solved']][body_joints[i], ] == 2)){
 						will_disjoint_solved_joint <- TRUE
