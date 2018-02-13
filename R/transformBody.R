@@ -55,6 +55,11 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 				}
 			}
 
+			# **** May not need to transform joint coordinates and constraints every time 
+			# this function is called. Could just update transformation matrices and then 
+			# apply transformation to joints/constraints when needed to solve paths. Would 
+			# probably improve performance.
+
 			# Apply to joints associated with body
 			mechanism[['joint.coor.anim']][jt_idx, , iter, jt_set[i]] <- applyTransform(mechanism[['joint.coor']][jt_idx, ], mechanism[['tmat']][, , body, iter])
 
@@ -83,14 +88,18 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 			jt_set_transform <- jt_set[body_joints != at.joint]
 
 			# Add joint to list of transformed joints
-			apply_to_joints <- paste0(mechanism[['joint.names']][joints_transform], '(', joints_transform, ')-', jt_set_transform)
+			if(length(joints_transform) > 0){
+				apply_to_joints <- paste0(mechanism[['joint.names']][joints_transform], '(', joints_transform, ')-', jt_set_transform)
+			}else{
+				apply_to_joints <- NULL
+			}
 		}
 
 		if(print.progress){
 			#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Transform body \'', mechanism[['body.names']][body], '\' (', body, ') and associated joints: ', paste0(apply_to_joints, collapse=', ')))
 			cat(paste0('\'', mechanism[['body.names']][body], '\' (', body, ')'))
 			if(!is.null(at.joint)) cat(paste0(' at joint ', mechanism[['joint.names']][at.joint], '(', at.joint, ')'))
-			cat(paste0(' and associated joints: ', paste0(apply_to_joints, collapse=', ')))
+			if(!is.null(apply_to_joints)) cat(paste0(' and associated joints: ', paste0(apply_to_joints, collapse=', ')))
 			#print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
 		}
 	}
