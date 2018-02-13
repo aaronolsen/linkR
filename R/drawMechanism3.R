@@ -1,4 +1,4 @@
-drawMechanism <- function(linkage, method = "svgViewR", file = NULL, animate = TRUE, 
+drawMechanism3 <- function(linkage, method = "svgViewR", file = NULL, animate = TRUE, 
 	animate.duration = 1, animate.reverse = FALSE, animate.repeat = -1, 
 	connect.joints=TRUE, window.title='Linkage Viewer', joint.col.fill="white", 
 	joint.col.stroke="black", joint.cex=1.5, joint.lwd=2,
