@@ -365,9 +365,10 @@ drawLinkage <- function(linkage, method = "svgViewR", file = NULL, animate = TRU
 				}
 			}
 		}
-		
+
 		# CONNECT JOINTS WITH PATHS
 		if(connect.joints){
+
 			if(animate){
 				for(i in 1:nrow(linkage$joint.links)){
 
