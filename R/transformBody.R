@@ -23,8 +23,6 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 	# Check if joints
 	if(length(body_joints) > 0){
 
-		#if(print.progress) print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
-
 		for(i in 1:length(body_joints)){
 			
 			# Get joint index
@@ -54,31 +52,6 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 					if(status.solved.to > mechanism[['status']][['solved']][jt_idx, jt_set[i]]) mechanism[['status']][['solved']][jt_idx, jt_set[i]] <- status.solved.to
 				}
 			}
-
-			# **** May not need to transform joint coordinates and constraints every time 
-			# this function is called. Could just update transformation matrices and then 
-			# apply transformation to joints/constraints when needed to solve paths. Would 
-			# probably improve performance.
-
-			# Apply to joints associated with body
-			mechanism[['joint.coor.anim']][jt_idx, , iter, jt_set[i]] <- applyTransform(mechanism[['joint.coor']][jt_idx, ], mechanism[['tmat']][, , body, iter])
-
-			# Skip if no constraint
-			if(is.null(mechanism[['joint.cons']][[jt_idx]])) next
-			
-			# Create point vector matrix
-			cons_origin <- matrix(mechanism[['joint.coor']][jt_idx, ], 
-				nrow=nrow(mechanism[['joint.cons']][[jt_idx]]), ncol=3)
-
-			# Translate vectors so base is at origin
-			cons_point <- cons_origin + mechanism[['joint.cons']][[jt_idx]]
-			
-			# Transform origin and vectors
-			cons_origin_trfm <- applyTransform(cons_origin, mechanism[['tmat']][, , body, iter])
-			cons_point_trfm <- applyTransform(cons_point, mechanism[['tmat']][, , body, iter])
-			
-			# Move back to origin
-			mechanism[['joint.cons.anim']][[jt_idx]][, , iter, jt_set] <- cons_point_trfm - cons_origin_trfm
 		}
 
 		if(print.progress){
@@ -93,14 +66,11 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 			}else{
 				apply_to_joints <- NULL
 			}
-		}
 
-		if(print.progress){
 			#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Transform body \'', mechanism[['body.names']][body], '\' (', body, ') and associated joints: ', paste0(apply_to_joints, collapse=', ')))
 			cat(paste0('\'', mechanism[['body.names']][body], '\' (', body, ')'))
 			if(!is.null(at.joint)) cat(paste0(' at joint ', mechanism[['joint.names']][at.joint], '(', at.joint, ')'))
 			if(!is.null(apply_to_joints)) cat(paste0(' and associated joints: ', paste0(apply_to_joints, collapse=', ')))
-			#print(mechanism[['joint.coor.anim']][body_joints, , iter, ])
 		}
 	}
 
