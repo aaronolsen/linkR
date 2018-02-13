@@ -156,6 +156,7 @@ fitJointConstraint <- function(coor, type, control = NULL, smooth = TRUE, fixed 
 
 			svg.close()
 		}
+
 	} else if(type %in% c('RL2')){
 	
 		# Find centroid over time
