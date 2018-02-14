@@ -103,7 +103,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					path_standardized <- TRUE
 				}
 
-				if(path_strings[['tj']] %in% c('R(D)-1-R(J)-2-R(D)', 'R(D)-1-R(D)-2-R(D)', 'R(D)-1-R(J)-2-R(J)')){
+				if(path_strings[['tj']] %in% c('R(D)-1-S(J)-2-S(J)', 'R(D)-1-R(J)-2-R(D)', 'R(D)-1-R(D)-2-R(D)', 'R(D)-1-R(J)-2-R(J)')){
 
 					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[1]], ' (', joint_idx[1], ')\n'))
@@ -134,39 +134,46 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			path_dists <- mechanism[['paths.closed.dist']][[path_idx]]
 
 			# Solve path
-			if(path_strings[['tjs']] %in% c('R(JSN)-1-R(JNN)-2-R(DNS)')){
-
-				# Get current line length -- easiest to calculate in real time in case link is composite of other joints
-				line_len <- distPointToPoint(mechanism[['joint.coor.anim']][joint_idx[1:2], , iter, 1])
+			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
 				
-				line_point <- mechanism[['joint.coor.anim']][joint_idx[1], , iter, 1]
+				# Apply current transformation to get current joint coordinate and constraint vectors
+				joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+				
+				# Get current line length -- easiest to calculate in real time in case link is composite of other joints
+				line_len <- distPointToPoint(joint_current$coor[2, , 1], joint_current$coor[3, , joint_sets[3,1]])
+
+				# Get point at distance from circle
+				line_point <- joint_current$coor[3, , joint_sets[3,2]]
+
+				# Get previous point for toggle position comparison
 				if(iter == 1){
 					line_point_prev <- mechanism[['joint.coor']][joint_idx[2], ]
 				}else{
-					line_point_prev <- mechanism[['joint.coor.anim']][joint_idx[2], , iter-1, 1]
+					line_point_prev <- applyJointTransform(mechanism, joint=joint_idx[2], iter=iter-1)$coor[1, , 1]
 				}
-		
-				# Get current circle radius
-				#circle_rad <- path_dists[2]
-				circle_rad <- distPointToPoint(mechanism[['joint.coor.anim']][joint_idx[2], , iter, 1], 
-					mechanism[['joint.coor.anim']][joint_idx[3], , iter, joint_sets[3,1]])
-				circle_center <- mechanism[['joint.coor.anim']][joint_idx[3], , iter, joint_sets[3,2]]
-				circle_norm <- mechanism[['joint.cons.anim']][[joint_idx[3]]][, , iter, joint_sets[3,2]]
+
+				# Get current circle radius, center and normal vector
+				circle_pt_on_rad <- joint_current$coor[2, , 1]
+				circle_center <- joint_current$coor[1, , 1]
+				circle_norm <- joint_current$cons[[1]][, , 1]
 
 				# 
 				if(print.progress){
 					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
 						'Finding ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], 
-						') on circle with center at ', mechanism[['joint.names']][joint_idx[3]], 
-						'(', joint_idx[3], '), ', 'radius=', signif(circle_rad, 3), ', and normal={' , 
+						') on circle with center {', paste0(signif(circle_center, 3), collapse=','), 
+						'} at ', mechanism[['joint.names']][joint_idx[1]], 
+						'(', joint_idx[1], '), ', 'point on radius=', paste0(signif(circle_pt_on_rad, 3), collapse=','), ', and normal={' , 
 						paste0(signif(circle_norm, 3), collapse=','), '}', ' at distance=', 
-						signif(line_len, 3), ' from ', mechanism[['joint.names']][joint_idx[1]], 
-						'(', joint_idx[1], ') and closest to point {', paste0(signif(line_point_prev, 3), collapse=','), '}\n')
+						signif(line_len, 3), ' from {', paste0(signif(line_point, 3), collapse=','), 
+						'} at ', mechanism[['joint.names']][joint_idx[3]], '(', joint_idx[3], 
+						') and closest to point {', paste0(signif(line_point_prev, 3), collapse=','), '}\n')
 					cat(solve_str)
 				}
 
 				# Define circle
-				circle <- defineCircle(center=circle_center, nvector=circle_norm, radius=circle_rad)
+				circle <- defineCircle(center=circle_center, nvector=circle_norm, 
+					point_on_radius=circle_pt_on_rad, redefine_center=TRUE)
 
 				# Find angle on circle at distance from point
 				circle_t <- angleOnCircleFromPoint(circle=circle, dist=line_len, P=line_point, point_compare=line_point_prev)
@@ -175,19 +182,27 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				J2_solve <- circlePoint(circle=circle, T=circle_t)
 
 				# If no solution, return NULL
-				if(is.vector(J2_solve) && is.na(J2_solve[1])){ warning('No solution.'); return(mechanism) }
-				if(!is.vector(J2_solve) && is.na(J2_solve[1,1])){ warning('No solution.'); return(mechanism) }
+				if((is.vector(J2_solve) && is.na(J2_solve[1])) || (!is.vector(J2_solve) && is.na(J2_solve[1,1]))){
+					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 'No solution found.\n'))
+					return(mechanism) 
+				}
 
 				# Get vectors and axis to find first body transformation
-				V_pre <- mechanism[['joint.coor.anim']][joint_idx[2], , iter, 1] - mechanism[['joint.coor.anim']][joint_idx[1], , iter, 1]
-				V_new <- J2_solve - mechanism[['joint.coor.anim']][joint_idx[1], , iter, 1]
-				J_axis <- mechanism[['joint.cons.anim']][[joint_idx[1]]][, , iter, 1]
+				V_pre <- joint_current$coor[2, , 1] - joint_current$coor[1, , 1]
+				V_new <- J2_solve - joint_current$coor[1, , 1]
+
+				# Get axis to rotate link about
+				if(path_strings[['tjs']] %in% c('R(JSN)-1-R(JNN)-2-R(DNS)')) J_axis <- joint_current$cons[[1]][, , 1]
+				if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)')) J_axis <- joint_current$cons[[1]][, , 1]
+
+				# Get rotation matrix
+				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
 
 				# Get transformation of first body
 				tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
-				tmat_B_1[1:3, 4] <- -mechanism[['joint.coor.anim']][joint_idx[1], , iter, 1]
-				tmat_B_2[1:3, 1:3] <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
-				tmat_B_3[1:3, 4] <- mechanism[['joint.coor.anim']][joint_idx[1], , iter, 1]
+				tmat_B_1[1:3, 4] <- -joint_current$coor[1, , 1]
+				tmat_B_2[1:3, 1:3] <- RM
+				tmat_B_3[1:3, 4] <- joint_current$coor[1, , 1]
 				tmat_B <- tmat_B_3 %*% tmat_B_2 %*% tmat_B_1
 
 				# Transform first body and extend transformation
@@ -195,15 +210,27 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					status.solved.to=1, tmat=tmat_B, iter=iter, recursive=TRUE, 
 					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
 
+				# Update 3rd joint coordinate and constraint after transformation
+				joint_current3 <- applyJointTransform(mechanism, joint=joint_idx[3], iter=iter)
+
 				# Get vectors and axis to find second body transformation
-				V_pre <- mechanism[['joint.coor.anim']][joint_idx[3], , iter, joint_sets[3,1]] - J2_solve
-				V_new <- circle_center - J2_solve
-				J_axis <- mechanism[['joint.cons.anim']][[joint_idx[3]]][, , iter, 1]
+				V_pre <- joint_current3$coor[1, , joint_sets[3,1]] - J2_solve
+				V_new <- line_point - J2_solve
+				
+				# Get axis to rotate link about
+				if(path_strings[['tjs']] %in% c('R(JSN)-1-R(JNN)-2-R(DNS)')){
+					joint_current2 <- applyJointTransform(mechanism, joint=joint_idx[2], iter=iter)
+					J_axis <- joint_current2$cons[[1]][, , 1]
+				}
+				if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)')) J_axis <- cprod(V_pre, V_new)
+				
+				# Get rotation matrix
+				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
 
 				# Get transformation of second body
 				tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
 				tmat_B_1[1:3, 4] <- J2_solve
-				tmat_B_2[1:3, 1:3] <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+				tmat_B_2[1:3, 1:3] <- RM
 				tmat_B_3[1:3, 4] <- -J2_solve
 				tmat_B <- tmat_B_1 %*% tmat_B_2 %*% tmat_B_3
 
@@ -213,9 +240,14 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
 					indent.level=indent.level+2)
 
+				#print(line_point)
+				#print(applyJointTransform(mechanism, joint=joint_idx[3], iter=iter)$coor[, , joint_sets[3,2]])
+
 				# Set last joint as jointed
 				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
 				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
+
+				path_solved <- TRUE
 			}
 
 			# Extend solved status through mechanism
@@ -223,8 +255,6 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 
 			#if(print.progress) print_joint_status(mechanism, indent, indent.level+2)
 			
-			path_solved <- TRUE
-
 			#if(path_strings[['p']] == 'R2(JSN)-R3(JNN)-R4(DNS)'){ path_solved <- FALSE; break }
 
 			i <- i + 1
