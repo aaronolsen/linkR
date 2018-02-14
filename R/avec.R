@@ -28,7 +28,10 @@ avec <- function(u, v, axis=NULL, about.axis=FALSE, max.pi=FALSE){
 
 	if(!is.null(axis)){
 	
-		if(sqrt(sum(axis * axis)) == 0) stop("Input vector 'axis' is zero-length")
+		if(sqrt(sum(axis * axis)) == 0){
+			if(abs(angle) < 1e-10) return(0)
+			stop("Input vector 'axis' is zero-length")
+		}
 
 		axis <- uvector(axis)
 		
