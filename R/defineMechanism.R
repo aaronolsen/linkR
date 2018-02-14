@@ -1,5 +1,5 @@
-defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, input.body, 
-	input.joint = NULL, fixed.body = 'Fixed', find.paths = TRUE, print.progress = FALSE){
+defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, input.joint = NULL,
+	input.body = NULL, fixed.body = 'Fixed', find.paths = TRUE, print.progress = FALSE){
 
 	if(print.progress) cat('defineMechanism()\n')
 	indent <- '  '
@@ -273,79 +273,44 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 		}
 	}
 
-	# Make sure input bodies are numeric
-	if(!is.numeric(input.body[1])){
+	# If input.body is NULL, find default input bodies from input.joint
+	if(is.null(input.body)){
 
+		# Create input body vector
+		input.body <- rep(NA, length(input.joint))
+
+		# Fill in unknowns
 		for(i in 1:length(input.body)){
 
- 
-			# MAKE SURE THAT ALL BODY NAMES ARE FOUND
-			if(!input.body[i] %in% body.names) stop(paste0("Name '", input.body[i], "' in 'input.body' not found in body names."))
-
-			# FIND NUMBER CORRESPONDING TO BODY
-			input.body[i] <- which(input.body[i] == body.names)
-		}
-
-		# MAKE NUMERIC
-		input.body <- as.numeric(input.body)
-	}
-
-	# IF INPUT BODY IS NULL CREATE LIST
-	if(FALSE){
-
-		# **** Fix this so that it is simple vector - only one input body needed per input joint
-
-		if(is.null(input.body)){
-			input_body <- as.list(rep(NA, length(input.joint)))
-		}else{
-
-			# CHECK THAT THE LENGTH OF INPUT.BODY MATCHES THE LENGTH OF INPUT.JOINT
-			if(length(input.body) != length(input.joint)) stop(paste0("The length of input.body (", length(input.body), ") should match the length of input.joint (", length(input.joint), ")"))
-
-			input_body <- input.body
-		}
-
-		# FILL IN UNKNOWNS IN INPUT BODY LIST
-		for(i in 1:length(input_body)){
-	
-			if(!is.na(input_body[[i]][1])){
-
-				for(j in 1:length(input_body[[i]])){
-
-					if(is.numeric(input_body[[i]][j])) next
-
-					# GET NON-NA VALUES
-					input_body_nna <- input_body[!is.na(input_body)]
-			
-					# MAKE SURE THAT ALL BODY NAMES ARE FOUND
-					if(!input_body[[i]][j] %in% mechanism$body.names) stop(paste0("Name '", input_body[[i]][j], "' in 'input.body' not found in body names."))
-			
-					# FIND NUMBER CORRESPONDING TO BODY
-					input_body[[i]][j] <- which(input_body[[i]][j] == mechanism$body.names)
-				}
-
-				# MAKE NUMERIC
-				input_body[[i]] <- as.numeric(input_body[[i]])
-
-				next
-			}
-
-			if(1 %in% mechanism$body.conn.num[input.joint[i], ]){
+			if(1 %in% body_conn_num[input.joint[i], ]){
 		
-				# LINK OTHER THAN 1 (FIXED)
-				input_body[[i]] <- max(mechanism$body.conn.num[input.joint[i], ])
+				# Linkage other than one
+				input.body[i] <- max(body_conn_num[input.joint[i], ])
 			}else{
 
-				# CHOOSE MAX FOR NOW - PERHAPS NOT NECESSARY IN MOST CASES SINCE INPUT AT JOINT 
-				# WITHIN CLOSED LOOP LIKELY USED FOR SPECIFIC PATH FRAGMENTS IN SOLVING PATH
-				input_body[[i]] <- max(mechanism$body.conn.num[input.joint[i], ])
+				stop("input.body must be specified if one or more input.joints is not at a fixed joint.")
+			}
+		}
+
+	}else{
+
+		# Check that lengths match
+		if(length(input.body) != length(input.joint)) stop(paste0("The length of input.body (", length(input.body), ") should match the length of input.joint (", length(input.joint), ")"))
+
+		# Make sure input bodies are numeric
+		if(!is.numeric(input.body[1])){
+
+			for(i in 1:length(input.body)){
+
+				# MAKE SURE THAT ALL BODY NAMES ARE FOUND
+				if(!input.body[i] %in% body.names) stop(paste0("Name '", input.body[i], "' in 'input.body' not found in body names."))
+
+				# FIND NUMBER CORRESPONDING TO BODY
+				input.body[i] <- which(input.body[i] == body.names)
 			}
 
-			if(is.null(mechanism$body.transform)) next
-
-			# ADD OPEN CHAIN BODIES TO TRANSFORM FOR EACH INPUT PARAMETER
-			body_transform <- sort(unique(c(input_body[[i]], mechanism$body.transform[[input.joint[i]]])))
-			input_body[[i]] <- body_transform[!is.na(body_transform)]
+			# MAKE NUMERIC
+			input.body <- as.numeric(input.body)
 		}
 	}
 
@@ -403,6 +368,10 @@ print.mechanism <- function(x, ...){
 	rc <- c(rc, paste0('Mechanism\n'))
 	rc <- c(rc, paste0('\tNumber of joints (num.joints): ', x$num.joints, '\n'))
 	rc <- c(rc, paste0('\tNumber of bodies (num.bodies): ', x$num.bodies, '\n'))
+
+	input_names <- rep(NA, length(x$input.joint))
+	for(input_num in 1:length(x$input.joint)) input_names[input_num] <- paste0(x$joint.names[x$input.joint[input_num]], ' (', x$body.names[x$input.body[input_num]], ')')
+	rc <- c(rc, paste0('\tInputs (input.joint and input.body): ', paste0(input_names, collapse=', '), '\n'))
 
 	## Joints
 	# Create dataframe for joints
