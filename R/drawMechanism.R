@@ -77,9 +77,8 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 	cs_xyz <- mean(distPointToPoint(xyz, colMeans(xyz, na.rm=TRUE)), na.rm=TRUE)
 
 	# SET JOINT CONSTRAINT ARROW PROPERTIES
-	arrow_len <- cs_xyz*0.5
+	arrow_len <- cs_xyz*0.3
 	arrowhead_len <- cs_xyz*0.03
-	col_cons <- c('purple', 'hotpink')
 
 	# Set paths connecting points
 	points_connect <- mechanism[['points.connect']]
@@ -232,7 +231,7 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 			}else{
 
 				for(k in seq(1, n_vectors, by=2)){
-					svg.arrows(x=cons_vec1[[i]][k:(k+1), 1:3, ], len=2*arrowhead_len, col=col_cons[1], 
+					svg.arrows(x=cons_vec1[[i]][k:(k+1), 1:3, ], len=2*arrowhead_len, col='purple', 
 						lwd=2, layer='Joint constraints', z.index=1)
 				}
 			}
@@ -320,7 +319,7 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 
 				for(j in 1:j_max){
 
-					svg.arrows(x=cons_vec[[i]][, 1:3, j], len=arrowhead_len, col=col_cons[1], 
+					svg.arrows(x=cons_vec[[i]][, 1:3, j], len=arrowhead_len, col='purple', 
 						lwd=2, layer='Joint constraints', z.index=1)
 				}
 			}
