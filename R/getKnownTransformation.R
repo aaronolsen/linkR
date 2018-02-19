@@ -14,8 +14,10 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 	#kn_jt_center <- mechanism[['joint.coor.anim']][joint, , iter, 1]
 	#kn_jt_axes <- array(mechanism[['joint.cons.anim']][[joint]][, , iter, ], dim=c(dim(mechanism[['joint.cons.anim']][[joint]])[1:2], 2))
 
+	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'getKnownTransformation()\n'))
+
 	# Print known parameters
-	if(print.progress){
+	if(FALSE){
 
 		# For each joint set
 		axes_c <- c()
@@ -33,7 +35,6 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 			}
 		}
 		
-		cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'getKnownTransformation(), '))
 		if(kn_jt_type %in% c('R', 'U', 'S', 'O', 'X')){
 			#cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Center: ', paste0(signif(kn_jt_center, 3), collapse=','), '; '))
 			cat(paste0('Center: ', paste0(signif(kn_jt_center, 3), collapse=','), '; '))
@@ -47,20 +48,24 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		cat('\n')
 	}
 
-	# Set initial transformation matrices
-	tmat1 <- tmat2 <- tmat3 <- tmat4 <- diag(4)
+	#
+	rtmat <- ttmat <- diag(4)
 
 	# Get joint set index of current/transformed (first) and neighboring body (second)
 	jt_set <- which(body == mechanism[['body.conn.num']][joint, ])
+	jt_set_adj <- which(body != mechanism[['body.conn.num']][joint, ])
 	
 	# Set initial value of whether transformation was found
 	tform_set <- FALSE
 
 	# Create transformation matrix
-	if(kn_jt_type %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'O')){
+	if(kn_jt_type %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'RP', 'O')){
+
+		# Set initial transformation matrices
+		tmat1 <- tmat2 <- tmat3 <- diag(4)
 
 		# Set magnitudes
-		if(kn_jt_type == 'PR'){
+		if(kn_jt_type %in% c('PR', 'RP')){
 			mags <- input.param[iter, 3]
 		}else{
 			mags <- input.param[iter, ]
@@ -69,44 +74,63 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
 		if(sum(is.na(mags)) == length(mags)) return(NULL)
 
-		# Set axes of rotation
-		if(kn_jt_type == 'PR'){
-			AOR <- matrix(cprod(kn_jt_axes[1, , jt_set], kn_jt_axes[2, , jt_set]), nrow=1)
-		}else{
-			AOR <- matrix(kn_jt_axes[, , jt_set], nrow=1)
-		}
-		
 		# TRANSLATE TO CENTER OF ROTATION (JOINT)
 		tmat1[1:3, 4] <- kn_jt_center
 
+		# Set axes of rotation
+		if(kn_jt_type %in% c('PR', 'RP')){
+			AOR <- matrix(cprod(kn_jt_axes[1, , 1], kn_jt_axes[2, , 1]), nrow=1, ncol=3)
+		}else if(kn_jt_type == 'U'){
+			AOR <- matrix(NA, 2, 3)
+			AOR[1,] <- matrix(kn_jt_axes[1, , 1], ncol=3)
+			AOR[2,] <- matrix(kn_jt_axes[2, , 2], ncol=3)
+		}else{
+			AOR <- matrix(kn_jt_axes[, , 1], ncol=3)
+		}
+
 		# LOOP THROUGH EACH COLUMNN OF INPUT PARAMETERS
-		for(i in dim(AOR)[1]:1){
-		
+		for(i in length(mags):1){
+
 			# SKIP IF NA
-			if(is.na(mags[i])) next
+			if(is.na(mags[i]) || is.na(AOR[i, 1])) next
+			
+			#
+			RM <- tMatrixEP(AOR[i, ], -mags[i])
 			
 			# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
-			tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% tMatrixEP(AOR[i, ], -mags[i])
+			tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% RM
+
+			if(print.progress){
+				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Apply rotation of magnitude ', 
+					signif(mags[i], 3), ' about center {', paste0(signif(kn_jt_center, 3), collapse=','), 
+					'} and axis {', paste0(signif(AOR[i, ], 3), collapse=','), '}\n'))
+			}
+
+			#
+			if(kn_jt_type == 'U' && i == 2) AOR[1, ] <- AOR[1, ] %*% RM
 		}
 
 		# TRANSLATE BACK FROM CENTER OF ROTATION
 		tmat3[1:3, 4] <- -kn_jt_center
 		
+		# Get rotation transformations
+		rtmat <- tmat1 %*% tmat2 %*% tmat3
+		
 		# Transform found
 		tform_set <- TRUE
 	}
 
-	if(kn_jt_type %in% c('L', 'P', 'T', 'PR')){
+	if(kn_jt_type %in% c('L', 'P', 'T', 'PR', 'RP')){
 	
 		# Set translation magnitudes
-		if(kn_jt_type == 'PR'){
+		if(kn_jt_type %in% c('PR', 'RP')){
 			mags <- input.param[iter, 1:2]
 		}else{
 			mags <- input.param[iter, ]
 		}
 
 		# TRANSLATE
-		tmat4[1:3, 4] <- colSums(mags*matrix(kn_jt_axes[, , jt_set], ncol=3))
+		ttmat[1:3, 4] <- colSums(mags*matrix(kn_jt_axes[, , jt_set], ncol=3))
 
 		# Transform found
 		tform_set <- TRUE
@@ -116,7 +140,11 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 	if(!tform_set){cat('\n');stop(paste0("Unrecognized joint type '", kn_jt_type, "'"))}
 
 	# COMBINE TRANSFORMATION MATRICES
-	tmat <- tmat1 %*% tmat2 %*% tmat3 %*% tmat4
+	if(kn_jt_type == 'RP'){
+		tmat <- ttmat %*% rtmat
+	}else{
+		tmat <- rtmat %*% ttmat
+	}
 	
 	tmat
 }
