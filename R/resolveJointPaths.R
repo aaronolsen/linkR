@@ -133,11 +133,88 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			# Get original distances between joints in path (used for solving some paths)
 			path_dists <- mechanism[['paths.closed.dist']][[path_idx]]
 
+			# Apply current transformation to get current joint coordinate and constraint vectors
+			joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+
+			# Solve path
+			if(path_strings[['tjs']] %in% c('R(JSN)-1-L(JNN)-2-R(DNS)', 'S(JSN)-1-L(JNN)-2-S(DNS)')){
+
+				# Find target length between solved halves of rotational joints
+				len_target <- distPointToPoint(joint_current$coor[1, , 1], joint_current$coor[3, , joint_sets[3,2]])
+				
+				# Get previous point for toggle position comparison
+				if(iter == 1){
+					t_target_prev <- mechanism[['joint.coor']][joint_idx[3], ]
+				}else{
+					t_target_prev <- joint_current$coor[3, , 1]
+				}
+				
+				# Get translation vector
+				tvec <- joint_current$cons[[2]][1, , 1]
+
+				# Find intersection of sphere and line
+				t_target <- intersectSphereLine(c=joint_current$coor[1, , 1], r=len_target, 
+					x=joint_current$coor[3, , joint_sets[3,1]], l=tvec, point.compare=t_target_prev)
+				
+				# Get translation magnitude
+				tmag <- distPointToPoint(t_target, joint_current$coor[3, , joint_sets[3,1]])
+				
+				# Set magnitude sign
+				tpos <- sum(abs((joint_current$coor[3, , joint_sets[3,1]] + tmag*tvec - t_target)))
+				tneg <- sum(abs((joint_current$coor[3, , joint_sets[3,1]] - tmag*tvec - t_target)))
+				if(tpos < tneg){ tmag <- tmag }else { tmag <- -tmag }
+
+				# Get transformation of second body
+				tmat_B <- diag(4)
+				tmat_B[1:3, 4] <- tmag*tvec
+
+				# Transform second body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=tmat_B, 
+					iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=0, 
+					body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Update joint coordinates after transformation
+				joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+
+				# Get vectors and axis to find first body transformation
+				V_pre <- joint_current$coor[3, , joint_sets[3,1]]-joint_current$coor[1, , 1]
+				V_new <- joint_current$coor[3, , joint_sets[3,2]]-joint_current$coor[1, , 1]
+
+				# Get axis to rotate link about
+				if(path_strings[['tjs']] %in% c('R(JSN)-1-L(JNN)-2-R(DNS)')) J_axis <- joint_current$cons[[1]][, , 1]
+				if(path_strings[['tjs']] %in% c('S(JSN)-1-L(JNN)-2-S(DNS)')) J_axis <- cprod(V_pre, V_new)
+
+				# Get rotation matrix
+				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+				# Get transformation of first and second body
+				tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
+				tmat_B_1[1:3, 4] <- joint_current$coor[1, , 1]
+				tmat_B_2[1:3, 1:3] <- RM
+				tmat_B_3[1:3, 4] <- -joint_current$coor[1, , 1]
+				tmat_B <- tmat_B_1 %*% tmat_B_2 %*% tmat_B_3
+
+				# Transform first body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[1], joint=joint_idx[1], 
+					status.solved.to=1, tmat=tmat_B, iter=iter, recursive=TRUE, 
+					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+
+				# Update joint coordinates after transformation
+				joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+				len_current <- distPointToPoint(joint_current$coor[1, , 1], joint_current$coor[3, , joint_sets[3,1]])
+
+				# Set remaining joints as jointed and solved
+				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
+				mechanism[['status']][['solved']][joint_idx[2], ] <- 1
+				mechanism[['status']][['solved']][joint_idx[3], joint_sets[3,1]] <- 1
+
+				path_solved <- TRUE
+			}
+
 			# Solve path
 			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
-				
-				# Apply current transformation to get current joint coordinate and constraint vectors
-				joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
 				
 				# Get current line length -- easiest to calculate in real time in case link is composite of other joints
 				line_len <- distPointToPoint(joint_current$coor[2, , 1], joint_current$coor[3, , joint_sets[3,1]])
@@ -192,8 +269,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				V_new <- J2_solve - joint_current$coor[1, , 1]
 
 				# Get axis to rotate link about
-				if(path_strings[['tjs']] %in% c('R(JSN)-1-R(JNN)-2-R(DNS)')) J_axis <- joint_current$cons[[1]][, , 1]
-				if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)')) J_axis <- joint_current$cons[[1]][, , 1]
+				J_axis <- joint_current$cons[[1]][, , 1]
 
 				# Get rotation matrix
 				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
