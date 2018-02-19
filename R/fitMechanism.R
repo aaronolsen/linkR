@@ -2,7 +2,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	input.joint = NULL, input.body = NULL, joint.coor = NULL, joint.cons = NULL, 
 	joint.optim = rep(TRUE, nrow(joint.coor)), fit.wts = NULL, joint.names = NULL, 
 	planar = FALSE, fixed.body = 'Fixed', coor.vectors = NULL, use.ref.as.prev = FALSE, 
-	print.progress = FALSE, control = NULL, print.level = 0){
+	direct.input = FALSE, print.progress = FALSE, ref.iter = 1, control = NULL, print.level = 0){
 
 	# Start run time
 	time1 <- proc.time()
@@ -40,14 +40,15 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	# Get number of iterations
 	n_iter <- dim(fit.points)[3]
 	
-	# Set reference iteration - shouldn't change fit when completed
-	ref.iter <- 1
-	
 	# Get number of joints
 	n_joints <- length(joint.types)
+	
+	# Standardize joint names
+	joint.types[joint.types == 'Our'] <- 'O'
 
 	# Set NA joint coordinates
 	if(is.null(joint.coor)) joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
+	if(is.vector(joint.coor)) joint.coor <- matrix(joint.coor, nrow=1, ncol=3, dimnames=list(joint.names, NULL))
 	
 	# Set joint names from coordinates if NULL
 	if(is.null(joint.names)) joint.names <- rownames(joint.coor)
@@ -97,6 +98,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	if(print.progress){
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Total time points: ', n_iter, '\n'))
+		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Reference iteration: ', ref.iter, '\n'))
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Number of time points used in optimization: ', n_optim, '\n'))
 		cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'Time points (max. dispersed): ', paste0(optim_use, collapse=','), '\n'))
 	}
@@ -344,7 +346,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	# Set joints for which input parameters will be calculated directly (for now only use in single joint case)
 	direct.input <- rep(FALSE, length(input.joint))
-	if(length(input.joint) == 1) direct.input[joint.types == 'U'] <- TRUE
+	if(direct.input && n_joints == 1) direct.input[joint.types == 'U'] <- TRUE
 
 	# Logical for whether there are any fixed inputs
 	any_fixed_input <- FALSE
@@ -571,16 +573,20 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	# Add fit points to mechanism as body points
 	for(body_name in mechanism$body.names){
 
-#**** BUG ALIGN EACH BODYS POINTS SEPARATELY
-		## Align coordinates across all time points using generalized procrustes analysis to 
-		# find mean (consensus) shape scaled to mean centroid size
-		consensus <- procAlign(fit.points[, , optim_use])$mean
-
-		# Set initial reference pose by aligning consensus with reference time point
-		pose_ref <- bestAlign(fit.points[, , ref.iter], consensus)$mat
-
 		# Get fit points associated with body
 		fit_assoc <- which(body.assoc == body_name)
+
+		if(length(fit_assoc) == 0) next
+	
+		#**** BUG ALIGN EACH BODYS POINTS SEPARATELY
+		## Align coordinates across all time points using generalized procrustes analysis to 
+		# find mean (consensus) shape scaled to mean centroid size
+		#consensus <- procAlign(fit.points[names(fit_assoc), , optim_use])$mean
+		proc_align <- procrustes(fit.points[fit_assoc, , optim_use], scale=FALSE, rotate=TRUE, scale.to.mean.Csize=FALSE)
+		consensus <- proc_align$consensus
+
+		# Set initial reference pose by aligning consensus with reference time point
+		pose_ref <- bestAlign(fit.points[fit_assoc, , ref.iter], consensus)$mat
 
 		# Set points connect
 		if(length(fit_assoc) == 2){
@@ -590,10 +596,10 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		}
 		
 		# Associate fit points with body
-		mechanism <- associatePoints(mechanism, points=pose_ref[fit_assoc, ], body=body_name, 
+		mechanism <- associatePoints(mechanism, points=pose_ref, body=body_name, 
 			points.connect=points_connect)
 	}
-	
+
 	# Sort fit point weights to match mechanism$body.points
 	if(!is.null(fit.wts)){
 		names(fit.wts) <- dimnames(fit.points)[[1]]
@@ -917,8 +923,7 @@ if(TRUE){
 			# No need to update coor_optim because joint coordinates are updated and coor_optim restarts at 0
 		}
 		
-		#cat('\n')
-		#print(mechanism$joint.coor)
+		#cat('\n');print(mechanism$joint.coor)
 
 		## Optimize joint constraints
 		if(!planar && optim_joint_cons){
@@ -1275,7 +1280,7 @@ if(TRUE){
 		if(print.progress && iter %% 25 == 0) cat(paste0(',', iter))
 	}
 
-	if(print.progress && n_iter > 50) cat('\n')
+	if(print.progress) cat('\n')
 
 	# Add input parameters into list
 	#n <- 1
@@ -1294,7 +1299,7 @@ if(TRUE){
 			nrow=nrow(input_optim), ncol=length(input_param_fill[[i]][['col.idx']]))
 
 		# Set angles to minimum equivalent angle
-		if(joint.types[i] %in% c('R', 'U', 'O')){
+		if(joint.types[input_joint_num[i]] %in% c('R', 'U', 'O')){
 			for(j in 1:nrow(input_param[[i]])){
 				for(k in 1:ncol(input_param[[i]])){
 					input_param[[i]][j,k] <- input_param[[i]][j,k] + min_equ_shift[which.min(abs(input_param[[i]][j,k] + min_equ_shift))]
