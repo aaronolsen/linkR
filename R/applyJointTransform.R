@@ -1,4 +1,4 @@
-applyJointTransform <- function(mechanism = NULL, joint = NULL, iter = NULL){
+applyJointTransform <- function(mechanism, joint = NULL, iter = NULL){
 
 	if(!is.null(joint)){
 	
@@ -40,6 +40,12 @@ applyJointTransform <- function(mechanism = NULL, joint = NULL, iter = NULL){
 				# Move back to origin
 				joint_cons[[i]][, , set] <- cons_point_trfm - cons_origin_trfm
 			}
+
+			# If U-joint, set axis in other set to NA
+			if(mechanism[['joint.types']][joint[i]] %in% c('U')){
+				joint_cons[[i]][2, , 1] <- NA
+				joint_cons[[i]][1, , 2] <- NA
+			}
 		}
 
 		# Set names for joint constraint list
@@ -79,6 +85,12 @@ applyJointTransform <- function(mechanism = NULL, joint = NULL, iter = NULL){
 		
 					# Move back to origin
 					mechanism[['joint.cons.anim']][[jt_idx]][, , iter, jt_set] <- cons_point_trfm - cons_origin_trfm
+
+					# If U-joint, set axis in other set to NA
+					if(mechanism[['joint.types']][jt_idx] %in% c('U')){
+						mechanism[['joint.cons.anim']][[jt_idx]][2, , iter, 1] <- NA
+						mechanism[['joint.cons.anim']][[jt_idx]][1, , iter, 2] <- NA
+					}
 				}
 			}
 		}
