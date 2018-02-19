@@ -129,7 +129,10 @@ extendTransformation <- function(mechanism, iter, tmat = NULL, joint = NULL, bod
 			}
 
 			# Transformation will leave solve joint disjointed - do no proceed
-			if(will_disjoint_solved_joint) next
+			if(will_disjoint_solved_joint){
+				if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 'Transformation at joint (', disjointed, ') would leave solved joint disjointed\n'))
+				next
+			}
 
 			# Get transformed state before transformBody()
 			transformed_pre <- mechanism[['status']][['transformed']]
