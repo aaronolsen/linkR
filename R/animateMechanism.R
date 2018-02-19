@@ -1,7 +1,7 @@
 animateMechanism <- function(mechanism, input.param, 
 	joint.compare = NULL, use.ref.as.prev = FALSE, 
 	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
-	check.inter.point.dist = TRUE, print.progress = FALSE, print.progress.iter = 1:2){
+	check.inter.point.dist = TRUE, print.progress = FALSE, print.progress.iter = 2){
 
 	if(print.progress) cat(paste0('animateMechanism()\n'))
 	
