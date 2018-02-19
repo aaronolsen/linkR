@@ -56,8 +56,8 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 	num_iter <- dim(joints)[3]
 
 	# GET XYZ OF ALL JOINTS
-	xyz1 <- apply(joints[, , , 1], 2, matrix, nrow=dim(joints)[1]*num_iter, ncol=dim(joints)[2])
-	xyz2 <- apply(joints[, , , 2], 2, matrix, nrow=dim(joints)[1]*num_iter, ncol=dim(joints)[2])
+	xyz1 <- apply(array(joints[, , , 1], dim=c(dim(joints)[1:3])), 2, matrix, nrow=dim(joints)[1]*num_iter, ncol=dim(joints)[2])
+	xyz2 <- apply(array(joints[, , , 2], dim=c(dim(joints)[1:3])), 2, matrix, nrow=dim(joints)[1]*num_iter, ncol=dim(joints)[2])
 
 	# GET XYZ OF ALL POINTS
 	if(!is.null(body_points)){
