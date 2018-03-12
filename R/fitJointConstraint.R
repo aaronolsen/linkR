@@ -19,6 +19,9 @@ fitJointConstraint <- function(coor, type, control = NULL, smooth = TRUE, fixed 
 
 	#layout(cbind(1:3))
 
+	# If few time points, don't smooth
+	if(dim(coor)[3] < 10) smooth <- FALSE
+
 	## Apply smoothing
 	if(smooth){
 		for(i in 1:dim(coor)[1]){
