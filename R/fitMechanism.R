@@ -1356,10 +1356,16 @@ if(TRUE){
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Total run time: ', round(proc_time, 2), ' sec (', round(floor(proc_time / 60)), 'm ', round(proc_time %% 60, 2),'s)\n'))
 	}
 
+	# Run animate mechanism using final parameters to get fit points and transformations
+	anim_mech <- animateMechanism(mechanism, input.param=input_param, use.ref.as.prev=use.ref.as.prev, 
+		joint.compare=joint_compare)
+
 	list(
 		'mechanism'=mechanism,
+		'animate'=anim_mech,
 		'fit.points'=fit.points,
 		'body.tmarr'=body_points_tmarr,
+		'body.points.anim'=body_points_tmarr,
 		'input.param'=input_param,
 		'joint.compare'=joint_compare,
 		'rmse'=input_fit_errors_f,
