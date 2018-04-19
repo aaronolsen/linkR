@@ -24,3 +24,6 @@ for(linkR_i in 1:length(linkR_sp[['exp']])){
 	linkR_sp[['str']][['tj']][linkR_i] <- jt_str[['tj']]
 	linkR_sp[['str']][['tjs']][linkR_i] <- jt_str[['tjs']]
 }
+
+# Set joint degrees of freedom
+linkR_sp[['dof']] <- c('R'=1, 'P'=2, 'U'=2, 'S'=3, 'PR'=3, 'O'=3, 'L'=1)
