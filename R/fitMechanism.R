@@ -1,5 +1,5 @@
 fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.param, 
-	input.joint = NULL, input.body = NULL, joint.coor = NULL, joint.cons = NULL, 
+	input.joint = NULL, input.body = NULL, input.dof = NULL, joint.coor = NULL, joint.cons = NULL, 
 	joint.optim = rep(TRUE, nrow(joint.coor)), fit.wts = NULL, joint.names = NULL, 
 	planar = FALSE, fixed.body = 'Fixed', coor.vectors = NULL, use.ref.as.prev = FALSE, 
 	direct.input = FALSE, print.progress = FALSE, ref.iter = 1, control = NULL, print.level = 0){
@@ -71,7 +71,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	# Use define linkage just to get body.conn.num and other mechanism properties (skip path finding)
 	mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
-		input.body=input.body, input.joint=input.joint, joint.cons=joint.cons, body.conn=body.conn, 
+		input.body=input.body, input.joint=input.joint, input.dof=input.dof, joint.cons=joint.cons, body.conn=body.conn, 
 		fixed.body=fixed.body, print.progress=FALSE)
 
 	# Save input formatted joint constraints
@@ -246,8 +246,8 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	# Re-define linkage with initial joint coordinate and constraints
 	mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
-		input.body=input.body, input.joint=input.joint, joint.cons=joint.cons, body.conn=body.conn, 
-		fixed.body=fixed.body)
+		input.body=input.body, input.joint=input.joint, input.dof=input.dof, joint.cons=joint.cons, 
+		body.conn=body.conn, fixed.body=fixed.body)
 
 	# If input.joint is NULL and a single joint, set sole joint as input
 	if(is.null(input.joint)){
