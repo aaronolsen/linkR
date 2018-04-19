@@ -1,5 +1,5 @@
 defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, input.joint = NULL,
-	input.body = NULL, fixed.body = 'Fixed', find.paths = TRUE, print.progress = FALSE){
+	input.body = NULL, input.dof = NULL, fixed.body = 'Fixed', find.paths = TRUE, print.progress = FALSE){
 
 	if(print.progress) cat('defineMechanism()\n')
 	indent <- '  '
@@ -16,6 +16,11 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 
 	# MAKE SURE JOINT TYPE LETTERS ARE UPPERCASE FOR STRING MATCHING
 	if(!is.null(joint.types)) joint.types <- toupper(joint.types)
+
+	# Make sure that all joint types are allowed
+	for(i in 1:length(joint.types)){
+		if(!joint.types[i] %in% names(linkR_sp[['dof']])) stop(paste0("Joint of type '", joint.types[i], "' does not match any of the recognized joint types: '", paste0(names(linkR_sp[['dof']]), collapse="','"), "'"))
+	}
 
 	# CHECK THAT JOINTS ARE 3D
 	if(ncol(joint.coor) == 2) stop("Joint coordinates must be three-dimensional.")
@@ -150,6 +155,29 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 		input.joint <- input_joint_num
 	}
 
+	# If input.dof is NULL, set default as input along all joint DoFs
+	if(is.null(input.dof)) input.dof <- setNames(as.list(rep(0, length(input.joint))), joint_names[input.joint])
+
+	# Set names to the same as joints
+	names(input.dof) <- joint_names[input.joint]
+
+	# Set any null items to default (all DoFs)
+	for(i in 1:length(input.dof)){
+
+		# Add input at all DoFs if NULL/empty
+		if(is.null(input.dof[[i]]) || input.dof[[i]][1] == 0) input.dof[[i]] <- 1:linkR_sp[['dof']][joint.types[input.joint[i]]]
+		
+		# Sort ascending
+		input.dof[[i]] <- sort(input.dof[[i]])
+
+		# Add NAs to make length match total DoFs at joint (so incomplete input joints can be easily detected)
+		if(length(input.dof[[i]]) != linkR_sp[['dof']][joint.types[input.joint[i]]]){
+			not_na <- input.dof[[i]]
+			input.dof[[i]] <- rep(NA, linkR_sp[['dof']][joint.types[input.joint[i]]])
+			input.dof[[i]][not_na] <- (1:linkR_sp[['dof']][joint.types[input.joint[i]]])[not_na]
+		}
+	}
+
 	# Get joints connected to each joint
 	joint_conn <- list()
 	for(i in 1:nrow(body_conn_num)){
@@ -181,7 +209,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 	}
 	
 	# Find closed paths
-	solve_paths <- findSolvablePaths(joint_conn, body_conn_num, input.joint, fixed_joints, open_joints, 
+	solve_paths <- findSolvablePaths(joint_conn, body_conn_num, input.joint, input.dof, fixed_joints, open_joints, 
 		joint.types=joint.types, body.names=body.names, indent=indent, indent.level=1, print.progress=FALSE)
 
 	# Set joints transformed by each body transformation
@@ -326,6 +354,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 		'joint.cons' = joint.cons,
 		'joint.types' = joint.types,
 		'input.joint' = input.joint,
+		'input.dof' = input.dof,
 		'input.body' = input.body,
 		'paths.closed' = solve_paths[['paths.joints']],
 		'paths.closed.dist' = paths_closed_dist,
@@ -369,9 +398,23 @@ print.mechanism <- function(x, ...){
 	rc <- c(rc, paste0('\tNumber of joints (num.joints): ', x$num.joints, '\n'))
 	rc <- c(rc, paste0('\tNumber of bodies (num.bodies): ', x$num.bodies, '\n'))
 
-	input_names <- rep(NA, length(x$input.joint))
-	for(input_num in 1:length(x$input.joint)) input_names[input_num] <- paste0(x$joint.names[x$input.joint[input_num]], ' (', x$body.names[x$input.body[input_num]], ')')
-	rc <- c(rc, paste0('\tInputs (input.joint and input.body): ', paste0(input_names, collapse=', '), '\n'))
+	# Create input DoF strings
+	input_dof <- rep(NA, length(x$input.dof))
+	for(i in 1:length(x$input.dof)){
+		input_dof_not_na <- x$input.dof[[i]][!is.na(x$input.dof[[i]])]
+		if(length(input_dof_not_na) == 1){
+			input_dof[i] <- input_dof_not_na
+		}else if(length(input_dof_not_na) == max(input_dof_not_na, na.rm=TRUE)){
+			input_dof[i] <- paste0(input_dof_not_na[1], '-', tail(input_dof_not_na, 1))
+		}else{
+			input_dof[i] <- paste0(input_dof_not_na, collapse=',')
+		}
+		input_dof[i] <- paste0(input_dof[i], ' of ', length(x$input.dof[[i]]))
+	}
+
+	input_df <- data.frame('Joint name'=x$joint.names[x$input.joint], 'Body name'=paste0('     ', x$body.names[x$input.body]), 
+		'DoFs'=paste0('     ', input_dof))
+	rc <- c(rc, paste0('\tInputs:\n\t\t', paste0(capture.output(print(input_df)), collapse='\n\t\t'), '\n'))
 
 	## Joints
 	# Create dataframe for joints
