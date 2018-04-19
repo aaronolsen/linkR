@@ -1,7 +1,6 @@
-animateMechanism <- function(mechanism, input.param, 
-	joint.compare = NULL, use.ref.as.prev = FALSE, 
-	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, 
-	check.inter.point.dist = TRUE, print.progress = FALSE, print.progress.iter = 2){
+animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.ref.as.prev = FALSE, 
+	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, check.inter.point.dist = TRUE, 
+	print.progress = FALSE, print.progress.iter = 2){
 
 	if(print.progress) cat(paste0('animateMechanism()\n'))
 	
@@ -54,11 +53,31 @@ animateMechanism <- function(mechanism, input.param,
 	}
 
 	# Get input joint(s) and body/bodies from mechanism
+	input.dof <- mechanism[['input.dof']]
 	input.joint <- mechanism[['input.joint']]
 	input.body <- mechanism[['input.body']]
 
-	# Check that number of input parameters matches input.joint length
+	# Check that number of input parameters matches input_joint_full length
 	if(n_inputs != length(input.joint)) stop(paste0("The length of input.param (", n_inputs, ") must match the number of input.joint (", length(input.joint), ")."))
+
+	## Separate full and partial inputs *** Eventually these will be combined, user will 
+	# specify all known and necessary DoFs at each joint (either full or partial) and program will solve for 
+	# transformations. But currently chain solving only treats joints as solved or not solved, 
+	# not partially solved. Solved status 1 is a solved joint that is not yet fixed.
+	# Which joints are fully input (all DoFs specified)
+	input_joint_is_full <- rep(TRUE, length(input.joint))
+	for(i in 1:length(input.joint)) if(any(is.na(input.dof[[i]]))) input_joint_is_full[i] <- FALSE
+
+	# Vector of just those input joints that have all DoFs specified
+	input_joint_full <- input.joint[input_joint_is_full]
+	input_body_full <- input.body[input_joint_is_full]
+	input_param_full <- input.param[input_joint_is_full]
+	
+	# Get partial inputs
+	input_joint_part <- input.joint[!input_joint_is_full]
+	input_body_part <- input.body[!input_joint_is_full]
+	input_dof_part <- input.dof[!input_joint_is_full]
+	input_param_part <- input.param[!input_joint_is_full]
 
 	# Create array of transformation matrices for each body and iteration
 	mechanism[['tmat']] <- array(diag(4), dim=c(4,4,mechanism[['num.bodies']], n_iter), 
@@ -87,32 +106,30 @@ animateMechanism <- function(mechanism, input.param,
 		# Reset joint status to initial state
 		mechanism[['status']] <- status_init
 
-		if(print_progress_iter){
-			cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformations\n'))
-		}
+		if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformations\n'))
 
-		for(kn_idx in 1:length(input.joint)){
+		for(kn_idx in 1:length(input_joint_full)){
 		
-			kn_jt_idx <- input.joint[kn_idx]
+			kn_jt_idx <- input_joint_full[kn_idx]
 
 			# Print known transformation header (transformation number, body, joint)
 			if(print_progress_iter){
 				cat(paste0(paste0(rep(indent, 3), collapse=''), kn_idx, ') Apply transformation to body \'', 
-					mechanism$body.names[input.body[kn_idx]], '\' (', input.body[kn_idx], ') at joint \'', 
-					dimnames(mechanism$joint.coor)[[1]][kn_jt_idx], '\' (', kn_jt_idx, 
-					') of type \'', mechanism$joint.types[kn_jt_idx], '\'\n'))
+					mechanism[['body.names']][input_body_full[kn_idx]], '\' (', input_body_full[kn_idx], ') at joint \'', 
+					dimnames(mechanism[['joint.coor']])[[1]][kn_jt_idx], '\' (', kn_jt_idx, 
+					') of type \'', mechanism[['joint.types']][kn_jt_idx], '\'\n'))
 			}
 
 			# Resolve disjoint at input joint if disjointed
 			# Extend transformation across input joint and then subtracting that transformation 
 			# from any subsequently disjointed joints so that any previous transformations are kept
-			mechanism <- extendTransformation(mechanism, joint=kn_jt_idx, body=input.body[kn_idx],
-				body.excl=input.body[kn_idx], iter=iter, recursive=TRUE, print.progress=print_progress_iter, indent=indent, 
+			mechanism <- extendTransformation(mechanism, joint=kn_jt_idx, body=input_body_full[kn_idx],
+				body.excl=input_body_full[kn_idx], iter=iter, recursive=TRUE, print.progress=print_progress_iter, indent=indent, 
 				indent.level=4)
 
 			# Get transformation to apply to input body at input joint
-			kn_tmat <- getKnownTransformation(mechanism=mechanism, input.param=input.param[[kn_idx]], 
-				joint=kn_jt_idx, body=input.body[kn_idx], iter=iter, print.progress=print_progress_iter, 
+			kn_tmat <- getKnownTransformation(mechanism=mechanism, input.param=input_param_full[[kn_idx]], 
+				joint=kn_jt_idx, body=input_body_full[kn_idx], iter=iter, print.progress=print_progress_iter, 
 				indent=indent, indent.level=4)
 			
 			# **** U-joint and other joints where different axes are associated with different bodies
@@ -121,8 +138,8 @@ animateMechanism <- function(mechanism, input.param,
 			# for the second transformation.			
 
 			# Transform body and extend transformation
-			mechanism <- extendTransformation(mechanism, body=input.body[kn_idx], tmat=kn_tmat, 
-				iter=iter, recursive=TRUE, joint=kn_jt_idx, status.solved.to=1, body.excl=input.body[kn_idx], 
+			mechanism <- extendTransformation(mechanism, body=input_body_full[kn_idx], tmat=kn_tmat, 
+				iter=iter, recursive=TRUE, joint=kn_jt_idx, status.solved.to=1, body.excl=input_body_full[kn_idx], 
 				print.progress=print_progress_iter, indent=indent, indent.level=4)
 				
 			# Extend solved status through mechanism
@@ -145,6 +162,35 @@ animateMechanism <- function(mechanism, input.param,
 		# Try solving joint paths
 		mechanism <- resolveJointPaths(mechanism, iter=iter, print.progress=print_progress_iter, 
 			indent=indent, indent.level=2)
+
+		# Apply partial knowns (at this point this is just used to rotate S-S links about specified axis
+		if(length(input_joint_part) > 0){
+
+			if(print_progress_iter) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known partial transformations\n'))
+
+			for(kn_idx in 1:length(input_joint_part)){
+
+				kn_jt_idx <- input_joint_part[kn_idx]
+
+				# Print known transformation header (transformation number, body, joint)
+				if(print_progress_iter){
+					cat(paste0(paste0(rep(indent, 3), collapse=''), kn_idx, ') Apply partial transformation to body \'', 
+						mechanism[['body.names']][input_body_part[kn_idx]], '\' (', input_body_part[kn_idx], ') at joint \'', 
+						dimnames(mechanism[['joint.coor']])[[1]][kn_jt_idx], '\' (', kn_jt_idx, 
+						') of type \'', mechanism[['joint.types']][kn_jt_idx], '\'\n'))
+				}
+
+				# Get transformation to apply to input body at input joint
+				kn_tmat <- getKnownTransformation(mechanism=mechanism, input.param=input_param_part[[kn_idx]], 
+					joint=kn_jt_idx, dof=input_dof_part[[kn_idx]], body=input_body_part[kn_idx], iter=iter, print.progress=print_progress_iter, 
+					indent=indent, indent.level=4)
+				
+				# Transformation body
+				mechanism <- transformBody(mechanism, status.solved.to=NULL, body=input_body_part[kn_idx], 
+					tmat=kn_tmat, iter=iter, print.progress=print_progress_iter, 
+					indent=indent, indent.level=4)
+			}
+		}
 
 		# Print statuses
 		if(print_progress_iter) print_joint_status(mechanism, indent, indent.level=2)
