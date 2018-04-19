@@ -1,5 +1,5 @@
 getKnownTransformation <- function(mechanism, input.param, joint, body, iter, 
-	print.progress = FALSE, indent = '\t', indent.level=3){
+	dof = NULL, print.progress = FALSE, indent = '\t', indent.level=3){
 
 	#if(print.progress) cat(paste0(paste0(rep(indent, 2), collapse=''), 'Apply known transformation', ))
 
@@ -87,7 +87,10 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		}else{
 			AOR <- matrix(kn_jt_axes[, , 1], ncol=3)
 		}
-
+		
+		# Limit AOR to specified degrees of freedom
+		if(!is.null(dof)) AOR <- matrix(AOR[na.omit(dof),], nrow=sum(!is.na(dof)), ncol=3)
+		
 		# LOOP THROUGH EACH COLUMNN OF INPUT PARAMETERS
 		for(i in length(mags):1){
 
@@ -128,9 +131,22 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		}else{
 			mags <- input.param[iter, ]
 		}
+		
+		# Get axis/axes along which to translate
+		T_axes <- matrix(kn_jt_axes[, , jt_set], ncol=3)
+
+		# Limit AOR to specified degrees of freedom
+		if(!is.null(dof)) T_axes <- matrix(AOR[na.omit(dof),], nrow=sum(!is.na(dof)), ncol=3)
 
 		# TRANSLATE
-		ttmat[1:3, 4] <- colSums(mags*matrix(kn_jt_axes[, , jt_set], ncol=3))
+		ttmat[1:3, 4] <- colSums(mags*T_axes)
+
+		if(print.progress){
+			for(i in 1:length(mags)){
+				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Apply translation of magnitude ', 
+					paste0(signif(mags[i], 3), collapse=','), ' along axis {', paste0(signif(uvector(T_axes[i,]), 3), collapse=','), '}\n'))
+			}
+		}
 
 		# Transform found
 		tform_set <- TRUE
