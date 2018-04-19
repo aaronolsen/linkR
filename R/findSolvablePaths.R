@@ -1,11 +1,19 @@
-findSolvablePaths <- function(joint.conn, body.conn, input.joint, fixed.joints, open.joints, joint.types, 
+findSolvablePaths <- function(joint.conn, body.conn, input.joint, input.dof, fixed.joints, open.joints, joint.types, 
 	body.names = NULL, indent = '\t', indent.level = 1, print.progress = FALSE){
 
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'findSolvablePaths()'))
 
+	# Which joints are fully input (all DoFs specified)
+	input_joint_is_full <- rep(TRUE, length(input.joint))
+	for(i in 1:length(input.joint)) if(any(is.na(input.dof[[i]]))) input_joint_is_full[i] <- FALSE
+	
+	# Vector of just those input joints that have all DoFs specified
+	input_joint_full <- input.joint[input_joint_is_full]
+
 	# Create list for saving solvable paths
 	solv_path_joints <- list()
 	solv_path_bodies <- list()
+	added_solv_path_joints <- c()
 
 	# Get number of joints
 	num_joints <- nrow(body.conn)
@@ -29,7 +37,7 @@ findSolvablePaths <- function(joint.conn, body.conn, input.joint, fixed.joints, 
 			next
 		}
 
-		if(joint_start %in% input.joint){
+		if(joint_start %in% input_joint_full){
 			if(print.progress) cat(paste0('\n', paste0(rep(indent, indent.level+1), collapse=''), 'Skipping input joint ', joint_start))
 			next
 		}
@@ -128,7 +136,7 @@ findSolvablePaths <- function(joint.conn, body.conn, input.joint, fixed.joints, 
 				
 					# Add 0 if fixed
 					if(add_joint %in% fixed.joints){
-						if(last_joint %in% fixed.joints || add_joint %in% input.joint){
+						if(last_joint %in% fixed.joints || add_joint %in% input_joint_full){
 							add_joint <- 0
 							add_body <- 1
 						}else{
@@ -176,7 +184,7 @@ findSolvablePaths <- function(joint.conn, body.conn, input.joint, fixed.joints, 
 					}
 					
 					# Set any joints to 
-					ignore_joints <- which(joint_path[[add_at]] %in% input.joint)
+					ignore_joints <- which(joint_path[[add_at]] %in% input_joint_full)
 
 					# Create joint-body string
 					jt_str <- createJointPathString(joint.types=joint.types[joint_path[[add_at]]], 
@@ -196,14 +204,28 @@ findSolvablePaths <- function(joint.conn, body.conn, input.joint, fixed.joints, 
 						final_body_path <- body_path[[add_at]]
 						final_body_path <- final_body_path[final_body_path != 1]
 						
-						# Remove input joints
+						# Remove bodies after any input joints (skip last joint here since body vector has length one less than joints)
 						final_joint_path_short <- final_joint_path[1:(length(final_joint_path)-1)]
-						final_body_path <- final_body_path[!final_joint_path_short %in% input.joint]
-						final_joint_path <- final_joint_path[!final_joint_path %in% input.joint]
+						final_body_path <- final_body_path[!final_joint_path_short %in% input_joint_full]
+
+						# If last joint is input joint remove last body
+						if(tail(final_joint_path, 1) %in% input_joint_full) final_body_path <- final_body_path[1:(length(final_body_path)-1)]
+
+						# Remove input joints
+						final_joint_path <- final_joint_path[!final_joint_path %in% input_joint_full]
+						
+						# Create joint string to compare against previous strings
+						joint_collapse <- paste0(final_joint_path, collapse='-')
+
+						if(joint_collapse %in% added_solv_path_joints){
+							if(print.progress) cat(paste0('\n', paste0(rep(indent, indent.level+4), collapse=''), 'Joint string matches previously found string'))
+							next
+						}
 
 						# Add joints to paths list
 						solv_path_joints[[length(solv_path_joints)+1]] <- final_joint_path
 						solv_path_bodies[[length(solv_path_bodies)+1]] <- final_body_path
+						added_solv_path_joints <- c(added_solv_path_joints, joint_collapse)
 
 						if(print.progress) cat(paste0('\n', paste0(rep(indent, indent.level+4), collapse=''), 'Joint-body string matches solvable path'))
 
