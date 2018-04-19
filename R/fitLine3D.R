@@ -1,4 +1,4 @@
-fitLine3D <- function(X){
+fitLine3D <- function(X, margin=0.2){
 
 	# Source: http://r.789695.n4.nabble.com/Fit-a-3-Dimensional-Line-to-Data-Points-td863596.html
 
@@ -6,7 +6,7 @@ fitLine3D <- function(X){
 
 	meanX <- apply(X, 2, mean) 
 	pca <- prcomp(X)
-	t <- c(min(pca$x[, 1])-.2, max(pca$x[, 1])+.2) 
+	t <- c(min(pca$x[, 1])-margin, max(pca$x[, 1])+margin) 
 	endpts <- rbind(meanX + t[1]*pca$rotation[, 1], meanX + t[2]*pca$rotation[, 1])
 	
 	list(
