@@ -29,7 +29,7 @@ transformBody <- function(mechanism, body, tmat, iter, replace = FALSE, reverse 
 			jt_idx <- body_joints[i]
 			
 			# Change statuses
-			if(!jt_idx %in% at.joint){
+			if(!is.null(at.joint) && !jt_idx %in% at.joint){
 				mechanism[['status']][['jointed']][jt_idx] <- FALSE
 				mechanism[['status']][['transformed']][jt_idx, jt_set[i]] <- TRUE
 			}else{
