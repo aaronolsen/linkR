@@ -1,5 +1,7 @@
 associatePoints <- function(mechanism, points, body, points.connect = NULL){
 
+	# Input needs to be matrix so that row names are maintained
+
 	if(nrow(points) == 0) return(mechanism)
 
 	# Get current number of points
