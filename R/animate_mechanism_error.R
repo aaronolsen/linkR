@@ -15,8 +15,6 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param,
 
 	}else if(replace == 'joint.coor'){
 
-		#mechanism$joint.coor <- mechanism$joint.coor + matrix(p, mechanism$num.joints, 3, byrow=TRUE)
-
 		j <- 1
 		for(i in joint.optim){
 			if(length(coor.vectors[[i]]) == 1){
@@ -87,11 +85,6 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param,
 		}
 	}
 	
-	if(print.progress){
-		#cat('\n')
-		#print(mechanism$joint.cons[[1]])
-	}
-
 	# Run mechanism model
 	anim_mech <- suppressWarnings(animateMechanism(mechanism, input.param=input.param, 
 		joint.compare=joint.compare, use.ref.as.prev=use.ref.as.prev, 
@@ -103,7 +96,7 @@ animate_mechanism_error <- function(p, fit.points, mechanism, input.param,
 	}else{
 		return_error <- sqrt(mean(fit.wts*(anim_mech$body.points.anim - fit.points)^2))
 	}
-	
+
 	# Add NA penalty
 	#if(sum(is.na(anim_mech$joint.coor)) > 0){cat(TRUE, '')}else{cat(FALSE, '')}
 	return_error <- return_error + 0.2*(sum(is.na(anim_mech$joint.coor)) / 3)
