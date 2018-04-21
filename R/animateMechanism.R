@@ -212,9 +212,15 @@ animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.r
 			if(is.na(mechanism[['points.assoc']][[body_num]][1])) next
 			
 			# Apply transformation
-			mechanism[['body.points.anim']][mechanism[['points.assoc']][[body_num]], , ] <- 
-				applyTransform(mechanism[['body.points']][mechanism[['points.assoc']][[body_num]], ], 
-					mechanism[['tmat']][, , body_num, ])
+			transformed <- applyTransform(mechanism[['body.points']][mechanism[['points.assoc']][[body_num]], ], 
+				mechanism[['tmat']][, , body_num, ])
+
+			# Account for single point at multiple time points getting transposed when coercing into an array
+			if(length(mechanism[['points.assoc']][[body_num]]) == 1 && length(dim(mechanism[['tmat']][, , body_num, ])) == 3){
+				transformed <- t(transformed)
+			}
+			
+			mechanism[['body.points.anim']][mechanism[['points.assoc']][[body_num]], , ] <- transformed
 		}
 	}
 
