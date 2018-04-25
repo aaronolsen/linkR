@@ -159,10 +159,18 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 	if(is.null(input.dof)) input.dof <- setNames(as.list(rep(0, length(input.joint))), joint_names[input.joint])
 
 	# Set names to the same as joints
-	names(input.dof) <- joint_names[input.joint]
+	if(length(input.dof) == length(input.joint)){
+		names(input.dof) <- joint_names[input.joint]
+	}else{
+		input_dof <- setNames(as.list(rep(0, length(input.joint))), joint_names[input.joint])
+		for(joint_dof_name in names(input.dof)){
+			input_dof[[joint_dof_name]] <- input.dof[[joint_dof_name]]
+		}
+		input.dof <- input_dof
+	}
 
 	# Set any null items to default (all DoFs)
-	for(i in 1:length(input.dof)){
+	for(i in 1:length(input.joint)){
 
 		# Add input at all DoFs if NULL/empty
 		if(is.null(input.dof[[i]]) || input.dof[[i]][1] == 0) input.dof[[i]] <- 1:linkR_sp[['dof']][joint.types[input.joint[i]]]
