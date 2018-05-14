@@ -46,10 +46,14 @@ animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.r
 	mechanism[['joint.coor.anim']] <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter, 2), 
 		dimnames=list(mechanism$joint.names, colnames(mechanism$joint.coor), NULL, NULL))
 
-	# Make joint coordinate compare a single iteration array if single time point and add to mechanism
+	# Make joint coordinate compare an array matching number of iterations and add to mechanism
 	if(!is.null(joint.compare)){
-		if(length(dim(joint.compare)) == 2) mechanism[['joint.compare']] <- array(joint.compare, dim=c(dim(joint.compare), 1), 
-			dimnames=list(dimnames(joint.compare)[[1]], dimnames(joint.compare)[[2]], NULL))
+		if(length(dim(joint.compare)) == 2){
+			mechanism[['joint.compare']] <- array(joint.compare, dim=c(dim(joint.compare), n_iter), 
+				dimnames=list(dimnames(joint.compare)[[1]], dimnames(joint.compare)[[2]], NULL))
+		}else{
+			mechanism[['joint.compare']] <- joint.compare
+		}
 	}
 
 	# Get input joint(s) and body/bodies from mechanism
