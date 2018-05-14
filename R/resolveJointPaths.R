@@ -136,6 +136,112 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			# Apply current transformation to get current joint coordinate and constraint vectors
 			joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
 
+			# Get previous point for toggle position comparison
+			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-P(DNS)', 'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
+				if(iter == 1){
+					if(is.null(mechanism[['joint.compare']])){
+						J2_compare <- mechanism[['joint.coor']][joint_idx[2], ]
+					}else{
+						J2_compare <- mechanism[['joint.compare']][joint_idx[2],,1]
+					}
+				}else{
+					if(is.null(mechanism[['joint.compare']])){
+						J2_compare <- applyJointTransform(mechanism, joint=joint_idx[2], iter=iter-1)$coor[1, , 1]
+					}else{
+						J2_compare <- mechanism[['joint.compare']][joint_idx[2],,iter]
+					}
+				}
+			}
+
+			# Solve path
+			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-P(DNS)')){
+
+				# Get current circle radius, center and normal vector
+				circle_pt_on_rad <- joint_current$coor[2, , 1]		# Also point in plane
+				circle_center <- joint_current$coor[1, , 1]
+				circle_norm <- joint_current$cons[[1]][, , 1]
+
+				# Get point in plane
+				plane_point <- joint_current$coor[3, , 2]
+
+				# Get plane normal vector
+				plane_norm <- cprod(joint_current$cons[[3]][1, , 2], joint_current$cons[[3]][2, , 2])
+
+				# 
+				if(print.progress){
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Finding ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], 
+						') on circle with center {', paste0(signif(circle_center, 3), collapse=','), 
+						'} at ', mechanism[['joint.names']][joint_idx[1]], 
+						'(', joint_idx[1], '), ', 'point on radius {', paste0(signif(circle_pt_on_rad, 3), collapse=','), '}, and normal {' , 
+						paste0(signif(circle_norm, 3), collapse=','), '}', ' at intersection with plane defined by point={', 
+						paste0(signif(plane_point, 3), collapse=','), '} and normal vector {', 
+						paste0(signif(uvector(plane_norm), 3), collapse=','), '} and closest to point {', 
+						paste0(signif(J2_compare, 3), collapse=','), '}', '\n')
+					cat(solve_str)
+				}
+
+				# Define circle
+				circle <- defineCircle(center=circle_center, nvector=circle_norm, 
+					point_on_radius=circle_pt_on_rad, redefine_center=TRUE)
+
+				# Find intersection of circle and plane
+				int_cp <- intersectCirclePlane(circle=circle, P=plane_point, N=plane_norm)
+
+				# Find point on circle
+				J2_solve <- circlePoint(circle=circle, T=int_cp)
+
+				# If no solution, return NULL
+				if((is.vector(J2_solve) && is.na(J2_solve[1])) || (!is.vector(J2_solve) && is.na(J2_solve[1,1]))){
+					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 'No solution found.\n'))
+					return(mechanism) 
+				}
+
+				# Find point closest to compare point
+				which_min <- which.min(distPointToPoint(J2_solve, J2_compare))
+				
+				# Set solved joint
+				J2_solve <- J2_solve[which_min,]
+
+				# Get vectors and axis to find first body transformation
+				V_pre <- joint_current$coor[2, , 1] - joint_current$coor[1, , 1]
+				V_new <- J2_solve - joint_current$coor[1, , 1]
+
+				# Get axis to rotate link about
+				J_axis <- joint_current$cons[[1]][, , 1]
+
+				# Get rotation matrix
+				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+				# Get transformation of first body
+				tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
+				tmat_B_1[1:3, 4] <- -joint_current$coor[1, , 1]
+				tmat_B_2[1:3, 1:3] <- RM
+				tmat_B_3[1:3, 4] <- joint_current$coor[1, , 1]
+				tmat_B1 <- tmat_B_3 %*% tmat_B_2 %*% tmat_B_1
+
+				# Find vector for second body transformation
+				tmat_B2 <- diag(4)
+				tmat_B2[1:3, 4] <- J2_solve - circle_pt_on_rad
+
+				# Transform second body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=tmat_B2, 
+					iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=1, 
+					body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Transform first body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[1], joint=joint_idx[1], 
+					status.solved.to=1, tmat=tmat_B1, iter=iter, recursive=TRUE, 
+					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+
+				# Set last joint as jointed
+				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
+
+				path_solved <- TRUE
+			}
+
 			# Solve path
 			if(path_strings[['tjs']] %in% c('R(JSN)-1-L(JNN)-2-R(DNS)', 'S(JSN)-1-L(JNN)-2-S(DNS)')){
 
@@ -143,6 +249,8 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				len_target <- distPointToPoint(joint_current$coor[1, , 1], joint_current$coor[3, , joint_sets[3,2]])
 				
 				# Get previous point for toggle position comparison
+				# **** Should this be iter-1???
+				# **** Also need to add in joint.compare
 				if(iter == 1){
 					t_target_prev <- mechanism[['joint.coor']][joint_idx[3], ]
 				}else{
@@ -222,13 +330,6 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				# Get point at distance from circle
 				line_point <- joint_current$coor[3, , joint_sets[3,2]]
 
-				# Get previous point for toggle position comparison
-				if(iter == 1){
-					line_point_prev <- mechanism[['joint.coor']][joint_idx[2], ]
-				}else{
-					line_point_prev <- applyJointTransform(mechanism, joint=joint_idx[2], iter=iter-1)$coor[1, , 1]
-				}
-
 				# Get current circle radius, center and normal vector
 				circle_pt_on_rad <- joint_current$coor[2, , 1]
 				circle_center <- joint_current$coor[1, , 1]
@@ -240,11 +341,11 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						'Finding ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], 
 						') on circle with center {', paste0(signif(circle_center, 3), collapse=','), 
 						'} at ', mechanism[['joint.names']][joint_idx[1]], 
-						'(', joint_idx[1], '), ', 'point on radius=', paste0(signif(circle_pt_on_rad, 3), collapse=','), ', and normal={' , 
+						'(', joint_idx[1], '), ', 'point on radius={', paste0(signif(circle_pt_on_rad, 3), collapse=','), '}, and normal={' , 
 						paste0(signif(circle_norm, 3), collapse=','), '}', ' at distance=', 
 						signif(line_len, 3), ' from {', paste0(signif(line_point, 3), collapse=','), 
 						'} at ', mechanism[['joint.names']][joint_idx[3]], '(', joint_idx[3], 
-						') and closest to point {', paste0(signif(line_point_prev, 3), collapse=','), '}\n')
+						') and closest to point {', paste0(signif(J2_compare, 3), collapse=','), '}\n')
 					cat(solve_str)
 				}
 
@@ -253,7 +354,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					point_on_radius=circle_pt_on_rad, redefine_center=TRUE)
 
 				# Find angle on circle at distance from point
-				circle_t <- angleOnCircleFromPoint(circle=circle, dist=line_len, P=line_point, point_compare=line_point_prev)
+				circle_t <- angleOnCircleFromPoint(circle=circle, dist=line_len, P=line_point, point_compare=J2_compare)
 
 				# Find point on circle
 				J2_solve <- circlePoint(circle=circle, T=circle_t)
