@@ -1,4 +1,4 @@
-circleOnSphereFromPoint <- function(sphere, d, p, point.compare=NULL){
+circleOnSphereFromPoint <- function(sphere, d, p){
 
 	# GIVEN A SPHERE AND A POINT P, THIS FUNCTION FINDS THE CIRCLE ON THE SURFACE OF THE 
 	#	SPHERE WITH EACH POINT ON THE CIRCLE BEING THE SPECIFIED DISTANCE FROM POINT P
