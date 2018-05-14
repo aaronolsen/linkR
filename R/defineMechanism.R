@@ -31,6 +31,9 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 	# MAKE SURE JOINT CONSTRAINTS ARE LIST
 	if(!is.list(joint.cons)) joint.cons <- list(joint.cons)
 
+	# Make sure joint types and joint.cons have the same length
+	if(length(joint.types) != length(joint.cons)) stop(paste0("The length of 'joint.types' (", length(joint.types), ") must be equal to the number of joints specified in 'joint.cons' (", length(joint.cons), ")."))
+
 	for(i in 1:length(joint.cons)){
 
 		# IF JOINT CONSTRAINT IS N (NO CONSTRAINT) MAKE SURE IT IS NA
