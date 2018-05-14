@@ -74,7 +74,7 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		# SKIP IF INPUTS ARE NA (ALLOWS INPUT RESOLVE PARAMETERS TO BE ADDED IN ADDITION TO INPUT PARAMETERS)
 		if(sum(is.na(mags)) == length(mags)) return(NULL)
 
-		# TRANSLATE TO CENTER OF ROTATION (JOINT)
+		# TRANSLATE FROM CENTER OF ROTATION (JOINT)
 		tmat1[1:3, 4] <- kn_jt_center
 
 		# Set axes of rotation
@@ -91,8 +91,11 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		# Limit AOR to specified degrees of freedom
 		if(!is.null(dof)) AOR <- matrix(AOR[na.omit(dof),], nrow=sum(!is.na(dof)), ncol=3)
 		
+		#
+		#if(print.progress) rotations_print <- c()
+		
 		# LOOP THROUGH EACH COLUMNN OF INPUT PARAMETERS
-		for(i in length(mags):1){
+		for(i in 1:length(mags)){
 
 			# SKIP IF NA
 			if(is.na(mags[i]) || is.na(AOR[i, 1])) next
@@ -101,19 +104,45 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 			RM <- tMatrixEP(AOR[i, ], -mags[i])
 			
 			# APPLY ROTATION ABOUT SINGLE JOINT CONSTRAINT VECTOR
-			tmat2[1:3, 1:3] <- tmat2[1:3, 1:3] %*% RM
+			tmat2[1:3, 1:3] <- RM %*% tmat2[1:3, 1:3]
 
 			if(print.progress){
+				#rotations_print <- c(rotations_print, 
 				cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 'Apply rotation of magnitude ', 
-					signif(mags[i], 3), ' about center {', paste0(signif(kn_jt_center, 3), collapse=','), 
+					signif(mags[i], 3), ' radians about center {', paste0(signif(kn_jt_center, 3), collapse=','), 
 					'} and axis {', paste0(signif(AOR[i, ], 3), collapse=','), '}\n'))
 			}
 
+			#if(print.progress){ # First two and last two axes should stay orthogonal, first and third not necessarily
+			#	print(avec(AOR[1,],AOR[2,]))
+			#	print(avec(AOR[2,],AOR[3,]))
+			#	print(avec(AOR[1,],AOR[3,]))
+			#	cat('\n')
+			#}
+
 			#
-			if(kn_jt_type == 'U' && i == 2) AOR[1, ] <- AOR[1, ] %*% RM
+			if(kn_jt_type == 'U'){
+				if(i == 1) AOR[2, ] <- RM %*% AOR[2, ]
+			}else if(kn_jt_type == 'O'){
+				if(i == 1){
+					AOR[2, ] <- RM %*% AOR[2, ]
+					AOR[3, ] <- RM %*% AOR[3, ]
+				}else if(i == 2){
+					AOR[3, ] <- RM %*% AOR[3, ]
+				}
+			}
 		}
 
-		# TRANSLATE BACK FROM CENTER OF ROTATION
+		#if(print.progress) cat(paste0(rev()), sep='')
+		
+		#if(print.progress){ # First two and last two axes should stay orthogonal, first and third not necessarily
+		#	print(avec(AOR[1,],AOR[2,]))
+		#	print(avec(AOR[2,],AOR[3,]))
+		#	print(avec(AOR[1,],AOR[3,]))
+		#	cat('\n')
+		#}
+
+		# TRANSLATE TO CENTER OF ROTATION
 		tmat3[1:3, 4] <- -kn_jt_center
 		
 		# Get rotation transformations
