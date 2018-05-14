@@ -1,6 +1,7 @@
 print_joint_status <- function(mechanism, indent, indent.level=4){
 
 	dframe <- data.frame(
+		'name'=mechanism[['joint.names']],
 		'jointed'=mechanism[['status']][['jointed']],
 		'solved-1'=mechanism[['status']][['solved']][,1],
 		'solved-2'=mechanism[['status']][['solved']][,2],
