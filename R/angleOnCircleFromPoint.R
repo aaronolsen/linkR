@@ -8,6 +8,25 @@ angleOnCircleFromPoint <- function(circle, dist, P, point_compare=NULL){
 
 	if(is.na(P[1])) stop("'P' has NA values.")
 	
+	# Point is on circle
+	if(dist == 0){
+
+		# Check that point is in circle plane
+		#if(distPointToPlane(P, circle$N, circle$C) > 1e-7) stop("If dist is 0 then point must lie in circle plane")
+
+		# Check that distance is equal to radius
+		#if(distPointToPoint(circle$C, P) - circle$R > 1e-7) stop("If dist is 0 then distance from point to circle center must be equal to the circle radius")
+
+		# Find angle between U-vector and vector to point
+		a_vec <- avec(circle$U, P-circle$C, axis=circle$N, about.axis=TRUE)
+
+		# Check that rotation returns point
+		#circle$R*rotateBody(circle$U, circle$N, -a_vec) + circle$C
+		#print(circlePoint(circle, -a_vec))
+
+		return(-a_vec)
+	}
+
 	a <- 2*circle$R*(sum(circle$V*(circle$C-P)))
 	b <- 2*circle$R*(sum(circle$U*(circle$C-P)))
 	c <- (dist^2 - (circle$R^2) - sum(P^2) - sum(circle$C^2) + 2*sum(circle$C*P))
