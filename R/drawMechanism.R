@@ -247,7 +247,7 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 
 		## Draw points and connecting paths
 		if(!is.null(body_points)){
-
+		
 			# DRAW POINTS
 			#svgviewr.points(body_points, file=file, col.fill=point.col.fill, col.stroke=point.col.stroke, cex=point.cex, lwd=point.lwd)
 
