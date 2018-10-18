@@ -1,10 +1,13 @@
 fitShape <- function(mat, shape, centroid.align = NULL){
 
 	## Fits a shape to a set of points
+	
+	# Remove NA values
+	mat <- mat[!is.na(mat[,1]),]
 
 	# Align coor by centroid, if not input
 	if(shape %in% c('circle', 'plane')){
-		if(is.null(centroid.align)) centroid.align <- mat  - matrix(colMeans(mat, na.rm=TRUE), nrow(mat), ncol(mat), byrow=TRUE)
+		if(is.null(centroid.align)) centroid.align <- mat  - matrix(colMeans(mat), nrow(mat), ncol(mat), byrow=TRUE)
 	}
 	
 	if(shape == 'vector'){
