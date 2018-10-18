@@ -1,4 +1,4 @@
-findJointPaths <- function(body.conn, joint.types, solvable.paths){
+findJointPaths <- function(body.conn, joint.types, solvable.paths, sole.joints){
 
 	# IF A SINGLE JOINT, RETURN 0,1
 	if(nrow(body.conn) == 1) return(list(
@@ -92,7 +92,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			# CHECK IF NO CONNECTED JOINTS
 			if(length(joints_conn) == 0) next
 
-			# TRYING WITHOUT FOR NOW - SHOULD REFINE TO LIMIT NUMBER OF LOOPS WITHIN LINK
+			# REFINE TO LIMIT NUMBER OF LOOPS WITHIN LINK
 			if(TRUE){
 
 				if(length(paths[[i]]) > 1 && paths[[i]][length(paths[[i]])] != 0){
@@ -212,16 +212,22 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 	for(i in 1:length(paths)){
 
 		# REMOVE PATHS WITH NA VALUE
-		if(sum(is.na(paths[[i]])) > 0 && !is_open[i]){paths_str[i] <- NA; next}
+		#if(sum(is.na(paths[[i]])) > 0 && !is_open[i]){paths_str[i] <- NA; next}
+
+		# GET END JOINT
+		end_joint <- tail(paths[[i]], 1)
 
 		# REMOVE PATHS THAT END IN NON-FIXED JOINT THAT IS CONNECTED TO TWO OR MORE OTHER JOINTS (FALSE OPEN CHAIN)
-		if(paths[[i]][length(paths[[i]])] > 0){
+		if(end_joint > 0){
+		
+			# SKIP IF JOINT IS "SOLE JOINT" - JOINT CONNECTED TO OTHERWISE ISOLATED BODY
+			if(end_joint %in% sole.joints) next
 			
 			# FIND CONNECTED JOINTS
-			joints_conn_end <- unique(c(joint.conn[rowSums(paths[[i]][length(paths[[i]])] == joint.conn[, 2:3]) > 0, 2:3]))
+			joints_conn_end <- unique(c(joint.conn[rowSums(end_joint == joint.conn[, 2:3]) > 0, 2:3]))
 
 			# REMOVE FOCAL JOINT AND ZERO
-			joints_conn_end <- joints_conn_end[!joints_conn_end %in% c(0, paths[[i]][length(paths[[i]])])]
+			joints_conn_end <- joints_conn_end[!joints_conn_end %in% c(0, end_joint)]
 
 			# REMOVE FIXED JOINTS
 			joints_conn_end <- joints_conn_end[!joints_conn_end %in% fixed.joints]
@@ -237,7 +243,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 			
 			next
 		}
-		
+
 		if(FALSE){
 
 			# REMOVE PATHS THAT DOUBLE BACK ON THE SAME LINK
@@ -265,7 +271,7 @@ findJointPaths <- function(body.conn, joint.types, solvable.paths){
 		}
 		
 		# REMOVE PATHS THAT ARE REVERSE OF ANOTHER PATH - EVERY FIXED-TO-FIXED PATH SHOULD HAVE REVERSE
-		if(sum(paste(rev(paths[[i]]), collapse='-') == paths_str[-i], na.rm=TRUE) > 0) paths_str[i] <- NA
+		#if(sum(paste(rev(paths[[i]]), collapse='-') == paths_str[-i], na.rm=TRUE) > 0) paths_str[i] <- NA
 	}
 
 	# REMOVE NA VALUES
