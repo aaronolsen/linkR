@@ -20,7 +20,10 @@ whichMaxShapeDist <- function(shapes, max.index = dim(shapes)[3], method = c('pr
 	
 	# Determine which columns to use
 	cols_use <- (1:ncol(scores))[percent.var > min.per.var]
-
+	
+	# If just one column, add second highest axis so there are at least 2 columns
+	if(length(cols_use) == 1) cols_use <- order(percent.var, decreasing=TRUE)[1:2]
+	
 	# Create vector for distance index
 	dist_index <- rep(NA, max.index)
 
@@ -33,7 +36,7 @@ whichMaxShapeDist <- function(shapes, max.index = dim(shapes)[3], method = c('pr
 		center <- colMeans(scores_mat)
 
 		# Start with point furthest from center
-		dist_index[1] <- which.max(distPointToPoint(colMeans(scores_mat), scores_mat))
+		dist_index[1] <- which.max(distPointToPoint(center, scores_mat))
 
 		# Re-set center
 		center <- scores_mat[dist_index[1], ]
