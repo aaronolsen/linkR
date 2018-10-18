@@ -1,4 +1,4 @@
-intersectPlanes <- function(p1, n1, p2, n2){
+intersectPlanes <- function(p1, n1, p2, n2, project = TRUE){
 
 	## Find line at the intersection of two planes
 	# https://math.stackexchange.com/questions/475953/how-to-calculate-the-intersection-of-two-planes
@@ -111,6 +111,12 @@ intersectPlanes <- function(p1, n1, p2, n2){
 	check1 <- sum(pl*n1) - c1
 	check2 <- sum(pl*n2) - c2
 	if(abs(check1) > 1e-7 || abs(check2) > 1e-7) stop('One of checks exceeds 0')
+	
+	# Project solution
+	if(project){
+		mid_p12 <- c(p1 + p2) / 2
+		pl <- pointNormalOnLine(mid_p12, pl, pl+l_v)
+	}
 
 	#cat(paste0('Check: ', check1, '\n'))
 	#cat(paste0('Check: ', check2, '\n'))
