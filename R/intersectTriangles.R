@@ -40,6 +40,17 @@ intersectTriangles <- function(t1, t2, return.logical = FALSE){
 			# Find whether line intersects with any edge of triangle
 			ei <- intersectLines(inp$p, inp$v, tri[edge[1],], tri[edge[2],]-tri[edge[1],])
 
+			if(FALSE){
+				svg.new(paste0('/Users/aaron/Downloads/', tri_num, '-', i, '.html'), mode='webgl')
+				svg.triangle(t1, col='purple')
+				svg.spheres(t1, col='purple', radius=0.5)
+				svg.triangle(t2, col='orange')
+				svg.spheres(t2, col='orange', radius=0.5)
+				svg.lines(rbind(inp$p, inp$p + inp$v))
+				svg.spheres(ei, col='red', radius=0.1)
+				svg.close()
+			}
+
 			# Check whether intersection is on edge
 			if(!is.null(ei)){
 
@@ -50,13 +61,13 @@ intersectTriangles <- function(t1, t2, return.logical = FALSE){
 				# Skip if point is not on line
 				if(dpl > 1e-10) next
 				
-				# Check if intersection is at edge
+				# Check if intersection is at vertex
 				if(sqrt(sum((ei - tri[edge[1],])^2)) < 1e-10 || sqrt(sum((ei - tri[edge[2],])^2)) < 1e-10){
 				
 					# Intersection point: ei
 					intersecting[tri_num] <- TRUE
 					
-					if(return.logical) next
+					#if(return.logical) next
 
 					# Add intersecting point
 					int_pts[int_ct, ] <- ei
@@ -68,28 +79,14 @@ intersectTriangles <- function(t1, t2, return.logical = FALSE){
 					
 					next
 				}
-
-				# Intersection
+				
+				# Check whether intersection point is between two vertices of edge
 				if(ptBnPts(ei, tri[edge[1],], tri[edge[2],])){
-
-				# Find distance between vertices
-				#d12 <- sqrt(sum((tri[edge[1],] - tri[edge[2],])^2))
-				#print(d12)
-		
-				# Find distances from each vertex to the intersection point
-				#d1 <- sqrt(sum((ei - tri[edge[1],])^2))
-				#d2 <- sqrt(sum((ei - tri[edge[2],])^2))
-
-				#print(d1)
-				#print(d2)
-				#cat('\n')
-
-				#if(d1 < d12 && d2 < d12){
 
 					# Intersection point: ei
 					intersecting[tri_num] <- TRUE
 					
-					if(return.logical) next
+					#if(return.logical) next
 
 					# Add intersecting point
 					int_pts[int_ct, ] <- ei
@@ -106,7 +103,7 @@ intersectTriangles <- function(t1, t2, return.logical = FALSE){
 
 		#if(!intersecting[tri_num]) return(list(lp=inp$p, lv=inp$v, ip=int_pts))
 	}
-	
+
 	# 
 	inter <- FALSE
 	
