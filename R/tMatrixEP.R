@@ -6,6 +6,9 @@ tMatrixEP <- function(v, a){
 	# If zero length axis, return identity matrix
 	#if(sum(abs(a)) < 1e-12) return(diag(3))
 
+	if(length(v) == 1) stop('"v" must be a vector of length 3')
+	if(length(a) > 1) stop('"a" must be a single value (angle)')
+
 	# For some reason the resulting rotation matrix does not follow the right-hand rule... Flip angle so that it is right-hand
 	a <- -a
 
