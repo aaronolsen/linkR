@@ -1,6 +1,6 @@
 animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.ref.as.prev = FALSE, 
 	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, check.inter.point.dist = TRUE, 
-	print.progress = FALSE, print.progress.iter = 2){
+	print.progress = FALSE, print.progress.iter = 1){
 
 	if(print.progress) cat(paste0('animateMechanism()\n'))
 	
@@ -29,7 +29,12 @@ animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.r
 	mechanism[['joint.cons.anim']] <- list()
 	for(i in 1:length(mechanism$joint.cons)){
 
-		if(is.na(mechanism$joint.cons[[i]][1])){joint_cons[[i]] <- NULL;next}
+		# Set default constraint?? - should do this in defineMechanism
+		if(is.na(mechanism$joint.cons[[i]][1])){
+			next
+		}
+
+		# Create array
 		mechanism[['joint.cons.anim']][[i]] <- array(mechanism$joint.cons[[i]], dim=c(dim(mechanism$joint.cons[[i]])[1:2], n_iter, 2))
 		
 		# If U-joint, make sure only corresponding axis is in each set
@@ -46,6 +51,9 @@ animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.r
 	mechanism[['joint.coor.anim']] <- array(mechanism$joint.coor, dim=c(dim(mechanism$joint.coor), n_iter, 2), 
 		dimnames=list(mechanism$joint.names, colnames(mechanism$joint.coor), NULL, NULL))
 
+	# Create identity matrix associated with each body
+	#mechanism[['body.diag']] <- array(diag(3), dim=c(3,3, mechanism$num.bodies, n_iter, 2), dimnames=list(NULL, NULL, mechanism[['body.names']], NULL, NULL))
+	
 	# Make joint coordinate compare an array matching number of iterations and add to mechanism
 	if(!is.null(joint.compare)){
 		if(length(dim(joint.compare)) == 2){
