@@ -37,7 +37,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 	for(i in 1:length(joint.cons)){
 
 		# IF JOINT CONSTRAINT IS N (NO CONSTRAINT) MAKE SURE IT IS NA
-		if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
+		#if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
 
 		# IF JOINT CONSTRAINT IS ALREADY AN ARRAY, MAKE SURE VECTORS ARE UNIT VECTORS
 		if(is.array(joint.cons[[i]]) && length(dim(joint.cons[[i]])) > 2){
@@ -132,7 +132,9 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 
 	# CREATE LIST OF JOINTS ASSOCIATED WITH EACH BODY
 	body_joints <- as.list(rep(NA, num_bodies))
-	for(i in 1:num_bodies) body_joints[[i]] <- sort(unique(c(which(body_conn_num[, 1] == i), which(body_conn_num[, 2] == i))))
+	for(i in 1:num_bodies){
+		body_joints[[i]] <- sort(unique(c(which(body_conn_num[, 1] == i), which(body_conn_num[, 2] == i))))
+	}
 	names(body_joints) <- body.names
 
 	if(print.progress){
