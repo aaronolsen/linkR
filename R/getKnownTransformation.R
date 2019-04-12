@@ -59,14 +59,16 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 	tform_set <- FALSE
 
 	# Create transformation matrix
-	if(kn_jt_type %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'RP', 'O')){
+	if(kn_jt_type %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'N', 'RP', 'O')){
 
 		# Set initial transformation matrices
 		tmat1 <- tmat2 <- tmat3 <- diag(4)
 
-		# Set magnitudes
+		# Set rotation magnitudes
 		if(kn_jt_type %in% c('PR', 'RP')){
 			mags <- input.param[iter, 3]
+		}else if(kn_jt_type %in% c('N')){
+			mags <- input.param[iter, 4:6]
 		}else{
 			mags <- input.param[iter, ]
 		}
@@ -152,11 +154,13 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		tform_set <- TRUE
 	}
 
-	if(kn_jt_type %in% c('L', 'P', 'T', 'PR', 'RP')){
+	if(kn_jt_type %in% c('L', 'P', 'T', 'PR', 'N', 'RP')){
 	
 		# Set translation magnitudes
 		if(kn_jt_type %in% c('PR', 'RP')){
 			mags <- input.param[iter, 1:2]
+		}else if(kn_jt_type %in% c('N')){
+			mags <- input.param[iter, 1:3]
 		}else{
 			mags <- input.param[iter, ]
 		}
