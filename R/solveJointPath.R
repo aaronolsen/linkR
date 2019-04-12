@@ -17,10 +17,12 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 		if(print.progress) joint_props <- c()
 
 		# CREATE TRANSFORMATION MATRIX
-		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'O')){
+		if(joint.types %in% c('S', 'X', 'XO', 'R', 'U', 'PR', 'N', 'O')){
 
 			# Set rotation magnitudes
-			if(joint.types == 'PR'){
+			if(joint.types == 'N'){
+				mags <- input[iter, 4:6]
+			}else if(joint.types == 'PR'){
 				mags <- input[iter, 3]
 			}else{
 				mags <- input[iter, ]
@@ -88,10 +90,12 @@ solveJointPath <- function(joint.types, joint.status, joint.coor, joint.cons,  b
 			tform_set <- TRUE
 		}
 
-		if(joint.types %in% c('L', 'P', 'T', 'PR')){
+		if(joint.types %in% c('L', 'P', 'T', 'PR', 'N')){
 		
 			# Set translation magnitudes
-			if(joint.types == 'PR'){
+			if(joint.types == 'N'){
+				mags <- input[iter, 1:3]
+			}else if(joint.types == 'PR'){
 				mags <- input[iter, 1:2]
 			}else{
 				mags <- input[iter, ]
