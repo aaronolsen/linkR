@@ -48,8 +48,19 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	# Get number of joints
 	n_joints <- length(joint.types)
 	
+	# Set input parameters if single joint and NULL
+	if(is.null(input.param)){
+
+		if(n_joints > 1) stop("'input.param' can only be NULL for single joint models (i.e. joint.types of length 1).")
+		
+		# Set input.param based on model DoFs
+		input.param <- matrix(NA, nrow=n_iter, ncol=jointDoF(joint.types))
+	}
+	
 	# Standardize joint names
 	joint.types[joint.types == 'Our'] <- 'O'
+	joint.types[joint.types == 'Ou'] <- 'O'
+	joint.types[joint.types == 'Ur'] <- 'U'
 
 	# Set NA joint coordinates
 	if(is.null(joint.coor)) joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
@@ -612,6 +623,8 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			if(length(fit_assoc) == 2){
 				points_connect <- list(c(1,2))
 			}else if(length(fit_assoc) == 3){
+				points_connect <- list(c(1,2), c(2,3), c(1,3))
+			}else{
 				points_connect <- list(c(1,2), c(2,3), c(1,3))
 			}
 		}
