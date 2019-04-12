@@ -161,7 +161,6 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 			}
 		}
 
-
 		## Create joint constraints
 		# Create joint constraint lists
 		cons_vec1 <- list()
@@ -244,7 +243,6 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 			if(debug){ index_add <- index_add + (2*dim(joints)[1]*num_iter) }else{ index_add <- index_add + (dim(joints)[1]*num_iter) }
 		}
 
-
 		## Draw points and connecting paths
 		if(!is.null(body_points)){
 		
@@ -296,6 +294,7 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 		}
 
 		# DRAW FRAME
+		#print(xyz)
 		svg.frame(x=xyz)
 
 		svg.close()
@@ -325,36 +324,6 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 			}
 		}
 
-		# CONNECT JOINTS WITH PATHS
-		if(connect.joints && !is.null(mechanism$joint.conn)){
-			if(animate){
-				for(i in 1:nrow(mechanism$joint.conn)){
-
-					# SKIP LINES AMONG JOINTS CONNECTED TO GROUND
-					#if(mechanism$joint.conn[i, 'body.idx'] == 1) next
-					if(mechanism$joint.conn[i, 'joint1'] == 0 || mechanism$joint.conn[i, 'joint2'] == 0) next
-					#if(mechanism$joint.conn[i, 'joint1'] == 1 || mechanism$joint.conn[i, 'joint2'] == 1) next
-
-					# ADD PATHS
-					svg.pathsC(c(mechanism$joint.conn[i, 'joint1'], mechanism$joint.conn[i, 'joint2']), 
-						index.add=index_add, lwd=path.lwd, layer='Joint wire frame')
-				}
-			}else{
-
-				for(itr in 1:num_iter){
-					for(i in 1:nrow(mechanism$joint.conn)){
-
-						# SKIP LINES AMONG JOINTS CONNECTED TO GROUND
-						if(mechanism$joint.conn[i, 'body.idx'] == 1) next
-						#if(mechanism$joint.conn[i, 'joint1'] == 1 || mechanism$joint.conn[i, 'joint2'] == 1) next
-
-						# ADD PATHS
-						svg.pathsC(c(mechanism$joint.conn[i, 'joint1'], mechanism$joint.conn[i, 'joint2']), 
-							index.add=(itr-1)*(nrow(joints)), lwd=path.lwd, layer='Joint wire frame')
-					}
-				}
-			}
-		}
 
 		# ADVANCE POINT COUNT FOR PATH INDEX
 		if(animate){
