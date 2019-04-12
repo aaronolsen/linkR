@@ -1,5 +1,8 @@
 resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = '\t', indent.level=3){
 
+	# Path syntax
+	# 	J/D: Jointed/disjointed
+
 	if(print.progress) cat(paste0(paste0(rep(indent, indent.level), collapse=''), 'resolveJointPaths()\n'))
 
 	if(mechanism[['num.paths.closed']] == 0){
@@ -68,11 +71,13 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			
 			# Check string against solvable joint type and status strings
 			solvable_ts <- ifelse(path_strings[['ts']] %in% linkR_sp[['str']][['ts']], TRUE, FALSE)
+			
+			#print(linkR_sp[['str']][['ts']])
 	
 			# If no match, skip
 			if(!solvable_ts){ 
 				if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
-					'Skipping unsolvable path ', path_strings[['p']], ', path num=', path_idx, ', run num=', ct_print, '\n'))
+					'Skipping unsolvable path ', path_strings[['p']], ', [', path_strings[['ts']], '], path num=', path_idx, ', run num=', ct_print, '\n'))
 				i <- i + 1
 				next
 			}
@@ -90,6 +95,19 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
 					'Standardizing path ', path_strings[['p']], ', path num=', path_idx, ', run num=', ct_print, '\n'))
 
+				if(path_strings[['tj']] %in% c('P(D)-1-S(J)-2-U(D)-3-S(J)-4-S(J)')){
+					
+					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[3]], ' (', joint_idx[3], ')\n'))
+
+					# Find transformation to restore disjointed joint and then extend across any subsequent disjoints
+					mechanism <- extendTransformation(mechanism, joint=joint_idx[3], body=path_bodies[2],
+						body.excl=path_bodies[2], iter=iter, recursive=TRUE, print.progress=print.progress, indent=indent, 
+						indent.level=indent.level+2)
+
+					path_standardized <- TRUE
+				}
+
 				if(path_strings[['tj']] %in% c('R(J)-1-R(D)-2-R(D)', 'R(J)-1-R(D)-2-R(J)')){
 					
 					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
@@ -103,7 +121,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					path_standardized <- TRUE
 				}
 
-				if(path_strings[['tj']] %in% c('R(D)-1-S(J)-2-S(J)', 'R(D)-1-R(J)-2-R(D)', 'R(D)-1-R(D)-2-R(D)', 'R(D)-1-R(J)-2-R(J)')){
+				if(path_strings[['tj']] %in% c('U(D)-1-R(J)-2-S(J)', 'R(D)-1-S(J)-2-S(J)', 'R(D)-1-R(J)-2-R(D)', 'R(D)-1-R(D)-2-R(D)', 'R(D)-1-R(J)-2-R(J)')){
 
 					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[1]], ' (', joint_idx[1], ')\n'))
@@ -125,7 +143,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 
 			# Print solving path
 			if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
-				'Solving path ', path_strings[['p']], ', path num=', path_idx, ', run num=', ct_print, '\n'))
+				'Solving path ', path_strings[['p']], ', [', path_strings[['tjs']], '], path num=', path_idx, ', run num=', ct_print, '\n'))
 	
 			# Get whether halves are solved
 			joint_sets <- mechanism[['paths.closed.set']][[path_idx]]
@@ -137,7 +155,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
 
 			# Get previous point for toggle position comparison
-			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-P(DNS)', 'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
+			if(path_strings[['tjs']] %in% c('U(JSN)-1-R(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-P(DNS)', 'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-S(DSN)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
 				if(iter == 1){
 					if(is.null(mechanism[['joint.compare']])){
 						J2_compare <- mechanism[['joint.coor']][joint_idx[2], ]
@@ -151,6 +169,262 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						J2_compare <- mechanism[['joint.compare']][joint_idx[2],,iter]
 					}
 				}
+			}
+			
+			# Solve path
+			if(path_strings[['tjs']] %in% c('U(JSN)-1-R(JNN)-2-S(DNS)')){
+			
+				# Example: Solving path LegL_FootL(DSN)-1-FemurL_LegL(JNN)-2-Pelvis_FemurL(JNS)
+
+				# Find distance from J2 to J3
+				J23_length <- distPointToPoint(mechanism[['joint.coor']][joint_idx[2], ], mechanism[['joint.coor']][joint_idx[3], ])
+				
+				# Set params
+				params <- list('U_axes'=rbind(joint_current$cons[[1]][1,,1], joint_current$cons[[1]][2,,2]), 
+					'U_cor'=joint_current$coor[1,,1], 'R_mat'=rbind('R_cor'=joint_current$coor[2,,1], 
+					'R_axis_pt'=joint_current$coor[2,,1]+joint_current$cons[[2]][1,,1], 'R_pt'=joint_current$coor[3,,joint_sets[3,1]]), 
+					'S_cor_S'=joint_current$coor[3,,joint_sets[3,2]], 'J2_compare'=J2_compare, 
+					'J23_length'=J23_length, 'return.J2'=FALSE, 'return.tmat'=FALSE)
+				
+				# Explain optimization
+				if(print.progress){
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Finding optimal rotations of U-joint ', mechanism[['joint.names']][joint_idx[1]], 
+						'(', joint_idx[1], ') to minimize the distance of joint ', mechanism[['joint.names']][joint_idx[3]], 
+						'(', joint_idx[3], ') from the circle defined by the hinge axis and center of rotation of joint ',
+						mechanism[['joint.names']][joint_idx[2]], '\n')
+					cat(solve_str)
+				}
+				# Set starting values to try - does not converge for some starting values
+				try_start <- list(c(0.1,0.2), c(0.1,-0.2), c(0,0), c(-0.2,-0.1))
+
+				# Run optimization with several starting values
+				list_optim_runs <- list()
+				toggle_dist <- rep(NA, length(try_start))
+				list_optim_errs <- rep(NA, length(try_start))
+				for(try_num in 1:length(try_start)){
+
+					u_jt_fit <- tryCatch(
+						expr={
+							nlminb(start=try_start[[try_num]], objective=path_min_j3dtc, lower=rep(-2*pi, 2), 
+								upper=rep(2*pi, 2), params=params)
+						},
+						error=function(cond) {return(NULL)},
+						warning=function(cond) {return(NULL)}
+					)
+
+					# Save optimization and error
+					list_optim_runs[[try_num]] <- u_jt_fit
+					list_optim_errs[try_num] <- u_jt_fit$objective
+					
+					#
+					params[['return.J2']] <- TRUE
+					toggle_dist[try_num] <- distPointToPoint(J2_compare, path_min_j3dtc(u_jt_fit$par, params))
+					params[['return.J2']] <- FALSE
+					
+					# If low error is reached stop
+					#if(u_jt_fit$objective < 1e-5) break
+					#if(sum(abs(u_jt_fit$par - try_start[[try_num]])) > 1e-5) break
+				}
+				
+				# Find best guess of closest toggle distance (min for now - should look for lowest value occurring at least twice?)
+				min_toggle_dist <- min(toggle_dist, na.rm=TRUE)
+
+				# Limit search to fits where toggle is lower
+				runs_at_min_toggle <- which(abs(toggle_dist-min_toggle_dist) < 1e-3)
+				list_optim_runs <- list_optim_runs[runs_at_min_toggle]
+				list_optim_errs <- list_optim_errs[runs_at_min_toggle]
+
+				# Save fit having lowest error and closest position to toggle
+				u_jt_fit <- list_optim_runs[[which.min(list_optim_errs)]]
+				
+				# Report optimization error
+				if(print.progress){
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Error after optimization: ', signif(u_jt_fit$objective, 3), '\n')
+					cat(solve_str)
+				}
+
+				# Get optimal transformation
+				params[['return.tmat']] <- TRUE
+				body_1_tmat <- path_min_j3dtc(u_jt_fit$par, params)
+
+				# Transform bodies and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[1], tmat=body_1_tmat, 
+					iter=iter, recursive=TRUE, joint=joint_idx[1], status.solved.to=1, 
+					print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+
+				# Apply current transformation to get current joint coordinate and constraint vectors
+				joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+				
+				## Find transformation of B4, rotation about joint 5
+				V_pre <- joint_current$coor[3,,joint_sets[3,1]] - joint_current$coor[2,,1]
+				V_new <- joint_current$coor[3,,joint_sets[3,2]] - joint_current$coor[2,,1]
+
+				# Get rotation matrix
+				RM <- tMatrixEP(joint_current$cons[[2]][,,1], avec(V_pre, V_new, axis=joint_current$cons[[2]][,,1], about.axis=TRUE))
+
+				# Get transformation
+				tmat_B2_1 <- tmat_B2_2 <- tmat_B2_3 <- diag(4)
+				tmat_B2_1[1:3, 4] <- joint_current$coor[2,,1]
+				tmat_B2_2[1:3, 1:3] <- RM
+				tmat_B2_3[1:3, 4] <- -joint_current$coor[2,,1]
+				tmat_B2 <- tmat_B2_1 %*% tmat_B2_2 %*% tmat_B2_3
+
+				# Transform second body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=tmat_B2, 
+					iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=1, 
+					print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Set as jointed
+				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
+
+				path_solved <- TRUE
+			}
+
+			# Solve path
+			if(path_strings[['tjs']] %in% c('P(DSN)-1-S(JNN)-2-U(JNS)-3-S(DSN)-4-S(JNN)')){
+
+				# Example: Solving path LJSYM_NEURO(DSN)-1-LJAWL_LJSYM(JNN)-2-SUSPL_LJAWL(DNS)-3-OPERL_INOPL(JSN)-4-INOPL_LJAWL(JNN)
+
+				# Find distance from J2 to J1-plane
+				dptp_J12 <- distPointToPlane(p=mechanism[['joint.coor']][joint_idx[2], ], n=mechanism[['joint.cons']][[joint_idx[1]]], q=mechanism[['joint.coor']][joint_idx[1], ])
+
+				# Find distance from J4 to J5
+				J45_length <- distPointToPoint(mechanism[['joint.coor']][joint_idx[4], ], mechanism[['joint.coor']][joint_idx[5], ])
+
+				# Find point in plane of final J2
+				pt_in_J2_plane <- joint_current$coor[1,,joint_sets[1,1]] + dptp_J12*joint_current$cons[[1]][, , joint_sets[1,1]]
+				
+				# Set other params
+				params <- list('U_axes'=rbind(joint_current$cons[[3]][1,,1], joint_current$cons[[3]][2,,2]), 
+					'CoR'=joint_current$coor[3,,1], 'joints'=joint_current$coor[c(2,5),,1],
+					'J2_plane_p'=pt_in_J2_plane, 'J2_plane_n'=joint_current$cons[[1]][, , joint_sets[1,1]],
+					'J4'=joint_current$coor[4,,joint_sets[4,1]], 'J45_length'=J45_length, 
+					'return.tmat'=FALSE)
+
+				# Explain optimization
+				if(print.progress){
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Finding optimal rotations of U-joint ', mechanism[['joint.names']][joint_idx[3]], 
+						'(', joint_idx[3], ') to minimize the distance of joint ', mechanism[['joint.names']][joint_idx[2]], 
+						'(', joint_idx[2], ') from the plane and the keep the length between joints ',
+						mechanism[['joint.names']][joint_idx[4]], '(', joint_idx[4], ') and ', 
+						mechanism[['joint.names']][joint_idx[5]], '(', joint_idx[5], ') close to the initial length of ', 
+						signif(J45_length, 3), '\n')
+					cat(solve_str)
+				}
+				
+				# Set starting values to try - does not converge for some starting values
+				try_start <- list(c(0.1,0.2), c(0,0), c(-0.2,-0.1), c(0.1,-0.2))
+
+				# Run optimization with several starting values
+				list_optim_runs <- list()
+				list_optim_errs <- rep(NA, length(try_start))
+				for(try_num in 1:length(try_start)){
+
+					u_jt_fit <- tryCatch(
+						expr={
+							nlminb(start=try_start[[try_num]], objective=path_min_j2ptp_u_j45ptp, lower=rep(-2*pi, 2), 
+								upper=rep(2*pi, 2), params=params)
+						},
+						error=function(cond) {return(NULL)},
+						warning=function(cond) {return(NULL)}
+					)
+
+					# Save optimization and error
+					list_optim_runs[[try_num]] <- u_jt_fit
+					list_optim_errs[try_num] <- u_jt_fit$objective
+					
+					# If low error is reached stop
+					if(u_jt_fit$objective < 1e-5) break
+					#if(sum(abs(u_jt_fit$par - try_start[[try_num]])) > 1e-5) break
+				}
+
+				# Save fit having lowest error
+				u_jt_fit <- list_optim_runs[[which.min(list_optim_errs)]]
+				
+				# Report optimization error
+				if(print.progress){
+					# Get error for rotation of 0
+					#u_jt_err <- path_min_j2ptp_u_j45ptp(p=c(0,0), params)
+
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Error after optimization: ', signif(u_jt_fit$objective, 3), '\n')
+					cat(solve_str)
+				}
+
+				# Get optimal transformation
+				params[['return.tmat']] <- TRUE
+				body_2_tmat <- path_min_j2ptp_u_j45ptp(u_jt_fit$par, params)
+
+				# Transform bodies and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=body_2_tmat, 
+					iter=iter, recursive=TRUE, joint=joint_idx[3], status.solved.to=1, 
+					body.excl=path_bodies[2], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Apply current transformation to get current joint coordinate and constraint vectors
+				joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+				
+				# Get initial position of J2
+				# *** This wont work if B1 has been re-oriented in space
+				# Will need to save transformations of bodies to reconstruct original position of J2 relative to J1
+				J2_coor_i <- (mechanism[['joint.coor']][joint_idx[2], ] - mechanism[['joint.coor']][joint_idx[1], ]) + joint_current$coor[1,,joint_sets[1,1]]
+				
+				# Find translation vector
+				B1_t_vec <- joint_current$coor[2,,1] - J2_coor_i
+
+				# Get two coordinate sets to compare 1:translation only, 2: translation and rotation
+				B1_t_tmat <- diag(4)
+				B1_t_tmat[1:3,4] <- B1_t_vec
+				B1_tfm1 <- applyTransform(diag(3), B1_t_tmat)
+				B1_tfm2 <- applyTransform(diag(3), mechanism[['tmat']][,,path_bodies[1],iter])
+				
+				# Find transformation at J2 of B1 so that B1 only translates
+				best_align <- bestAlign(B1_tfm1, B1_tfm2)
+				
+				# Extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[1], tmat=best_align$tmat, 
+					iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=1, 
+					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Set as jointed
+				mechanism[['status']][['jointed']][joint_idx[1]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[1], ] <- FALSE
+				
+
+				## Find transformation of B4, rotation about joint 5
+				V_pre <- joint_current$coor[4,,joint_sets[4,2]] - joint_current$coor[5,,1]
+				V_new <- joint_current$coor[4,,joint_sets[4,1]] - joint_current$coor[5,,1]
+				
+				# Get axis to rotate link about
+				J_axis <- cprod(V_pre, V_new)
+
+				# Get rotation matrix
+				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+				# Get transformation
+				tmat_B4_1 <- tmat_B4_2 <- tmat_B4_3 <- diag(4)
+				tmat_B4_1[1:3, 4] <- joint_current$coor[5,,1]
+				tmat_B4_2[1:3, 1:3] <- RM
+				tmat_B4_3[1:3, 4] <- -joint_current$coor[5,,1]
+				tmat_B4 <- tmat_B4_1 %*% tmat_B4_2 %*% tmat_B4_3
+
+				# Transform second body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[4], tmat=tmat_B4, 
+					iter=iter, recursive=TRUE, joint=joint_idx[5], status.solved.to=1, 
+					body.excl=path_bodies[4], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Set as jointed
+				mechanism[['status']][['jointed']][joint_idx[4]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[4], ] <- FALSE
+
+				path_solved <- TRUE
 			}
 
 			# Solve path
@@ -322,13 +596,20 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			}
 
 			# Solve path
-			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
+			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DSN)', 'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
 				
+				# Set 3rd joint set to use
+				if(grepl('2-S[(]DNS[)]', path_strings[['tjs']])){
+					joint_set3_use <- c(1,2)
+				}else{
+					joint_set3_use <- c(2,1)
+				}
+
 				# Get current line length -- easiest to calculate in real time in case link is composite of other joints
-				line_len <- distPointToPoint(joint_current$coor[2, , 1], joint_current$coor[3, , joint_sets[3,1]])
+				line_len <- distPointToPoint(joint_current$coor[2, , 1], joint_current$coor[3, , joint_sets[3,joint_set3_use[1]]])
 
 				# Get point at distance from circle
-				line_point <- joint_current$coor[3, , joint_sets[3,2]]
+				line_point <- joint_current$coor[3, , joint_sets[3,joint_set3_use[2]]]
 
 				# Get current circle radius, center and normal vector
 				circle_pt_on_rad <- joint_current$coor[2, , 1]
@@ -391,7 +672,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				joint_current3 <- applyJointTransform(mechanism, joint=joint_idx[3], iter=iter)
 
 				# Get vectors and axis to find second body transformation
-				V_pre <- joint_current3$coor[1, , joint_sets[3,1]] - J2_solve
+				V_pre <- joint_current3$coor[1, , joint_sets[3, joint_set3_use[1]]] - J2_solve
 				V_new <- line_point - J2_solve
 				
 				# Get axis to rotate link about
@@ -399,7 +680,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					joint_current2 <- applyJointTransform(mechanism, joint=joint_idx[2], iter=iter)
 					J_axis <- joint_current2$cons[[1]][, , 1]
 				}
-				if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)')) J_axis <- cprod(V_pre, V_new)
+				if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-S(DSN)')) J_axis <- cprod(V_pre, V_new)
 				
 				# Get rotation matrix
 				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
@@ -418,7 +699,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					indent.level=indent.level+2)
 
 				#print(line_point)
-				#print(applyJointTransform(mechanism, joint=joint_idx[3], iter=iter)$coor[, , joint_sets[3,2]])
+				#print(applyJointTransform(mechanism, joint=joint_idx[3], iter=iter)$coor[, , joint_sets[3,joint_set3_use[2]]])
 
 				# Set last joint as jointed
 				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
