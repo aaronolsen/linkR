@@ -27,7 +27,7 @@ defineCircle <- function(center, nvector, point_on_radius=NULL, radius=NULL, red
 		center_i <- center
 
 		# IF POINT ON RADIUS IS NOT WITHIN THE PLANE OF THE CIRCLE THEN RE-DEFINE CENTER TO SATISFY THIS
-		center <- pointNormalOnLine(point_on_radius, center, center + nvector)
+		center <- c(pointNormalOnLine(point_on_radius, center, center + nvector))
 	}
 
 	C <- list()
