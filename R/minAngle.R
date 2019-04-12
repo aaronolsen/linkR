@@ -2,6 +2,7 @@ minAngle <- function(angle, units='rad'){
 
 	if(is.matrix(angle)) return(apply(angle, 1:2, minAngle, units=units))
 	if(is.vector(angle) && length(angle) > 1) return(sapply(angle, minAngle, units=units))
+	if(is.na(angle)) return(NA)
 
 	rmdr <- sign(angle)*(abs(angle) %% (2*pi))
 
