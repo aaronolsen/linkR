@@ -1,9 +1,11 @@
 intersectCircles <- function(circle1, circle2){
 	# http://math.stackexchange.com/questions/938701/how-to-find-the-intersection-points-of-two-circles-in-3d
 	# TO ADD: ONE CIRCLE WITHIN THE OTHER, NO OVERLAP IN CIRCUMFERENCE
-
+	
 	# CURRENTLY ONLY WORKS WITH CIRCLES THAT ARE COPLANAR
-	if(avec(circle1$N, circle2$N)) stop(paste0("Currently only finds intersection of circles that are co-planar. Input circles are not coplanar; difference in angle between normal vectors: ", avec(circle1$N, circle2$N)))
+	if(avec(circle1$N, circle2$N, max.pi=TRUE)){
+		stop(paste0("Currently only finds intersection of circles that are co-planar. Input circles are not coplanar; difference in angle between normal vectors: ", avec(circle1$N, circle2$N)))
+	}
 
 	# FIND DISTANCE BETWEEN CENTERS
 	center_dist <- distPointToPoint(circle1$C, circle2$C)
