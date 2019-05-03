@@ -35,6 +35,18 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 	if(length(joint.types) != length(joint.cons)) stop(paste0("The length of 'joint.types' (", length(joint.types), ") must be equal to the number of joints specified in 'joint.cons' (", length(joint.cons), ")."))
 
 	for(i in 1:length(joint.cons)){
+	
+		## Standardize joint constraints
+		# If P-joint, make sure 3-row matrix (first 2 rows are parallel to plane, 3rd row is orthogonal)
+		if(joint.types[i] == 'P'){
+
+			if(!is.matrix(joint.cons[[i]])) joint.cons[[i]] <- matrix(joint.cons[[i]], 1, 3)
+
+			if(nrow(joint.cons[[i]]) < 3){
+				if(nrow(joint.cons[[i]]) == 1) joint.cons[[i]] <- rbind(vorthogonal(joint.cons[[i]]), cprod(joint.cons[[i]], vorthogonal(joint.cons[[i]])), joint.cons[[i]])
+				if(nrow(joint.cons[[i]]) == 2) joint.cons[[i]] <- rbind(joint.cons[[i]], cprod(joint.cons[[i]][1,], joint.cons[[i]][2,]))
+			}
+		}
 
 		# IF JOINT CONSTRAINT IS N (NO CONSTRAINT) MAKE SURE IT IS NA
 		#if(joint.types[i] == 'N'){ joint.cons[[i]] <- NA; next }
@@ -216,14 +228,19 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 	# Print open joints
 	if(print.progress){
 		cat(paste0(paste0(rep(indent, 1), collapse=''), 'open.joints: '))
-		joints_names <- c()
-		for(j in 1:length(open_joints)) joints_names <- c(joints_names, paste0(joint_names[open_joints[j]], '(', open_joints[j], ')'))
-		cat(paste0(paste0(joints_names, collapse=', '), '\n'))
+		if(is.null(open_joints)){
+			cat('none\n')
+		}else{
+			joints_names <- c()
+			for(j in 1:length(open_joints)) joints_names <- c(joints_names, paste0(joint_names[open_joints[j]], '(', open_joints[j], ')'))
+			cat(paste0(paste0(joints_names, collapse=', '), '\n'))
+		}
 	}
 	
 	# Find closed paths
 	solve_paths <- findSolvablePaths(joint_conn, body_conn_num, input.joint, input.dof, fixed_joints, open_joints, 
-		joint.types=joint.types, body.names=body.names, indent=indent, indent.level=1, print.progress=FALSE)
+		joint.types=joint.types, body.names=body.names, joint.names=joint_names, indent=indent, 
+		indent.level=1, print.progress=print.progress)
 
 	# Set joints transformed by each body transformation
 	joint_transform <- setNames(as.list(rep(NA, num_bodies)), body.names)
@@ -306,6 +323,10 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 							paths_closed_set[[i]][j,] <- c(2,1)
 						}
 					}
+					
+					# TEMP FIX
+					# For cases where path cross through ground-connected joint
+					if(paths_closed_set[[i]][j,1] == paths_closed_set[[i]][j,2]) paths_closed_set[[i]][j,] <- c(1,2)
 				}
 		
 				# FIND DISTANCES BETWEEN JOINTS IN PATHS
@@ -432,10 +453,23 @@ print.mechanism <- function(x, ...){
 	## Joints
 	# Create dataframe for joints
 	joint_df_colnames <- c('Name', 'Type')
+	
+	# Create constraint strings
+	constraint_strs <- rep('', length(x$joint.cons))
+	for(i in 1:length(x$joint.cons)){
+		if(is.matrix(x$joint.cons[[i]])){
+			if(nrow(x$joint.cons[[i]]) == 1) constraint_strs[i] <- paste0(round(x$joint.cons[[i]], 3), collapse=',')
+			if(nrow(x$joint.cons[[i]]) == 2) constraint_strs[i] <- paste0(paste0(round(x$joint.cons[[i]][1,], 3), collapse=','), '; ', paste0(round(x$joint.cons[[i]][2,], 3), collapse=','))
+			if(nrow(x$joint.cons[[i]]) == 3) constraint_strs[i] <- paste0(paste0(round(x$joint.cons[[i]][1,], 3), collapse=','), '; ', paste0(round(x$joint.cons[[i]][2,], 3), collapse=','), '; ', paste0(round(x$joint.cons[[i]][3,], 3), collapse=','))
+		}
+	}
+
 	joint_df <- data.frame('Name'=x$joint.names, 'Type'=paste0('     ', x$joint.types), 
 		'Body.1'=paste0('  ', x$body.conn[,1], ' (', x$body.conn.num[,1], ')'),
 		'Body.2'=paste0('  ', x$body.conn[,2], ' (', x$body.conn.num[,2], ')'),
-		'Position'=paste0('  {', apply(signif(x$joint.coor, 3), 1, 'paste0', collapse=','), '}'))
+		'Position'=paste0('  {', apply(signif(x$joint.coor, 3), 1, 'paste0', collapse=','), '}'),
+		'Constraints'=paste0('  {', constraint_strs, '}')
+		)
 	#print(joint_df)
 	rc <- c(rc, paste0('\tMechanism joints:\n\t\t', paste0(capture.output(print(joint_df)), collapse='\n\t\t'), '\n'))
 
