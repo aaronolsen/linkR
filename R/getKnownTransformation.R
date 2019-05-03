@@ -166,7 +166,11 @@ getKnownTransformation <- function(mechanism, input.param, joint, body, iter,
 		}
 		
 		# Get axis/axes along which to translate
-		T_axes <- matrix(kn_jt_axes[, , jt_set], ncol=3)
+		if(kn_jt_type %in% c('P')){
+			T_axes <- matrix(kn_jt_axes[1:2, , jt_set], ncol=3)
+		}else{
+			T_axes <- matrix(kn_jt_axes[, , jt_set], ncol=3)
+		}
 
 		# Limit AOR to specified degrees of freedom
 		if(!is.null(dof)) T_axes <- matrix(AOR[na.omit(dof),], nrow=sum(!is.na(dof)), ncol=3)
