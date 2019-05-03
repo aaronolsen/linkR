@@ -11,6 +11,8 @@ linkR_sp[['exp']][[length(linkR_sp[['exp']])+1]] <- c('S', 'J', 'SN', '1', 'L', 
 linkR_sp[['exp']][[length(linkR_sp[['exp']])+1]] <- c('R', 'J', 'SN', '1', 'S', 'J', 'NN', '2', 'P', 'D', 'NS')
 linkR_sp[['exp']][[length(linkR_sp[['exp']])+1]] <- c('P', 'D', 'SN', '1', 'S', 'J', 'NN', '2', 'U', 'J', 'NS', '3', 'S', 'D', 'SN', '4', 'S', 'J', 'NN')
 linkR_sp[['exp']][[length(linkR_sp[['exp']])+1]] <- c('U', 'J', 'SN', '1', 'R', 'J', 'NN', '2', 'S', 'D', 'NS')
+linkR_sp[['exp']][[length(linkR_sp[['exp']])+1]] <- c('R', 'J', 'SN', '1', 'S', 'J', 'NN', '2', 'P', 'D', 'NS', '2', 'S', 'J', 'NN', '3', 'S', 'D', 'NS')
+linkR_sp[['exp']][[length(linkR_sp[['exp']])+1]] <- c('S', 'J', 'SN', '1', 'S', 'D', 'NS')
 
 for(linkR_i in 1:length(linkR_sp[['exp']])){
 	
