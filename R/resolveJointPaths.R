@@ -84,7 +84,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 
 			# Check string against solvable joint type, jointed and status strings
 			solvable_tjs <- ifelse(path_strings[['tjs']] %in% linkR_sp[['str']][['tjs']], TRUE, FALSE)
-			
+
 			# Save solved path index
 			if(save_paths_solved) mechanism[['paths.solved']] <- c(mechanism[['paths.solved']], path_idx)
 
@@ -92,12 +92,12 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 
 				path_standardized <- FALSE
 
-				if(print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
-					'Standardizing path ', path_strings[['p']], ', path num=', path_idx, ', run num=', ct_print, '\n'))
+				if(print.progress) print_progress_standardize <- paste0(paste0(rep(indent, indent.level+1), collapse=''), 
+					'Standardizing path ', path_strings[['p']], ', path num=', path_idx, ', run num=', ct_print, '\n')
 
 				if(path_strings[['tj']] %in% c('P(D)-1-S(J)-2-U(D)-3-S(J)-4-S(J)')){
 					
-					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+					if(print.progress) cat(paste0(print_progress_standardize, paste0(rep(indent, indent.level+2), collapse=''), 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[3]], ' (', joint_idx[3], ')\n'))
 
 					# Find transformation to restore disjointed joint and then extend across any subsequent disjoints
@@ -110,7 +110,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 
 				if(path_strings[['tj']] %in% c('R(J)-1-R(D)-2-R(D)', 'R(J)-1-R(D)-2-R(J)')){
 					
-					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+					if(print.progress) cat(paste0(print_progress_standardize, paste0(rep(indent, indent.level+2), collapse=''), 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[2]], ' (', joint_idx[2], ')\n'))
 
 					# Find transformation to restore disjointed joint and then extend across any subsequent disjoints
@@ -121,9 +121,9 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					path_standardized <- TRUE
 				}
 
-				if(path_strings[['tj']] %in% c('U(D)-1-R(J)-2-S(J)', 'R(D)-1-S(J)-2-S(J)', 'R(D)-1-R(J)-2-R(D)', 'R(D)-1-R(D)-2-R(D)', 'R(D)-1-R(J)-2-R(J)')){
+				if(path_strings[['tj']] %in% c('R(D)-1-S(J)-2-P(D)-2-S(J)-3-S(J)', 'U(D)-1-R(J)-2-S(J)', 'R(D)-1-S(J)-2-S(J)', 'R(D)-1-R(J)-2-R(D)', 'R(D)-1-R(D)-2-R(D)', 'R(D)-1-R(J)-2-R(J)')){
 
-					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+					if(print.progress) cat(paste0(print_progress_standardize, paste0(rep(indent, indent.level+2), collapse=''), 
 						'Standardizing path by joining ', mechanism[['joint.names']][joint_idx[1]], ' (', joint_idx[1], ')\n'))
 
 					# Find transformation to restore disjointed joint and then extend across any subsequent disjoints
@@ -155,22 +155,72 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
 
 			# Get previous point for toggle position comparison
-			if(path_strings[['tjs']] %in% c('U(JSN)-1-R(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-P(DNS)', 'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-S(DSN)', 'R(JSN)-1-R(JNN)-2-R(DNS)')){
+			if(path_strings[['tjs']] %in% c('U(JSN)-1-R(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-P(DNS)', 
+				'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-S(DSN)', 'R(JSN)-1-R(JNN)-2-R(DNS)', 
+				'R(JSN)-1-S(JNN)-2-P(DNS)-2-S(JNN)-3-S(DNS)')){
+				
+				if(path_strings[['tjs']] == 'R(JSN)-1-S(JNN)-2-P(DNS)-2-S(JNN)-3-S(DNS)'){
+					which_jt <- 3
+				}else{
+					which_jt <- 2
+				}
+				
 				if(iter == 1){
 					if(is.null(mechanism[['joint.compare']])){
-						J2_compare <- mechanism[['joint.coor']][joint_idx[2], ]
+						toggle_jt_compare <- mechanism[['joint.coor']][joint_idx[which_jt], ]
 					}else{
-						J2_compare <- mechanism[['joint.compare']][joint_idx[2],,1]
+						toggle_jt_compare <- mechanism[['joint.compare']][joint_idx[which_jt],,1]
 					}
 				}else{
 					if(is.null(mechanism[['joint.compare']])){
-						J2_compare <- applyJointTransform(mechanism, joint=joint_idx[2], iter=iter-1)$coor[1, , 1]
+						toggle_jt_compare <- applyJointTransform(mechanism, joint=joint_idx[which_jt], iter=iter-1)$coor[1, , 1]
 					}else{
-						J2_compare <- mechanism[['joint.compare']][joint_idx[2],,iter]
+						toggle_jt_compare <- mechanism[['joint.compare']][joint_idx[which_jt],,iter]
 					}
 				}
 			}
-			
+
+			if(path_strings[['tjs']] %in% c('S(JSN)-1-S(DNS)')){
+
+				# Explain solution
+				if(print.progress){
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Finding rotation at S-joint ', mechanism[['joint.names']][joint_idx[1]], 
+						'(', joint_idx[1], ') to bring S-joint ', mechanism[['joint.names']][joint_idx[2]], 
+						'(', joint_idx[2], ') into alignment\n')
+					cat(solve_str)
+				}
+
+				## Find transformation of B4, rotation about joint 5
+				V_pre <- joint_current$coor[2,,joint_sets[2,1]] - joint_current$coor[1,,1]
+				V_new <- joint_current$coor[2,,joint_sets[2,2]] - joint_current$coor[1,,1]
+
+				# Get axis to rotate body about
+				J_axis <- cprod(V_pre, V_new)
+
+				# Get rotation matrix
+				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+				# Get transformation
+				tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
+				tmat_B_1[1:3, 4] <- joint_current$coor[1,,1]
+				tmat_B_2[1:3, 1:3] <- RM
+				tmat_B_3[1:3, 4] <- -joint_current$coor[1,,1]
+				tmat_B <- tmat_B_1 %*% tmat_B_2 %*% tmat_B_3
+
+				# Transform first body and extend transformation
+				mechanism <- extendTransformation(mechanism, body=path_bodies[1], tmat=tmat_B, 
+					iter=iter, recursive=TRUE, joint=joint_idx[1], status.solved.to=1, 
+					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, 
+					indent.level=indent.level+2)
+
+				# Set as jointed
+				mechanism[['status']][['jointed']][joint_idx[2]] <- TRUE
+				mechanism[['status']][['transformed']][joint_idx[2], ] <- FALSE
+
+				#if(print.progress) print('hi')
+			}
+
 			# Solve path
 			if(path_strings[['tjs']] %in% c('U(JSN)-1-R(JNN)-2-S(DNS)')){
 			
@@ -183,7 +233,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				params <- list('U_axes'=rbind(joint_current$cons[[1]][1,,1], joint_current$cons[[1]][2,,2]), 
 					'U_cor'=joint_current$coor[1,,1], 'R_mat'=rbind('R_cor'=joint_current$coor[2,,1], 
 					'R_axis_pt'=joint_current$coor[2,,1]+joint_current$cons[[2]][1,,1], 'R_pt'=joint_current$coor[3,,joint_sets[3,1]]), 
-					'S_cor_S'=joint_current$coor[3,,joint_sets[3,2]], 'J2_compare'=J2_compare, 
+					'S_cor_S'=joint_current$coor[3,,joint_sets[3,2]], 'J2_compare'=toggle_jt_compare, 
 					'J23_length'=J23_length, 'return.J2'=FALSE, 'return.tmat'=FALSE)
 				
 				# Explain optimization
@@ -219,7 +269,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					
 					#
 					params[['return.J2']] <- TRUE
-					toggle_dist[try_num] <- distPointToPoint(J2_compare, path_min_j3dtc(u_jt_fit$par, params))
+					toggle_dist[try_num] <- distPointToPoint(toggle_jt_compare, path_min_j3dtc(u_jt_fit$par, params))
 					params[['return.J2']] <- FALSE
 					
 					# If low error is reached stop
@@ -282,6 +332,138 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
 
 				path_solved <- TRUE
+			}
+
+			# Solve path
+			if(path_strings[['tjs']] %in% c('R(JSN)-1-S(JNN)-2-P(DNS)-2-S(JNN)-3-S(DNS)')){
+			
+				# Check that all middle joints are coincident
+				if(sum(apply(mechanism[['joint.coor']][joint_idx[2:4], ], 2, 'sd') > 1e-10)){
+					stop(paste0('Joints "', paste0(joint_idx[2:4], collapse=','), '" (', 
+						paste0(mechanism[['joint.names']][2:4], collapse=', '), 
+						') must be coincident for current version of path solver.'))
+				}
+				
+				# Get R and P vectors
+				R_vec <- joint_current$cons[[1]][, , 1]
+				P_vec <- joint_current$cons[[3]][3, , joint_sets[3,2]]
+
+				# Check that R and P vectors are parallel
+				if(avec(R_vec, P_vec, max.pi=TRUE) > 1e-10){
+					stop(paste0('Axis of joint ', joint_idx[1], ' (', mechanism[['joint.names']][joint_idx[1]], 
+						') and normal vector at joint ', joint_idx[3], ' (', mechanism[['joint.names']][joint_idx[3]], 
+						') must be parallel.'))
+				}
+				
+				if(print.progress){
+
+					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+						'Finding ', mechanism[['joint.names']][joint_idx[3]], '(', joint_idx[3], 
+						') in plane defined by point {', paste0(signif(joint_current$coor[3, , joint_sets[3,2]], 3), collapse=','), 
+						'} and normal vector {', paste0(signif(P_vec, 3), collapse=','), '} from R-joint and S-joint\n')
+					cat(solve_str)
+				}
+
+
+				# Find original distance from joint centers in P-plane
+				J1_o_proj <- pointPlaneProj(mechanism[['joint.coor']][joint_idx[1], ], 
+					mechanism[['joint.coor']][joint_idx[3], ], mechanism[['joint.cons']][[joint_idx[3]]][3,])
+				J12_o_dist <- distPointToPoint(J1_o_proj, mechanism[['joint.coor']][joint_idx[3], ])
+				
+				# Project new point into plane
+				J1_c_proj <- pointPlaneProj(joint_current$coor[1, , 1], joint_current$coor[3, , joint_sets[3,2]], P_vec)
+
+				# Find circle from R-joint side
+				R_circle <- defineCircle(center=J1_c_proj, nvector=R_vec, radius=J12_o_dist)
+
+				# Find intersection of sphere and plane for S-joint side (circles in plane)
+				int_sph_pln <- intersectSpherePlane(c=joint_current$coor[5, , joint_sets[5,2]], 
+					r=path_dists[4], p=joint_current$coor[3, , joint_sets[3,2]], n=P_vec)
+				S_circle <- defineCircle(center=int_sph_pln$center, nvector=int_sph_pln$nvector, radius=int_sph_pln$radius)
+				
+				# Find intersection of circles
+				int_circles <- intersectCircles(R_circle, S_circle)
+
+				if(int_circles$type %in% c('two', 'one')){
+
+					if(int_circles$type == 'two'){
+
+						# Find point closest to compare point (toggle)
+						which_min <- which.min(distPointToPoint(rbind(int_circles[[1]], int_circles[[2]]), toggle_jt_compare))
+
+						# Set solved joint
+						J3_solve <- int_circles[[which_min]]
+
+					}else{
+
+						# Set solved joint
+						J3_solve <- int_circles[[1]]
+					}
+				
+					## Find transformation of B1, rotation about J1
+					V_pre <- joint_current$coor[2, , 1] - J1_c_proj
+					V_new <- J3_solve - J1_c_proj
+				
+					# Get axis to rotate link about
+					J_axis <- cprod(V_pre, V_new)
+
+					# Get rotation matrix
+					RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+					# Get transformation
+					tmat_B1_1 <- tmat_B1_2 <- tmat_B1_3 <- diag(4)
+					tmat_B1_1[1:3, 4] <- joint_current$coor[1,,1]
+					tmat_B1_2[1:3, 1:3] <- RM
+					tmat_B1_3[1:3, 4] <- -joint_current$coor[1,,1]
+					tmat_B1 <- tmat_B1_1 %*% tmat_B1_2 %*% tmat_B1_3
+					#tmat_B1 <- diag(4)
+
+					# Transform first body and extend transformation
+					mechanism <- extendTransformation(mechanism, body=path_bodies[1], tmat=tmat_B1, 
+						iter=iter, recursive=TRUE, joint=joint_idx[1], status.solved.to=1, 
+						body.excl=path_bodies[1], print.progress=print.progress, indent=indent, 
+						indent.level=indent.level+2)
+
+					# Set as jointed
+					mechanism[['status']][['jointed']][joint_idx[1]] <- TRUE
+					mechanism[['status']][['transformed']][joint_idx[1], ] <- FALSE
+
+					# Apply current transformation to get current joint coordinate and constraint vectors
+					joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+
+					## Find transformation of B3, rotation about J3
+					V_pre <- joint_current$coor[5, , joint_sets[5,1]] - J3_solve
+					V_new <- joint_current$coor[5, , joint_sets[5,2]] - J3_solve
+
+					# Get axis to rotate link about
+					J_axis <- cprod(V_pre, V_new)
+
+					# Get rotation matrix
+					RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+					# Get transformation
+					tmat_B3_1 <- tmat_B3_2 <- tmat_B3_3 <- diag(4)
+					tmat_B3_1[1:3, 4] <- J3_solve
+					tmat_B3_2[1:3, 1:3] <- RM
+					tmat_B3_3[1:3, 4] <- -J3_solve
+					tmat_B3 <- tmat_B3_1 %*% tmat_B3_2 %*% tmat_B3_3
+
+					# Transform first body and extend transformation
+					# path_bodies has 4 elements - middle body is repeated
+					mechanism <- extendTransformation(mechanism, body=path_bodies[4], tmat=tmat_B3, 
+						iter=iter, recursive=TRUE, joint=joint_idx[4], status.solved.to=1, 
+						body.excl=path_bodies[4], print.progress=print.progress, indent=indent, 
+						indent.level=indent.level+2)
+
+					# Apply current transformation to get current joint coordinate and constraint vectors
+					joint_current <- applyJointTransform(mechanism, joint=joint_idx, iter=iter)
+
+					# Set as jointed
+					mechanism[['status']][['jointed']][joint_idx[5]] <- TRUE
+					mechanism[['status']][['transformed']][joint_idx[5], ] <- FALSE
+
+					path_solved <- TRUE
+				}
 			}
 
 			# Solve path
@@ -439,81 +621,91 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				plane_point <- joint_current$coor[3, , 2]
 
 				# Get plane normal vector
-				plane_norm <- cprod(joint_current$cons[[3]][1, , 2], joint_current$cons[[3]][2, , 2])
-
-				# 
-				if(print.progress){
-					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
-						'Finding ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], 
-						') on circle with center {', paste0(signif(circle_center, 3), collapse=','), 
-						'} at ', mechanism[['joint.names']][joint_idx[1]], 
-						'(', joint_idx[1], '), ', 'point on radius {', paste0(signif(circle_pt_on_rad, 3), collapse=','), '}, and normal {' , 
-						paste0(signif(circle_norm, 3), collapse=','), '}', ' at intersection with plane defined by point={', 
-						paste0(signif(plane_point, 3), collapse=','), '} and normal vector {', 
-						paste0(signif(uvector(plane_norm), 3), collapse=','), '} and closest to point {', 
-						paste0(signif(J2_compare, 3), collapse=','), '}', '\n')
-					cat(solve_str)
-				}
-
-				# Define circle
-				circle <- defineCircle(center=circle_center, nvector=circle_norm, 
-					point_on_radius=circle_pt_on_rad, redefine_center=TRUE)
-
-				# Find intersection of circle and plane
-				int_cp <- intersectCirclePlane(circle=circle, P=plane_point, N=plane_norm)
-
-				# Find point on circle
-				J2_solve <- circlePoint(circle=circle, T=int_cp)
-
-				# If no solution, return NULL
-				if((is.vector(J2_solve) && is.na(J2_solve[1])) || (!is.vector(J2_solve) && is.na(J2_solve[1,1]))){
-					if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 'No solution found.\n'))
-					return(mechanism) 
-				}
-
-				# Find point closest to compare point
-				which_min <- which.min(distPointToPoint(J2_solve, J2_compare))
+				plane_norm <- joint_current$cons[[3]][3, , 2]
 				
-				# Set solved joint
-				J2_solve <- J2_solve[which_min,]
+				# Check whether vectors are parallel - if they are then there is not a unique solution
+				a_vecs <- avec(circle_norm, plane_norm, max.pi=TRUE)
+				
+				if(a_vecs == 0){
+				
+					# Vectors are parallel - there is no unique solution
 
-				# Get vectors and axis to find first body transformation
-				V_pre <- joint_current$coor[2, , 1] - joint_current$coor[1, , 1]
-				V_new <- J2_solve - joint_current$coor[1, , 1]
+				}else{
 
-				# Get axis to rotate link about
-				J_axis <- joint_current$cons[[1]][, , 1]
+					# 
+					if(print.progress){
+						solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
+							'Finding ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], 
+							') on circle with center {', paste0(signif(circle_center, 3), collapse=','), 
+							'} at ', mechanism[['joint.names']][joint_idx[1]], 
+							'(', joint_idx[1], '), ', 'point on radius {', paste0(signif(circle_pt_on_rad, 3), collapse=','), '}, and normal {' , 
+							paste0(signif(circle_norm, 3), collapse=','), '}', ' at intersection with plane defined by point={', 
+							paste0(signif(plane_point, 3), collapse=','), '} and normal vector {', 
+							paste0(signif(uvector(plane_norm), 3), collapse=','), '} and closest to point {', 
+							paste0(signif(toggle_jt_compare, 3), collapse=','), '}', '\n')
+						cat(solve_str)
+					}
 
-				# Get rotation matrix
-				RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+					# Define circle
+					circle <- defineCircle(center=circle_center, nvector=circle_norm, 
+						point_on_radius=circle_pt_on_rad, redefine_center=TRUE)
 
-				# Get transformation of first body
-				tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
-				tmat_B_1[1:3, 4] <- -joint_current$coor[1, , 1]
-				tmat_B_2[1:3, 1:3] <- RM
-				tmat_B_3[1:3, 4] <- joint_current$coor[1, , 1]
-				tmat_B1 <- tmat_B_3 %*% tmat_B_2 %*% tmat_B_1
+					# Find intersection of circle and plane
+					int_cp <- intersectCirclePlane(circle=circle, P=plane_point, N=plane_norm)
 
-				# Find vector for second body transformation
-				tmat_B2 <- diag(4)
-				tmat_B2[1:3, 4] <- J2_solve - circle_pt_on_rad
+					# Find point on circle
+					J2_solve <- circlePoint(circle=circle, T=int_cp)
 
-				# Transform second body and extend transformation
-				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=tmat_B2, 
-					iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=1, 
-					body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
-					indent.level=indent.level+2)
+					# If no solution, return NULL
+					if((is.vector(J2_solve) && is.na(J2_solve[1])) || (!is.vector(J2_solve) && is.na(J2_solve[1,1]))){
+						if(print.progress) cat(paste0(paste0(rep(indent, indent.level+2), collapse=''), 'No solution found.\n'))
+						return(mechanism) 
+					}
 
-				# Transform first body and extend transformation
-				mechanism <- extendTransformation(mechanism, body=path_bodies[1], joint=joint_idx[1], 
-					status.solved.to=1, tmat=tmat_B1, iter=iter, recursive=TRUE, 
-					body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+					# Find point closest to compare point
+					which_min <- which.min(distPointToPoint(J2_solve, toggle_jt_compare))
+				
+					# Set solved joint
+					J2_solve <- J2_solve[which_min,]
 
-				# Set last joint as jointed
-				mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
-				mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
+					# Get vectors and axis to find first body transformation
+					V_pre <- joint_current$coor[2, , 1] - joint_current$coor[1, , 1]
+					V_new <- J2_solve - joint_current$coor[1, , 1]
 
-				path_solved <- TRUE
+					# Get axis to rotate link about
+					J_axis <- joint_current$cons[[1]][, , 1]
+
+					# Get rotation matrix
+					RM <- tMatrixEP(J_axis, avec(V_pre, V_new, axis=J_axis, about.axis=TRUE))
+
+					# Get transformation of first body
+					tmat_B_1 <- tmat_B_2 <- tmat_B_3 <- diag(4)
+					tmat_B_1[1:3, 4] <- -joint_current$coor[1, , 1]
+					tmat_B_2[1:3, 1:3] <- RM
+					tmat_B_3[1:3, 4] <- joint_current$coor[1, , 1]
+					tmat_B1 <- tmat_B_3 %*% tmat_B_2 %*% tmat_B_1
+
+					# Find vector for second body transformation
+					tmat_B2 <- diag(4)
+					tmat_B2[1:3, 4] <- J2_solve - circle_pt_on_rad
+
+					# Transform second body and extend transformation
+					mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=tmat_B2, 
+						iter=iter, recursive=TRUE, joint=joint_idx[2], status.solved.to=1, 
+						body.excl=path_bodies[1:2], print.progress=print.progress, indent=indent, 
+						indent.level=indent.level+2)
+
+					# Transform first body and extend transformation
+					mechanism <- extendTransformation(mechanism, body=path_bodies[1], joint=joint_idx[1], 
+						status.solved.to=1, tmat=tmat_B1, iter=iter, recursive=TRUE, 
+						body.excl=path_bodies[1], print.progress=print.progress, indent=indent, indent.level=indent.level+2)
+
+					# Set last joint as jointed
+					mechanism[['status']][['jointed']][joint_idx[3]] <- TRUE
+					mechanism[['status']][['transformed']][joint_idx[3], ] <- FALSE
+
+					path_solved <- TRUE
+				}
 			}
 
 			# Solve path
@@ -626,7 +818,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						paste0(signif(circle_norm, 3), collapse=','), '}', ' at distance=', 
 						signif(line_len, 3), ' from {', paste0(signif(line_point, 3), collapse=','), 
 						'} at ', mechanism[['joint.names']][joint_idx[3]], '(', joint_idx[3], 
-						') and closest to point {', paste0(signif(J2_compare, 3), collapse=','), '}\n')
+						') and closest to point {', paste0(signif(toggle_jt_compare, 3), collapse=','), '}\n')
 					cat(solve_str)
 				}
 
@@ -635,7 +827,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					point_on_radius=circle_pt_on_rad, redefine_center=TRUE)
 
 				# Find angle on circle at distance from point
-				circle_t <- angleOnCircleFromPoint(circle=circle, dist=line_len, P=line_point, point_compare=J2_compare)
+				circle_t <- angleOnCircleFromPoint(circle=circle, dist=line_len, P=line_point, point_compare=toggle_jt_compare)
 
 				# Find point on circle
 				J2_solve <- circlePoint(circle=circle, T=circle_t)
@@ -707,6 +899,9 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 
 				path_solved <- TRUE
 			}
+
+			if(!path_solved && print.progress) cat(paste0(paste0(rep(indent, indent.level+1), collapse=''), 
+				'Could not find solver for path [', path_strings[['tjs']], '], path num=', path_idx, ', run num=', ct_print, '\n'))
 
 			# Extend solved status through mechanism
 			mechanism <- extendSolvedStatus(mechanism, print.progress=print.progress, indent=indent, indent.level=indent.level+2)
