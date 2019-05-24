@@ -71,24 +71,64 @@ fitShape <- function(mat, shape, centroid.align = NULL){
 		if(mean(apply(centroid.align, 2, 'sd')) < 1e-10) return(NULL)
 
 		# SVD of centroid-aligned points
-		svd_res <- svd(centroid.align)
+		if(FALSE){
 
-		# SVD theory
-		# Given input matrix m x n
-		# U and V are unitary matrices, so w conjugate transpose of U (U*), U* %*% U is an 
-		# nxn identity matrix
-		#	print(round(Conj(t(svd_res$u)) %*% svd_res$u, 7))
-		# and V* %*% V is also an nxn identity matrix
-		#	print(round(Conj(t(svd_res$v)) %*% svd_res$v, 7))
-		# The original matrix can be recovered by
-		#	sigma <- diag(svd_res$d)
-		#	print(svd_res$u %*% sigma %*% t(svd_res$v))
+			svd_res <- svd(centroid.align)
+
+			# SVD theory
+			# Given input matrix m x n
+			# U and V are unitary matrices, so w conjugate transpose of U (U*), U* %*% U is an 
+			# nxn identity matrix
+			#	print(round(Conj(t(svd_res$u)) %*% svd_res$u, 7))
+			# and V* %*% V is also an nxn identity matrix
+			#	print(round(Conj(t(svd_res$v)) %*% svd_res$v, 7))
+			# The original matrix can be recovered by
+			#	sigma <- diag(svd_res$d)
+			#	print(svd_res$u %*% sigma %*% t(svd_res$v))
 		
-		# Create plane
-		# 	Normal vector to plane that minimizes mean orthogonal distances of points to plane
-		# 	Use centroid as point in plane
-		shape_obj <- list(N=svd_res$v[, 3], Q=colMeans(mat, na.rm=TRUE))
-		class(shape_obj) <- 'plane'
+
+			# Create plane
+			# 	Normal vector to plane that minimizes mean orthogonal distances of points to plane
+			# 	Use centroid as point in plane
+			shape_obj <- list(N=svd_res$v[, 3], Q=colMeans(mat, na.rm=TRUE))
+			class(shape_obj) <- 'plane'
+
+		}else{
+
+			meanX <- apply(mat, 2, mean) 
+			pca <- prcomp(mat)
+
+			v <- matrix(NA, nrow=3, ncol=3)
+			endpts <- array(NA, dim=c(2,3,3))
+			side_len <- rep(NA, 3)
+
+			for(i in 1:3){
+
+				t <- range(pca$x[, i])
+
+				# Get end points along axis
+				endpts[1,,i] <- meanX + t[1]*pca$rotation[, i]
+				endpts[2,,i] <- meanX + t[2]*pca$rotation[, i]
+
+				# Get vector corresponding to axis
+				v[i, ] <- uvector(endpts[2,,i]-endpts[1,,i])
+		
+				# Get half of length
+				side_len[i] <- distPointToPoint(endpts[1,,i], endpts[2,,i])
+			}
+
+			half_side_len <- side_len / 2
+			corners_center <- colMeans(rbind(endpts[,,1], endpts[,,2], endpts[,,3]))
+			corners <- matrix(NA, 4, 3, byrow=TRUE)
+			corners[1,] <- corners_center + half_side_len[1]*v[1,] + half_side_len[2]*v[2,]
+			corners[2,] <- corners_center - half_side_len[1]*v[1,] + half_side_len[2]*v[2,]
+			corners[3,] <- corners_center - half_side_len[1]*v[1,] - half_side_len[2]*v[2,]
+			corners[4,] <- corners_center + half_side_len[1]*v[1,] - half_side_len[2]*v[2,]
+
+			shape_obj <- list('N'=v[3, ], 'Q'=corners_center, 'center'=corners_center, 
+				'corners'=corners, 'vectors'=v, 'len'=side_len[1:2], 'halflen'=side_len[1:2]/2)
+			class(shape_obj) <- 'plane'
+		}
 
 		return(shape_obj)
 	}
