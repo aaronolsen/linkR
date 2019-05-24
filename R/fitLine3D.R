@@ -10,6 +10,7 @@ fitLine3D <- function(X, margin=0.2){
 	endpts <- rbind(meanX + t[1]*pca$rotation[, 1], meanX + t[2]*pca$rotation[, 1])
 	
 	list(
+		'center'=meanX,
 		'v'=uvector(endpts[2,]-endpts[1,]),
 		'p1'=endpts[1,],
 		'p2'=endpts[2,]
