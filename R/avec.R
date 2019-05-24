@@ -18,9 +18,11 @@ avec <- function(u, v, axis=NULL, about.axis=FALSE, max.pi=FALSE){
 			angle <- pi
 		}
 
+		if(max.pi) if(abs(angle) - pi < 1e-13) angle <- 0
 	}else{
 		if(max.pi){
 			angle <- min(acos(c), pi-acos(c))
+			if(abs(angle) - pi < 1e-13) angle <- 0
 		}else{
 			angle <- acos(c)
 		}
