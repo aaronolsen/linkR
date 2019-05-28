@@ -4,7 +4,7 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 	joint.col.stroke="black", joint.cex=1.5, joint.lwd=2,
 	point.col.fill="black", point.col.stroke="black", point.cex=1, point.lwd=2,
 	path.col.fill=NA, path.opacity.fill=1, path.opacity.stroke=1, path.col.stroke="black", 
-	path.lwd = 1, draw.trajectory = FALSE, add = FALSE, debug = FALSE, ...){
+	path.lwd = 1, draw.trajectory = FALSE, add = FALSE, app.dir.src = NULL, debug = FALSE, ...){
 
 	#if(is.null(file) && method == "svgViewR") stop("To plot a mechanism using the svgViewR method, 'file' must be non-NULL.")
 	if(is.null(file)) method <- "plot"
@@ -114,7 +114,7 @@ drawMechanism <- function(mechanism, method = "svgViewR", file = NULL, animate =
 
 		# Open new file connection
 		svg.new(file=file, window.title=window.title, animate.duration=animate.duration, 
-			animate.reverse=animate.reverse, animate.repeat, layers=writeLinkageLayers())
+			animate.reverse=animate.reverse, animate.repeat, layers=writeLinkageLayers(), app.dir.src=app.dir.src)
 
 		# INITIAL PATH INDEX
 		index_add <- 0
