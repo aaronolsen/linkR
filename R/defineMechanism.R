@@ -461,6 +461,7 @@ print.mechanism <- function(x, ...){
 			if(nrow(x$joint.cons[[i]]) == 1) constraint_strs[i] <- paste0(round(x$joint.cons[[i]], 3), collapse=',')
 			if(nrow(x$joint.cons[[i]]) == 2) constraint_strs[i] <- paste0(paste0(round(x$joint.cons[[i]][1,], 3), collapse=','), '; ', paste0(round(x$joint.cons[[i]][2,], 3), collapse=','))
 			if(nrow(x$joint.cons[[i]]) == 3) constraint_strs[i] <- paste0(paste0(round(x$joint.cons[[i]][1,], 3), collapse=','), '; ', paste0(round(x$joint.cons[[i]][2,], 3), collapse=','), '; ', paste0(round(x$joint.cons[[i]][3,], 3), collapse=','))
+			if(nrow(x$joint.cons[[i]]) == 6) constraint_strs[i] <- paste0(paste0(round(x$joint.cons[[i]][1,], 2), collapse=','), '; ', paste0(round(x$joint.cons[[i]][2,], 2), collapse=','), '; ', paste0(round(x$joint.cons[[i]][3,], 2), collapse=','), '; ', paste0(round(x$joint.cons[[i]][4,], 2), collapse=','), '; ', paste0(round(x$joint.cons[[i]][5,], 2), collapse=','), '; ', paste0(round(x$joint.cons[[i]][6,], 2), collapse=','))
 		}
 	}
 
