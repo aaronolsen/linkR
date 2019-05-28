@@ -472,18 +472,18 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				# Example: Solving path LJSYM_NEURO(DSN)-1-LJAWL_LJSYM(JNN)-2-SUSPL_LJAWL(DNS)-3-OPERL_INOPL(JSN)-4-INOPL_LJAWL(JNN)
 
 				# Find distance from J2 to J1-plane
-				dptp_J12 <- distPointToPlane(p=mechanism[['joint.coor']][joint_idx[2], ], n=mechanism[['joint.cons']][[joint_idx[1]]], q=mechanism[['joint.coor']][joint_idx[1], ])
+				dptp_J12 <- distPointToPlane(p=mechanism[['joint.coor']][joint_idx[2], ], n=mechanism[['joint.cons']][[joint_idx[1]]][3,], q=mechanism[['joint.coor']][joint_idx[1], ])
 
 				# Find distance from J4 to J5
 				J45_length <- distPointToPoint(mechanism[['joint.coor']][joint_idx[4], ], mechanism[['joint.coor']][joint_idx[5], ])
 
 				# Find point in plane of final J2
-				pt_in_J2_plane <- joint_current$coor[1,,joint_sets[1,1]] + dptp_J12*joint_current$cons[[1]][, , joint_sets[1,1]]
+				pt_in_J2_plane <- joint_current$coor[1,,joint_sets[1,1]] + dptp_J12*joint_current$cons[[1]][3, , joint_sets[1,1]]
 				
 				# Set other params
 				params <- list('U_axes'=rbind(joint_current$cons[[3]][1,,1], joint_current$cons[[3]][2,,2]), 
 					'CoR'=joint_current$coor[3,,1], 'joints'=joint_current$coor[c(2,5),,1],
-					'J2_plane_p'=pt_in_J2_plane, 'J2_plane_n'=joint_current$cons[[1]][, , joint_sets[1,1]],
+					'J2_plane_p'=pt_in_J2_plane, 'J2_plane_n'=joint_current$cons[[1]][3, , joint_sets[1,1]],
 					'J4'=joint_current$coor[4,,joint_sets[4,1]], 'J45_length'=J45_length, 
 					'return.tmat'=FALSE)
 
@@ -492,7 +492,9 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
 						'Finding optimal rotations of U-joint ', mechanism[['joint.names']][joint_idx[3]], 
 						'(', joint_idx[3], ') to minimize the distance of joint ', mechanism[['joint.names']][joint_idx[2]], 
-						'(', joint_idx[2], ') from the plane and the keep the length between joints ',
+						'(', joint_idx[2], ') from the plane defined by point in the plane {', paste0(signif(pt_in_J2_plane, 3), collapse=','), '}', 
+						' and normal vector {', paste0(signif(joint_current$cons[[1]][3, , joint_sets[1,1]], 3), collapse=','), '}', 
+						' and to keep the length between joints ',
 						mechanism[['joint.names']][joint_idx[4]], '(', joint_idx[4], ') and ', 
 						mechanism[['joint.names']][joint_idx[5]], '(', joint_idx[5], ') close to the initial length of ', 
 						signif(J45_length, 3), '\n')
