@@ -402,6 +402,7 @@ defineMechanism <- function(joint.coor, joint.types, joint.cons, body.conn, inpu
 		'body.conn.num' = body_conn_num,
 		'body.joints'=body_joints,
 		'body.names' = body.names,
+		'fixed.body' = fixed.body,
 		'fixed.joints' = fixed_joints,
 		'open.joints' = open_joints,
 		'num.paths.closed' = length(solve_paths[['paths.joints']]),
@@ -429,6 +430,7 @@ print.mechanism <- function(x, ...){
 	rc <- ''
 
 	rc <- c(rc, paste0('Mechanism\n'))
+	rc <- c(rc, paste0('\tFixed body: ', x$fixed.body, '\n'))
 	rc <- c(rc, paste0('\tNumber of joints (num.joints): ', x$num.joints, '\n'))
 	rc <- c(rc, paste0('\tNumber of bodies (num.bodies): ', x$num.bodies, '\n'))
 
