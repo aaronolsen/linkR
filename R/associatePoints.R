@@ -19,7 +19,7 @@ associatePoints <- function(mechanism, points, body, points.connect = NULL){
 	}
 
 	# Create list for points associated with each body
-	if(is.null(mechanism$points.assoc)) mechanism$points.assoc <- as.list(rep(NA, mechanism$num.bodies))
+	if(is.null(mechanism$points.assoc)) mechanism$points.assoc <- setNames(as.list(rep(NA, mechanism$num.bodies)), mechanism$body.names)
 
 	if(length(body) == 1){
 
@@ -38,16 +38,43 @@ associatePoints <- function(mechanism, points, body, points.connect = NULL){
 			# Add points associated with body
 			mechanism$points.assoc[[body_num]] <- c(mechanism$points.assoc[[body_num]], (1:nrow(points)) + num_points)
 		}
-	}
-	#print(mechanism$points.assoc)
-	
-	## Add body associations
-	# Add body associations to vector
-	if(is.null(mechanism$body.assoc)){
-		mechanism$body.assoc <- rep(body_num, nrow(points))
+
+		## Add body associations
+		# Add body associations to vector
+		if(is.null(mechanism$body.assoc)){
+			mechanism$body.assoc <- rep(body_num, nrow(points))
+		}else{
+			mechanism$body.assoc <- c(mechanism$body.assoc, rep(body_num, nrow(points)))
+		}
+
 	}else{
-		mechanism$body.assoc <- c(mechanism$body.assoc, rep(body_num, nrow(points)))
+
+		for(i in 1:length(body)){
+
+			# Find number corresponding to body name
+			body_num <- which(body[i] == mechanism$body.names)
+		
+			# Check that body is in body names
+			if(length(body_num) == 0) stop(paste0("Body '", body[i], "' not found in mechanism$body.names"))
+
+			if(length(mechanism$points.assoc[[body_num]]) == 1 && is.na(mechanism$points.assoc[[body_num]][1])){
+
+				mechanism$points.assoc[[body_num]] <- num_points + i
+
+			}else{
+
+				# Add points associated with body
+				mechanism$points.assoc[[body_num]] <- c(mechanism$points.assoc[[body_num]], num_points + i)
+			}
+
+			if(is.null(mechanism$body.assoc)){
+				mechanism$body.assoc <- body_num
+			}else{
+				mechanism$body.assoc <- c(mechanism$body.assoc, body_num)
+			}
+		}
 	}
+	
 
 	## Add points to connect when drawing
 	if(!is.null(points.connect)){
