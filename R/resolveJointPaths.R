@@ -263,6 +263,8 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						warning=function(cond) {return(NULL)}
 					)
 
+					if(is.null(u_jt_fit)) next
+
 					# Save optimization and error
 					list_optim_runs[[try_num]] <- u_jt_fit
 					list_optim_errs[try_num] <- u_jt_fit$objective
@@ -517,6 +519,8 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						error=function(cond) {return(NULL)},
 						warning=function(cond) {return(NULL)}
 					)
+					
+					if(is.null(u_jt_fit)) next
 
 					# Save optimization and error
 					list_optim_runs[[try_num]] <- u_jt_fit
