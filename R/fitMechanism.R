@@ -1,7 +1,6 @@
-fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.param, 
-	input.joint = NULL, input.body = NULL, input.dof = NULL, joint.coor = NULL, joint.cons = NULL, 
-	joint.optim = rep(TRUE, nrow(joint.coor)), pose.optim = TRUE, fit.wts = NULL, joint.names = NULL, 
-	planar = FALSE, fixed.body = 'Fixed', coor.vectors = NULL, use.ref.as.prev = FALSE, 
+fitMechanism <- function(mechanism, fit.points, body.assoc, input.param, 
+	joint.optim = rep(TRUE, nrow(joint.coor)), pose.optim = TRUE, fit.wts = NULL, 
+	planar = FALSE, coor.vectors = NULL, use.ref.as.prev = FALSE, 
 	direct.input = FALSE, print.progress = FALSE, ref.iter = 1, control = NULL, print.level = 0){
 
 	# Start run time
@@ -36,6 +35,36 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	}
 	control <- control_new
 
+	# Set parameters from mechanism
+	joint.types <- mechanism$joint.types
+	joint.coor <- mechanism$joint.coor
+	joint.names <- rownames(mechanism$joint.coor)
+	input.body <- mechanism$input.body
+	input.joint <- mechanism$input.joint
+	input_joint_name <- joint.names[input.joint]
+	input.dof <- mechanism$input.dof
+	joint.cons <- mechanism$joint.cons
+	body.conn <- mechanism$body.conn
+	fixed.body <- mechanism$fixed.body
+	body_names <- mechanism$body.names
+	
+	# If there's an N joint attached to fixed body, check if there are fit points associated with fixed body and add if there are not
+	if('N' %in% joint.types){
+		if(fixed.body %in% body.conn[joint.types == 'N',]){
+			if(!fixed.body %in% body.assoc){
+				new_fixed_pts <- paste0(fixed.body, '_fit_pt', 1:3)
+				fit_points_new <- array(NA, dim=dim(fit.points)+c(3,0,0), dimnames=list(c(new_fixed_pts, dimnames(fit.points)[[1]]), dimnames(fit.points)[[2]], dimnames(fit.points)[[3]]))
+				fit_points_new[new_fixed_pts,,] <- diag(3)
+				fit_points_new[dimnames(fit.points)[[1]],,] <- fit.points
+				fit.points <- fit_points_new
+				body.assoc <- c(rep(fixed.body, 3), body.assoc)
+				if(is.matrix(ref.iter)){
+					ref.iter <- rbind(matrix(diag(3), 3, 3, dimnames=list(new_fixed_pts, NULL)), ref.iter)
+				}
+			}
+		}
+	}
+
 	# Use motion between two bodies connected by each joint to generate initial joint 
 	# constraint estimate
 
@@ -45,6 +74,15 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	# Get number of iterations
 	n_iter <- dim(fit.points)[3]
 	
+	# Standardize joint types
+	stand_joint_type <- list('Our'='O', 'Ou'='O', 'Ur'='U')
+	for(i in 1:length(stand_joint_type)){
+		joint.types[joint.types == names(stand_joint_type)[i]] <- stand_joint_type[[i]]
+		if(!is.null(input_joint_name)){
+			input_joint_name[input_joint_name == names(stand_joint_type)[i]] <- stand_joint_type[[i]]
+		}
+	}
+
 	# Get number of joints
 	n_joints <- length(joint.types)
 	
@@ -57,17 +95,15 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		input.param <- matrix(NA, nrow=n_iter, ncol=jointDoF(joint.types))
 	}
 	
-	# Standardize joint names
-	joint.types[joint.types == 'Our'] <- 'O'
-	joint.types[joint.types == 'Ou'] <- 'O'
-	joint.types[joint.types == 'Ur'] <- 'U'
-
 	# Set NA joint coordinates
-	if(is.null(joint.coor)) joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
-	if(is.vector(joint.coor)) joint.coor <- matrix(joint.coor, nrow=1, ncol=3, dimnames=list(joint.names, NULL))
+	#if(is.null(joint.coor)) joint.coor <- matrix(NA, nrow=n_joints, ncol=3, dimnames=list(joint.names, NULL))
+	#if(is.vector(joint.coor)) joint.coor <- matrix(joint.coor, nrow=1, ncol=3, dimnames=list(joint.names, NULL))
 	
 	# Set joint names from coordinates if NULL
-	if(is.null(joint.names)) joint.names <- rownames(joint.coor)
+	#if(is.null(joint.names)) joint.names <- rownames(joint.coor)
+	
+	# If single joint.optim value and multiple joints, repeat for same number of joints
+	if(length(joint.optim) == 1 && n_joints > 1) joint.optim <- rep(joint.optim, n_joints)
 	
 	# Set joint coordinates to optimize
 	joints_optim <- which(joint.optim)
@@ -76,22 +112,23 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	if(length(joints_optim) > 0){ optim_joint_coor <- TRUE }else{ optim_joint_coor <- FALSE }
 
 	# Set NA joint constraints if no set values specified
-	if(is.null(joint.cons)){
-		joint.cons <- list()
-		for(joint_num in 1:n_joints){
-			if(joint.types[joint_num] %in% c('R', 'L', 'T')) joint.cons[[joint_num]] <- matrix(NA, 1, 3)
-			if(joint.types[joint_num] %in% c('X', 'U', 'P', 'PR')) joint.cons[[joint_num]] <- matrix(NA, 2, 3)
-			if(joint.types[joint_num] %in% c('S', 'O')) joint.cons[[joint_num]] <- matrix(NA, 3, 3)
-		}
-	}
-
+	#if(is.null(joint.cons)){
+	#	joint.cons <- list()
+	#	for(joint_num in 1:n_joints){
+	#		if(joint.types[joint_num] %in% c('R', 'L', 'T')) joint.cons[[joint_num]] <- matrix(NA, 1, 3)
+	#		if(joint.types[joint_num] %in% c('X', 'U', 'P', 'PR')) joint.cons[[joint_num]] <- matrix(NA, 2, 3)
+	#		if(joint.types[joint_num] %in% c('S', 'O')) joint.cons[[joint_num]] <- matrix(NA, 3, 3)
+	#		if(joint.types[joint_num] %in% c('N')) joint.cons[[joint_num]] <- matrix(NA, 6, 3)
+	#	}
+	#}
+	
 	# Use define linkage just to get body.conn.num and other mechanism properties (skip path finding)
-	mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
-		input.body=input.body, input.joint=input.joint, input.dof=input.dof, joint.cons=joint.cons, body.conn=body.conn, 
-		fixed.body=fixed.body, print.progress=FALSE)
+	#mechanism <- defineMechanism(joint.coor=joint.coor, joint.types=joint.types, 
+	#	input.body=input.body, input.joint=input.joint, input.dof=input.dof, joint.cons=joint.cons, body.conn=body.conn, 
+	#	fixed.body=fixed.body, print.progress=FALSE)
 
 	# Save input formatted joint constraints
-	joint.cons <- mechanism$joint.cons
+	#joint.cons <- mechanism$joint.cons
 	joint_cons_input <- mechanism$joint.cons
 
 	# Create numeric body association
@@ -99,7 +136,11 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	for(i in 1:length(body_assoc_num)) body_assoc_num[i] <- which(body.assoc[i] == mechanism$body.names)
 
 	# Find most dissimilar shapes for optimization
-	optim_use <- sort(whichMaxShapeDist(fit.points, max.index=min(n_iter, control$optim.frame.max)))
+	if(n_iter > control$optim.frame.max){
+		optim_use <- sort(whichMaxShapeDist(fit.points, max.index=min(n_iter, control$optim.frame.max)))
+	}else{
+		optim_use <- 1:n_iter
+	}
 
 	if(FALSE){
 		cols <- rainbow(n=length(dist_index), start=0, end=5/6)
@@ -115,7 +156,14 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	if(print.progress){
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Total time points: ', n_iter, '\n'))
-		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Reference iteration: ', ref.iter, '\n'))
+		if(is.vector(ref.iter)){
+			cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Reference iteration: ', ref.iter, '\n'))
+		}else{
+			cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Reference coordinates:\n'))
+			for(i in 1:nrow(ref.iter)){
+				cat(paste0(paste0(rep(indent, print.level+2), collapse=''), rownames(ref.iter)[i], ': {', paste0(signif(ref.iter[i,], 3), collapse=','), '}\n'))
+			}
+		}
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Number of time points used in optimization: ', n_optim, '\n'))
 		cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'Time points (max. dispersed): ', paste0(optim_use, collapse=','), '\n'))
 	}
@@ -123,6 +171,12 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	## Estimate initial joint constraints
 	if(print.progress) cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Estimating joint constraints...\n'))
 	for(joint_num in 1:n_joints){
+
+		if(joint.types[joint_num] == 'N'){
+			joint.coor[joint_num, ] <- c(0,0,0)
+			joint.cons[[joint_num]] <- rbind(diag(3), diag(3))
+			next
+		}
 
 		if(!is.na(joint.coor[joint_num, 1]) && joint.types[joint_num] == 'S'){
 			if(is.na(joint.cons[[joint_num]][3, 1])) joint.cons[[joint_num]] <- diag(3)
@@ -134,7 +188,10 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 		
 		# Get points associated with each body
 		body_points <- list(which(body_assoc_num == bodies[1]), which(body_assoc_num == bodies[2]))
-		
+
+		# Skip certain joints
+		if(joint.types[joint_num] %in% c('P')) next
+
 		# If fixed link among bodies
 		if(1 %in% bodies){
 
@@ -144,18 +201,25 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			# Get fit points
 			fit_points <- fit.points[body_points[[mobile_body]], , ]
 			
-			# Get fixed body points
-			fixed_points <- fit.points[body_points[[which(bodies == 1)]], , ]
-
 		# If no fixed link
 		}else{
-
-			# Fix body2 points relative to body1 (need to input body1+body2 points)
-			fit_points_rel <- immobilize(fit.points[unlist(body_points), , ], fit.points[body_points[[1]], , 1])
 			
-			# Save body2 points only
-			fit_points <- fit_points_rel[dimnames(fit.points)[[1]][body_points[[2]]], , ]
-			fixed_points <- fit_points_rel[dimnames(fit.points)[[1]][body_points[[1]]], , ]
+			if(is.vector(ref.iter)){
+
+				# Fix body2 points relative to body1 (need to input body1+body2 points)
+				fit_points_rel <- immobilize(fit.points[unlist(body_points), , ], fit.points[body_points[[1]], , 1])
+			
+				# Save body2 points only
+				fit_points <- fit_points_rel[dimnames(fit.points)[[1]][body_points[[2]]], , ]
+
+			}else{
+
+				# Fix body2 points relative to body1 (need to input body1+body2 points)
+				fit_points_rel <- immobilize(fit.points[unlist(body_points), , ], ref.iter[dimnames(fit.points)[[1]][body_points[[1]]], ])
+
+				# Save body2 points only
+				fit_points <- fit_points_rel[dimnames(fit.points)[[1]][body_points[[2]]], , ]
+			}
 		}
 
 		# Set initial fit type
@@ -297,11 +361,11 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			assoc_bodies <- mechanism$body.conn.num[i, ]
 		
 			# Find associated fit points
-			body_names <- mechanism$body.names[assoc_bodies]
+			body_names_a <- mechanism$body.names[assoc_bodies]
 
 			# Get fit point indices associated with each body
-			which_body1 <- which(body.assoc == body_names[1])
-			which_body2 <- which(body.assoc == body_names[2])
+			which_body1 <- which(body.assoc == body_names_a[1])
+			which_body2 <- which(body.assoc == body_names_a[2])
 
 			# Skip if less than 3 fit points
 			if(length(which_body1) < 3 && length(which_body2) < 3) next
@@ -312,7 +376,11 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			if(length(which_body2) < 3) which_body <- which_body1
 		
 			# Combine fit points and joint
-			fit_point_joint <- rbind(fit.points[which_body, , ref.iter], 'joint.coor'=mechanism$joint.coor[i, ])
+			if(is.vector(ref.iter)){
+				fit_point_joint <- rbind(fit.points[which_body, , ref.iter], 'joint.coor'=mechanism$joint.coor[i, ])
+			}else{
+				fit_point_joint <- rbind(ref.iter[dimnames(fit.points[which_body,,])[[1]],], 'joint.coor'=mechanism$joint.coor[i, ])
+			}
 
 			# Fill array
 			for(iter in 1:n_iter){
@@ -416,6 +484,8 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			add_bounds <- rbind(rep(input_bounds_t[1], n_cols), rep(input_bounds_t[2], n_cols))
 		}else if(joint.types[input.joint[i]] %in% c('PR')){
 			add_bounds <- rbind(c(rep(input_bounds_t[1], 2), input_bounds_r[1]), c(rep(input_bounds_t[2], 2), input_bounds_r[2]))
+		}else if(joint.types[input.joint[i]] %in% c('N')){
+			add_bounds <- rbind(c(rep(input_bounds_t[1], 3), rep(input_bounds_r[1], 3)), c(rep(input_bounds_t[2], 3), rep(input_bounds_r[2], 3)))
 		}else{
 			stop("Unrecognized joint type for setting initial input parameter values.")
 		}
@@ -437,7 +507,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 	colnames(input_optim_bounds) <- input_optim_names
 
 	# Set initial value for reference iteration to 0 - this will also be optimized
-	input_optim[ref.iter, ] <- 0
+	if(is.vector(ref.iter)) input_optim[ref.iter, ] <- 0
 
 	if(print.progress){
 		cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'Joint parameter optimization:\n'))
@@ -547,6 +617,11 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 					cons_optim <- rbind(cons_optim, c(NA, NA, NA))
 				}
 
+				if(joint.types[i] %in% c('N')){
+					cons_fill <- c(cons_fill, 'n')
+					cons_optim <- rbind(cons_optim, rep(NA, 3))
+				}
+
 			}else{
 
 				cons_fill <- c(cons_fill, 'n')
@@ -554,6 +629,7 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 			}
 		}
 	}
+	
 
 	# Create vector of upper and lower bounds
 	cons_optim_bounds_low <- matrix(NA, nrow=length(cons_fill), ncol=3)
@@ -597,36 +673,45 @@ fitMechanism <- function(joint.types, body.conn, fit.points, body.assoc, input.p
 
 	# Add fit points to mechanism as body points
 	for(body_name in mechanism$body.names){
-
+	
 		# Get fit points associated with body
 		fit_assoc <- which(body.assoc == body_name)
 
-		if(length(fit_assoc) == 0) next
-	
-		if(length(fit_assoc) == 1){
+		if(is.vector(ref.iter)){
 
-			# Single fit point, set to position at reference
-			pose_ref <- matrix(fit.points[fit_assoc, , ref.iter], 1,3, dimnames=list(dimnames(fit.points)[[1]][fit_assoc], NULL))
-			points_connect <- list(c(1,1))
+			if(length(fit_assoc) == 0) next
+	
+			if(length(fit_assoc) == 1){
+
+				# Single fit point, set to position at reference
+				pose_ref <- matrix(fit.points[fit_assoc, , ref.iter], 1,3, dimnames=list(dimnames(fit.points)[[1]][fit_assoc], NULL))
+				points_connect <- list(c(1,1))
+
+			}else{
+
+				## Align coordinates across all time points using generalized procrustes analysis to 
+				# find mean (consensus) shape scaled to mean centroid size
+				proc_align <- procrustes(fit.points[fit_assoc, , optim_use], scale=FALSE, rotate=TRUE, scale.to.mean.Csize=FALSE)
+				consensus <- proc_align$consensus
+
+				# Set initial reference pose by aligning consensus with reference time point
+				pose_ref <- bestAlign(fit.points[fit_assoc, , ref.iter], consensus)$mat
+
+				# Set points connect
+				if(length(fit_assoc) == 2){
+					points_connect <- list(c(1,2))
+				}else if(length(fit_assoc) == 3){
+					points_connect <- list(c(1,2), c(2,3), c(1,3))
+				}else{
+					points_connect <- list(c(1,2), c(2,3), c(1,3))
+				}
+			}
 
 		}else{
 
-			## Align coordinates across all time points using generalized procrustes analysis to 
-			# find mean (consensus) shape scaled to mean centroid size
-			proc_align <- procrustes(fit.points[fit_assoc, , optim_use], scale=FALSE, rotate=TRUE, scale.to.mean.Csize=FALSE)
-			consensus <- proc_align$consensus
-
-			# Set initial reference pose by aligning consensus with reference time point
-			pose_ref <- bestAlign(fit.points[fit_assoc, , ref.iter], consensus)$mat
-
-			# Set points connect
-			if(length(fit_assoc) == 2){
-				points_connect <- list(c(1,2))
-			}else if(length(fit_assoc) == 3){
-				points_connect <- list(c(1,2), c(2,3), c(1,3))
-			}else{
-				points_connect <- list(c(1,2), c(2,3), c(1,3))
-			}
+			# Use input ref.iter matrix to set reference pose
+			pose_ref <- ref.iter[dimnames(fit.points)[[1]][fit_assoc],]
+			points_connect <- list(c(1,2), c(2,3), c(1,3))
 		}
 		
 		# Associate fit points with body
