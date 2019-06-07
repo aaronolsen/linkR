@@ -1,4 +1,6 @@
 circlePoint <- function(circle, T){
+
+	# Finds point on circle given angle
 	
 	if(is.vector(T) && length(T) > 1){
 		if(circle$R == 0) return(matrix(circle$C, nrow=length(T), ncol=length(circle$C), byrow=TRUE))
