@@ -23,7 +23,7 @@ intersectCircleLine <- function(circle, l1, l2){
 	# CHECK THAT LINE OVERLAPS WITH CIRCLE
 	dist_mid_point <- distPointToPoint(mid_point, circle$C)
 	if(dist_mid_point > circle$R){
-
+	
 		return(NULL)
 
 	}else if(dist_mid_point == circle$R){
