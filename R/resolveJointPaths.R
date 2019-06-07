@@ -157,10 +157,12 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			# Get previous point for toggle position comparison
 			if(path_strings[['tjs']] %in% c('U(JSN)-1-R(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-P(DNS)', 
 				'R(JSN)-1-S(JNN)-2-S(DNS)', 'R(JSN)-1-S(JNN)-2-S(DSN)', 'R(JSN)-1-R(JNN)-2-R(DNS)', 
-				'R(JSN)-1-S(JNN)-2-P(DNS)-2-S(JNN)-3-S(DNS)')){
-				
+				'R(JSN)-1-S(JNN)-2-P(DNS)-2-S(JNN)-3-S(DNS)', 'P(DSN)-1-S(JNN)-2-U(JNS)-3-S(DSN)-4-S(JNN)')){
+
 				if(path_strings[['tjs']] == 'R(JSN)-1-S(JNN)-2-P(DNS)-2-S(JNN)-3-S(DNS)'){
 					which_jt <- 3
+				}else if (path_strings[['tjs']] == 'P(DSN)-1-S(JNN)-2-U(JNS)-3-S(DSN)-4-S(JNN)'){
+					which_jt <- c(2,5)
 				}else{
 					which_jt <- 2
 				}
@@ -173,7 +175,12 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					}
 				}else{
 					if(is.null(mechanism[['joint.compare']])){
-						toggle_jt_compare <- applyJointTransform(mechanism, joint=joint_idx[which_jt], iter=iter-1)$coor[1, , 1]
+						if(length(which_jt) == 1){
+							toggle_jt_compare <- applyJointTransform(mechanism, joint=joint_idx[which_jt], iter=iter-1)$coor[1, , 1]
+						}else if(length(which_jt) == 2){
+							toggle_jt_compare <- rbind(applyJointTransform(mechanism, joint=joint_idx[which_jt[1]], iter=iter-1)$coor[1, , 1], 
+								applyJointTransform(mechanism, joint=joint_idx[which_jt[2]], iter=iter-1)$coor[1, , 1])
+						}
 					}else{
 						toggle_jt_compare <- mechanism[['joint.compare']][joint_idx[which_jt],,iter]
 					}
@@ -366,7 +373,6 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 					cat(solve_str)
 				}
 
-
 				# Find original distance from joint centers in P-plane
 				J1_o_proj <- pointPlaneProj(mechanism[['joint.coor']][joint_idx[1], ], 
 					mechanism[['joint.coor']][joint_idx[3], ], mechanism[['joint.cons']][[joint_idx[3]]][3,])
@@ -471,7 +477,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 			# Solve path
 			if(path_strings[['tjs']] %in% c('P(DSN)-1-S(JNN)-2-U(JNS)-3-S(DSN)-4-S(JNN)')){
 
-				# Example: Solving path LJSYM_NEURO(DSN)-1-LJAWL_LJSYM(JNN)-2-SUSPL_LJAWL(DNS)-3-OPERL_INOPL(JSN)-4-INOPL_LJAWL(JNN)
+				# Example: Solving path LJSYM_NEURO(DSN)-1-LJAWL_LJSYM(JNN)-2-SUSPL_LJAWL(JNS)-3-OPERL_INOPL(DSN)-4-INOPL_LJAWL(JNN)
 
 				# Find distance from J2 to J1-plane
 				dptp_J12 <- distPointToPlane(p=mechanism[['joint.coor']][joint_idx[2], ], n=mechanism[['joint.cons']][[joint_idx[1]]][3,], q=mechanism[['joint.coor']][joint_idx[1], ])
@@ -482,71 +488,80 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				# Find point in plane of final J2
 				pt_in_J2_plane <- joint_current$coor[1,,joint_sets[1,1]] + dptp_J12*joint_current$cons[[1]][3, , joint_sets[1,1]]
 				
-				# Set other params
-				params <- list('U_axes'=rbind(joint_current$cons[[3]][1,,1], joint_current$cons[[3]][2,,2]), 
-					'CoR'=joint_current$coor[3,,1], 'joints'=joint_current$coor[c(2,5),,1],
-					'J2_plane_p'=pt_in_J2_plane, 'J2_plane_n'=joint_current$cons[[1]][3, , joint_sets[1,1]],
-					'J4'=joint_current$coor[4,,joint_sets[4,1]], 'J45_length'=J45_length, 
-					'return.tmat'=FALSE)
+				# Find fixed distance between J2 and J3
+				dptp_J23 <- distPointToPoint(mechanism[['joint.coor']][joint_idx[2], ], mechanism[['joint.coor']][joint_idx[3], ])
+				
+				## Find circle of potential positions of J2 in plane as intersection of plane and sphere surrounding U-joint
+				int_sph_pln <- intersectSpherePlane(c=joint_current$coor[3,,joint_sets[3,2]], r=dptp_J23, 
+					p=pt_in_J2_plane, n=joint_current$cons[[1]][3, , joint_sets[1,1]])
+				
+				# If no intersection - add handling of this
+				if(is.null(int_sph_pln)) stop("Sphere of U-joint and plane of P-joint do not intersect. Add operation.")
+				
+				# Define as circle
+				int_sph_pln <- defineCircle(center=int_sph_pln$center, nvector=int_sph_pln$nvector, radius=int_sph_pln$radius)
+				
+				# Get tp2 toggle point
+				# Without joint.compare the transformed joint position is used - this worked ok during initial testing but may not always work
+				if(is.null(mechanism[['joint.compare']])){
+					tp2 <- joint_current$coor[5,,1]
+				}else{
+					tp2 <- mechanism[['joint.compare']][joint_idx[5],,iter]
+				}
 
+				# Set params
+				params <- list('circle'=int_sph_pln, 'u.center'=joint_current$coor[3,,1], 
+					'u.axes'=rbind(joint_current$cons[[3]][2,,2], joint_current$cons[[3]][1,,1]), 
+					'p1'=joint_current$coor[2,,1], 'p2'=joint_current$coor[5,,1], 'p3'=joint_current$coor[4,,joint_sets[4,1]], 
+					'd23'=J45_length, 'tp2'=tp2, 'return.tmat'=FALSE)
+				
+				#print(joint_current$coor)
+				#print(mechanism[['joint.coor']][joint_idx[5], ])
+				
 				# Explain optimization
 				if(print.progress){
 					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
-						'Finding optimal rotations of U-joint ', mechanism[['joint.names']][joint_idx[3]], 
-						'(', joint_idx[3], ') to minimize the distance of joint ', mechanism[['joint.names']][joint_idx[2]], 
-						'(', joint_idx[2], ') from the plane defined by point in the plane {', paste0(signif(pt_in_J2_plane, 3), collapse=','), '}', 
-						' and normal vector {', paste0(signif(joint_current$cons[[1]][3, , joint_sets[1,1]], 3), collapse=','), '}', 
-						' and to keep the length between joints ',
-						mechanism[['joint.names']][joint_idx[4]], '(', joint_idx[4], ') and ', 
-						mechanism[['joint.names']][joint_idx[5]], '(', joint_idx[5], ') close to the initial length of ', 
-						signif(J45_length, 3), '\n')
+						'Finding position of joint ', mechanism[['joint.names']][joint_idx[2]], '(', joint_idx[2], ')', 
+						' on a circle with center {', paste0(signif(params[['circle']]$C, 3), collapse=','), '}', 
+						' and normal vector {', paste0(signif(params[['circle']]$N, 3), collapse=','), 
+						'} by finding rotations of U-joint ', mechanism[['joint.names']][joint_idx[3]], '(', joint_idx[3], ')', 
+						' that places joint ', mechanism[['joint.names']][joint_idx[5]], '(', joint_idx[5], ')', 
+						' at the initial length of ', signif(J45_length, 3), ' from joint ', 
+						mechanism[['joint.names']][joint_idx[4]], '(', joint_idx[4], ') and using previous position of joint ',
+						mechanism[['joint.names']][joint_idx[2]], ' {', paste0(signif(toggle_jt_compare[1,], 3), collapse=','), 
+						'} as a starting point for the optimization\n')
 					cat(solve_str)
 				}
 				
-				# Set starting values to try - does not converge for some starting values
-				try_start <- list(c(0.1,0.2), c(0,0), c(-0.2,-0.1), c(0.1,-0.2))
-
-				# Run optimization with several starting values
-				list_optim_runs <- list()
-				list_optim_errs <- rep(NA, length(try_start))
-				for(try_num in 1:length(try_start)){
-
-					u_jt_fit <- tryCatch(
-						expr={
-							nlminb(start=try_start[[try_num]], objective=path_min_j2ptp_u_j45ptp, lower=rep(-2*pi, 2), 
-								upper=rep(2*pi, 2), params=params)
-						},
-						error=function(cond) {return(NULL)},
-						warning=function(cond) {return(NULL)}
-					)
-					
-					if(is.null(u_jt_fit)) next
-
-					# Save optimization and error
-					list_optim_runs[[try_num]] <- u_jt_fit
-					list_optim_errs[try_num] <- u_jt_fit$objective
-					
-					# If low error is reached stop
-					if(u_jt_fit$objective < 1e-5) break
-					#if(sum(abs(u_jt_fit$par - try_start[[try_num]])) > 1e-5) break
-				}
-
-				# Save fit having lowest error
-				u_jt_fit <- list_optim_runs[[which.min(list_optim_errs)]]
+				# Find nearest point on circle from toggle compare point
+				p_cir_cmp <- pointMinDistOnCircle(params[['circle']], toggle_jt_compare[1,])
 				
+				# Find starting parameter corresponding to compare point
+				t_start <- circleAngle(params[['circle']], p_cir_cmp)
+
+				# Try optimization with limited range around starting value (compare point)
+				# 	to get point that doesn't toggle too far away
+				u_jt_fit <- tryCatch(
+					expr={
+						nlminb(start=t_start, objective=path_min_p1c_u_dp23, lower=t_start-pi, upper=t_start+pi, params=params)
+					},
+					error=function(cond) {print(cond);return(NULL)},
+					warning=function(cond) {print(cond);return(NULL)}
+				)
+				
+				# What to do if no solution... need to add something here
+				if(is.null(u_jt_fit)) stop("No solution found for path_min_p1c_u_dp23 optimization. Add operation.")
+
 				# Report optimization error
 				if(print.progress){
-					# Get error for rotation of 0
-					#u_jt_err <- path_min_j2ptp_u_j45ptp(p=c(0,0), params)
-
 					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
 						'Error after optimization: ', signif(u_jt_fit$objective, 3), '\n')
 					cat(solve_str)
 				}
-
+				
 				# Get optimal transformation
 				params[['return.tmat']] <- TRUE
-				body_2_tmat <- path_min_j2ptp_u_j45ptp(u_jt_fit$par, params)
+				body_2_tmat <- path_min_p1c_u_dp23(u_jt_fit$par, params)
 
 				# Transform bodies and extend transformation
 				mechanism <- extendTransformation(mechanism, body=path_bodies[2], tmat=body_2_tmat, 
