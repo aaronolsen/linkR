@@ -1,5 +1,5 @@
 fitMechanism <- function(mechanism, fit.points, body.assoc, input.param, 
-	joint.optim = rep(TRUE, nrow(joint.coor)), pose.optim = TRUE, fit.wts = NULL, 
+	coor.optim = rep(TRUE, nrow(joint.coor)), pose.optim = TRUE, fit.wts = NULL, 
 	planar = FALSE, coor.vectors = NULL, use.ref.as.prev = FALSE, 
 	direct.input = FALSE, print.progress = FALSE, ref.iter = 1, control = NULL, print.level = 0){
 
@@ -13,7 +13,7 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 	
 	control_default <- list(
 		'joint.coor.bounds'=0.1,
-		'fit.points.bounds.factor'=1,
+		'fit.points.bounds.factor'=0.1,
 		'optim.frame.max'=21,
 		'optim.to.percent'=0.001,
 		'optim.iter.max'=30,
@@ -102,11 +102,11 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 	# Set joint names from coordinates if NULL
 	#if(is.null(joint.names)) joint.names <- rownames(joint.coor)
 	
-	# If single joint.optim value and multiple joints, repeat for same number of joints
-	if(length(joint.optim) == 1 && n_joints > 1) joint.optim <- rep(joint.optim, n_joints)
+	# If single coor.optim value and multiple joints, repeat for same number of joints
+	if(length(coor.optim) == 1 && n_joints > 1) coor.optim <- rep(coor.optim, n_joints)
 	
 	# Set joint coordinates to optimize
-	joints_optim <- which(joint.optim)
+	joints_optim <- which(coor.optim)
 	
 	# Set logical whether joint coordinates will be optimized
 	if(length(joints_optim) > 0){ optim_joint_coor <- TRUE }else{ optim_joint_coor <- FALSE }
@@ -279,7 +279,7 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 	# If planar is TRUE, set joint coordinates into same plane and R-joint axes perpendicular to plane
 	if(planar){
 		
-		if(sum(!joint.optim) <= 1){
+		if(sum(!coor.optim) <= 1){
 
 			# Find normal vector to plane
 			v123 <- cprod(joint.coor[3, ]-joint.coor[1, ], joint.coor[2, ]-joint.coor[1, ])
@@ -290,7 +290,7 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 		}else{
 		
 			# ****** Temp fix
-			joints_plane <- which(!joint.optim)
+			joints_plane <- which(!coor.optim)
 			if(length(joints_plane) == 3){
 				v123 <- joint.coor[joints_plane[3], ] - joint.coor[joints_plane[1], ]
 				v124 <- joint.coor[joints_plane[2], ] - joint.coor[joints_plane[1], ]
@@ -303,10 +303,10 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 		}
 		
 		# Check if a joint is fixed
-		if(sum(!joint.optim) > 0){
+		if(sum(!coor.optim) > 0){
 
 			# Set joint center as point in plane
-			plane_point <- joint.coor[which(!joint.optim)[1], ]
+			plane_point <- joint.coor[which(!coor.optim)[1], ]
 
 		}else{
 
@@ -467,8 +467,13 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 		n_cols <- length(input_param_fill[[i]][['list.idx']])
 
 		# Add names for input_optim column names
-		input_optim_names <- c(input_optim_names, paste0(joint.types[input.joint[i]], input.joint[i], 
-			'-', which(is.na(input_param[[i]][1,]))))
+		if(is.null(joint.names)){
+			input_optim_names <- c(input_optim_names, paste0(joint.types[input.joint[i]], input.joint[i], 
+				'-', which(is.na(input_param[[i]][1,]))))
+		}else{
+			input_optim_names <- c(input_optim_names, paste0(joint.names[input.joint[i]], 
+				'-', which(is.na(input_param[[i]][1,]))))
+		}
 
 		# Fill with default values (for now, same for all joint types)
 		input_optim_vec <- c(input_optim_vec, rep(-0.1, n_cols))
@@ -570,9 +575,9 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 		for(j in 1:n_joints){
 			cat(paste0(paste0(rep(indent, print.level+3), collapse=''), joint.names[j], ': '))
 			if(j %in% joints_optim){
-				cat(paste0('Adding values to {', paste0(round(mechanism$joint.coor[j, ], 3), collapse=','), '}'))
+				cat(paste0('Adding values to {', paste0(signif(mechanism$joint.coor[j, ], 3), collapse=','), '}'))
 				if(coor_vectors_input[j]){
-					cat(paste0(' along input vectors {', paste0(round(coor.vectors[[j]], 3), collapse=','), '}'))
+					cat(paste0(' along input vectors {', paste0(signif(coor.vectors[[j]], 3), collapse=','), '}'))
 				}else if(joint.types[j] == 'R'){
 					cat(paste0(' along vectors in plane perpendicular to ', joint.names[j], ' axis'))
 				}else if(joint.types[j] == 'P'){
@@ -580,9 +585,9 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 				}else{
 					cat(paste0(' along x, y, and z-axes'))
 				}
-				cat(paste0(' with bounds of +/- ', round(control$joint.coor.bounds, 3), ' (per optim iter)'))
+				cat(paste0(' with bounds of +/- ', signif(control$joint.coor.bounds, 3), ' (per optim iter)'))
 			}else{
-				cat(paste0('Using {', paste0(round(mechanism$joint.coor[j, ], 3), collapse=','), '}'))
+				cat(paste0('Using {', paste0(signif(mechanism$joint.coor[j, ], 3), collapse=','), '}'))
 			}
 			cat('\n')
 		}
@@ -656,14 +661,14 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 			for(j in 1:dim(joint_cons_input[[i]])[1]){
 				cat(paste0(paste0(rep(indent, print.level+3), collapse=''), joint.names[i], '-', j, ': '))
 				if(cons_fill[n] %in% c('n', 'cprod')){
-					if(cons_fill[n] == 'n') cat(paste0('Using input vectors {', paste0(round(joint.cons[[i]][j, ], 3), collapse=','), '}'))
+					if(cons_fill[n] == 'n') cat(paste0('Using input vectors {', paste0(signif(joint.cons[[i]][j, ], 3), collapse=','), '}'))
 					if(cons_fill[n] == 'cprod') cat(paste0('Will be filled with cross product of ', joint.names[i], '-', j-2, ' and ', joint.names[i], '-', j-1))
 				}else{
 					if(cons_fill[n] == 'v') cat('Optimizing 3-unit vector')
 					if(cons_fill[n] == 'vo') cat(paste0('Optimizing vector orthogonal to ', joint.names[i], '-', j-1))
-					cat(paste0(' with initial value(s) {', paste0(round(na.omit(cons_optim[n, ]), 3), collapse=','), '}'))
-					cat(paste0(', lower bounds {', paste0(round(na.omit(cons_optim_bounds_low[n, ]), 3), collapse=','), '}'))
-					cat(paste0(', and upper bounds {', paste0(round(na.omit(cons_optim_bounds_upp[n, ]), 3), collapse=','), '}'))
+					cat(paste0(' with initial value(s) {', paste0(signif(na.omit(cons_optim[n, ]), 3), collapse=','), '}'))
+					cat(paste0(', lower bounds {', paste0(signif(na.omit(cons_optim_bounds_low[n, ]), 3), collapse=','), '}'))
+					cat(paste0(', and upper bounds {', paste0(signif(na.omit(cons_optim_bounds_upp[n, ]), 3), collapse=','), '}'))
 				}
 				cat('\n')
 				n <- n + 1
@@ -740,7 +745,7 @@ fitMechanism <- function(mechanism, fit.points, body.assoc, input.param,
 	if(print.progress){
 		optimizing_which <- c(TRUE, optim_joint_coor, optim_joint_cons, pose.optim)
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Optimizing ', 
-			paste0(c('input parameters', 'joint coordinates', 'constraint parameters', 'fit point reference poses')[optimizing_which], collapse=', '), 
+			paste0(c('input parameters', 'joint coordinates', 'constraint parameters', 'whole joint poses')[optimizing_which], collapse=', '), 
 			'...\n'))
 	}
 
@@ -798,7 +803,7 @@ if(TRUE){
 			input_error_outliers <- rep(FALSE, length(input_fit_errors_f))
 
 		}else{
-
+		
 			# Run optimization
 			for(i in 1:n_optim){
 
@@ -863,11 +868,14 @@ if(TRUE){
 			#print(input_optim[!is.na(input_optim[, 1]), ])
 			#print(input_optim_bounds['lower', ])
 			#print(input_optim_bounds['upper', ])
+
+			# Set final fit error
+			final_fit_error <- mean(input_fit_errors_f, na.rm=TRUE)
 		}
 
 		# Print error
 		if(print.progress){
-			cat(paste0('', round(mean(input_fit_errors_i, na.rm=TRUE), 7), '->', round(mean(input_fit_errors_f, na.rm=TRUE), 7)))
+			cat(paste0('', signif(mean(input_fit_errors_i, na.rm=TRUE), 3), '->', signif(mean(input_fit_errors_f, na.rm=TRUE), 3)))
 			cat(paste0(' {', sum(input_error_outliers), ' out}'))
 		}
 		
@@ -890,7 +898,7 @@ if(TRUE){
 			# Find initial error
 			if(print.progress) mtfm_fit_error_i <- mechanism_transform_error(rep(0, 1), 
 				fit.points=fit.points[, , optim_use], mechanism=mechanism, input.param=input_param_optim, 
-				fit.wts=fit.wts, center=mechanism$joint.coor[!joint.optim, ])
+				fit.wts=fit.wts, center=mechanism$joint.coor[!coor.optim, ])
 
 			# Run optimization
 			mtfm_fit <- tryCatch(
@@ -899,20 +907,20 @@ if(TRUE){
 						lower=c(rep(-2*pi, 1)), 
 						upper=c(rep(2*pi, 1)), 
 						fit.points=fit.points[, , optim_use], mechanism=mechanism, 
-						input.param=input_param_optim, fit.wts=fit.wts, center=mechanism$joint.coor[!joint.optim, ])
+						input.param=input_param_optim, fit.wts=fit.wts, center=mechanism$joint.coor[!coor.optim, ])
 				},
 				error=function(cond) {print(cond);return(NULL)},
 				warning=function(cond) {print(cond);return(NULL)}
 			)
 			
 			# Print error
-			if(print.progress) cat(paste0(', ', round(mtfm_fit_error_i, 5), '->', round(mtfm_fit$objective, 5)))
+			if(print.progress) cat(paste0(', ', signif(mtfm_fit_error_i, 3), '->', signif(mtfm_fit$objective, 3)))
 			
 			# Apply optimized parameters
 			tmat1 <- tmat2 <- tmat3 <- diag(4)
-			tmat1[1:3, 4] <- mechanism$joint.coor[which(!joint.optim)[1], ]
-			tmat2[1:3, 1:3] <- tMatrixEP(mechanism$joint.coor[which(!joint.optim)[4], ]-mechanism$joint.coor[which(!joint.optim)[1], ], mtfm_fit$par)
-			tmat3[1:3, 4] <- -mechanism$joint.coor[which(!joint.optim)[1], ]
+			tmat1[1:3, 4] <- mechanism$joint.coor[which(!coor.optim)[1], ]
+			tmat2[1:3, 1:3] <- tMatrixEP(mechanism$joint.coor[which(!coor.optim)[4], ]-mechanism$joint.coor[which(!coor.optim)[1], ], mtfm_fit$par)
+			tmat3[1:3, 4] <- -mechanism$joint.coor[which(!coor.optim)[1], ]
 			tmat <- tmat1 %*% tmat2 %*% tmat3
 			
 			# Apply transformation to joint constraints
@@ -1036,7 +1044,7 @@ if(TRUE){
 		
 			# Print error
 			if(print.progress){
-				cat(paste0(', ', round(coor_fit_error_i, 5), '->', round(coor_fit$objective, 5)))
+				cat(paste0(', ', signif(coor_fit_error_i, 3), '->', signif(coor_fit$objective, 3)))
 				if(bound_hit > 0){
 					if(bound_hit == 1){ cat(' {1 bound hit}') }else{ cat(paste0(' {', bound_hit, ' bounds hit}')) }
 				}
@@ -1116,7 +1124,7 @@ if(TRUE){
 
 			# Print error
 			if(print.progress){
-				cat(paste0(', ', round(cons_fit_error_i, 5), '->', round(cons_fit$objective, 5)))
+				cat(paste0(', ', signif(cons_fit_error_i, 3), '->', signif(cons_fit$objective, 3)))
 				if(any(direct_input)) cat(paste0(' {DI}'))
 			}
 			
@@ -1189,12 +1197,11 @@ if(TRUE){
 		}
 		
 		## Optimize reference pose of each body
-		if(pose.optim){
+		if(FALSE){
 
-
-			# 	Don't have to run model, just create optimization function that takes input 
-			# 	transformation parameters for each set of fit.points and at each iteration 
-			# 	applies the corresponding transformation arrays from the mechanism run and 
+			# This routine doesn't run/animate the model, it just takes the current 
+			#	transformation parameters for each set of fit.points and at each iteration,
+			# 	applies the corresponding transformation arrays from the mechanism run, and 
 			# 	compares the error
 			# Run model to get updated transformations
 			tmarr <- suppressWarnings(animateMechanism(mechanism, input.param=input_param_optim, 
@@ -1250,7 +1257,7 @@ if(TRUE){
 				tmat[1:3, 4] <- pose_fit$par[4:6]
 				mechanism$body.points[mechanism$points.assoc[[i]], ] <- applyTransform(mechanism$body.points[mechanism$points.assoc[[i]], ], tmat)
 			
-				#
+				# Apply transformation to tmat array containing the current transformations applied to the reference points
 				body_points_tmarr[, , i] <- body_points_tmarr[, , i] %*% tmat
 			}
 
@@ -1258,8 +1265,63 @@ if(TRUE){
 			final_fit_error <- mean(pose_fit_errors_f, na.rm=TRUE)
 
 			# Print error
-			if(print.progress) cat(paste0(', ', round(mean(pose_fit_errors_i, na.rm=TRUE), 5), '->', round(final_fit_error, 5)))
+			if(print.progress) cat(paste0(', ', signif(mean(pose_fit_errors_i, na.rm=TRUE), 3), '->', signif(final_fit_error, 3)))
 		}
+
+		## Optimize each joint coordinate and associated constraint individually - does it act like pose optimization?
+		if(pose.optim){
+			
+			# Create vectors for initial and final error
+			pose_fit_errors_i <- setNames(rep(NA, mechanism$num.joints), mechanism$joint.names)
+			pose_fit_errors_f <- setNames(rep(NA, mechanism$num.joints), mechanism$joint.names)
+
+			for(i in 1:mechanism$num.joints){
+
+				# If no fit points associated with body on either side of joint, skip
+				if(is.na(mechanism$points.assoc[[mechanism$body.conn.num[i, 1]]][1]) && is.na(mechanism$points.assoc[[mechanism$body.conn.num[i, 2]]][1])) next
+
+				# Find initial error
+				if(print.progress) pose_fit_errors_i[i] <- transform_joint_error(rep(0, 6), 
+					joint.idx=i, fit.points=fit.points[, , optim_use], mechanism=mechanism, 
+					input.param=input_param_optim, fit.wts=fit.wts, joint.compare=joint_compare[, , optim_use], 
+					print.progress=FALSE)
+				
+				# Run optimization
+				pose_fit <- tryCatch(
+					expr={
+						nlminb(start=rep(0, 6), objective=transform_joint_error, 
+							lower=c(rep(-0.4, 3), -rep(pose_optim_bounds_add, 3)), 
+							upper=c(rep(0.4, 3), rep(pose_optim_bounds_add, 3)), 
+							joint.idx=i, fit.points=fit.points[, , optim_use], mechanism=mechanism, 
+							input.param=input_param_optim, fit.wts=fit.wts, joint.compare=joint_compare[, , optim_use], 
+							print.progress=FALSE)
+					},
+					error=function(cond) {print(cond);return(NULL)},
+					warning=function(cond) {print(cond);return(NULL)}
+				)
+
+				# Save error
+				pose_fit_errors_f[i] <- pose_fit$objective
+
+				# Apply optimized parameters
+				tmat <- diag(4)
+				tmat[1:3, 1:3] <- rotationMatrixZYX(pose_fit$par[1:3])
+				tmat[1:3, 4] <- pose_fit$par[4:6]
+
+				# Apply transform to joint coordinate
+				mechanism$joint.coor[i, ] <- applyTransform(mechanism$joint.coor[i, ], tmat)
+	
+				# Apply transform to joint constraint
+				mechanism$joint.cons[[i]] <- applyTransform(mechanism$joint.cons[[i]], tmat)
+			}
+
+			# Set final error
+			final_fit_error <- mean(pose_fit_errors_f, na.rm=TRUE)
+
+			# Print error
+			if(print.progress) cat(paste0(', ', signif(mean(pose_fit_errors_i, na.rm=TRUE), 3), '->', signif(final_fit_error, 3)))
+		}
+
 
 		# Save error after optimization
 		optim_errors <- c(optim_errors, final_fit_error)
@@ -1290,7 +1352,7 @@ if(TRUE){
 			#turning_off <- ', turning off direct.input'
 		}
 
-		if(print.progress && optim_iter > 0) cat(paste0(' (', round(abs(percent_error_change)*100, 2), '% ', change_types[optim_iter+1], every_other, ')', turning_off, inc_iter_max))
+		if(print.progress && optim_iter > 0) cat(paste0(' (', signif(abs(percent_error_change)*100, 2), '% ', change_types[optim_iter+1], every_other, ')', turning_off, inc_iter_max))
 		if(print.progress) cat('\n')
 
 		# Stop if optim.to.percent threshold is reached - special cases for direct input since percent change bounces around much more
@@ -1340,8 +1402,8 @@ if(TRUE){
 		for(j in 1:n_joints){
 			if(!j %in% joints_optim) next
 			cat(paste0(paste0(rep(indent, print.level+2), collapse=''), joint.names[j], ': '))
-			cat(paste0('Optimized to {', paste0(round(mechanism$joint.coor[j, ], 3), collapse=','), '} from {', 
-				paste0(round(joints_optim_initial[j, ], 3), collapse=','), '}\n'))
+			cat(paste0('Optimized to {', paste0(signif(mechanism$joint.coor[j, ], 3), collapse=','), '} from {', 
+				paste0(signif(joints_optim_initial[j, ], 3), collapse=','), '}\n'))
 		}
 	}
 
@@ -1496,7 +1558,7 @@ if(TRUE){
 	}
 
 	# Print error
-	if(print.progress) cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'Error: ', round(mean(input_fit_errors_i, na.rm=TRUE), 5), '->', round(mean(input_fit_errors_f, na.rm=TRUE), 5), '\n'))
+	if(print.progress) cat(paste0(paste0(rep(indent, print.level+2), collapse=''), 'Error: ', signif(mean(input_fit_errors_i, na.rm=TRUE), 3), '->', signif(mean(input_fit_errors_f, na.rm=TRUE), 3), '\n'))
 
 #	mechanism_g <<- mechanism
 #}
@@ -1545,7 +1607,7 @@ if(TRUE){
 		optim_iter_exceeded <- ''
 		if(optim_iter >= control$optim.iter.max) optim_iter_exceeded <- ' (maximum number of iterations met)'
 		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Total number of optimization iterations: ', optim_iter ,'', optim_iter_exceeded, '\n'))
-		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Total run time: ', round(proc_time, 2), ' sec (', round(floor(proc_time / 60)), 'm ', round(proc_time %% 60, 2),'s)\n'))
+		cat(paste0(paste0(rep(indent, print.level+1), collapse=''), 'Total run time: ', signif(proc_time, 2), ' sec (', round(floor(proc_time / 60)), 'm ', signif(proc_time %% 60, 2),'s)\n'))
 	}
 
 	# Run animate mechanism using final parameters to get fit points and transformations
