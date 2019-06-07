@@ -1,5 +1,5 @@
-animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.ref.as.prev = FALSE, 
-	check.inter.joint.dist = TRUE, check.joint.cons = TRUE, check.inter.point.dist = TRUE, 
+animateMechanism <- function(mechanism, input.param, joint.compare = NULL, 
+	use.ref.as.prev = FALSE, check.inter.joint.dist = FALSE, check.joint.cons = FALSE, check.inter.point.dist = FALSE, 
 	print.progress = FALSE, print.progress.iter = 1){
 
 	if(print.progress) cat(paste0('animateMechanism()\n'))
@@ -210,6 +210,10 @@ animateMechanism <- function(mechanism, input.param, joint.compare = NULL, use.r
 
 	## Apply body transformations to joints and constraints
 	mechanism <- applyJointTransform(mechanism)
+
+	## Perform error checks
+	checkMechanism(mechanism, check.inter.joint.dist=check.inter.joint.dist, check.joint.cons=check.joint.cons, 
+		check.inter.point.dist=check.inter.point.dist, print.progress=print.progress, print.progress.iter=print.progress.iter)
 
 	## Apply body transformations to body points
 	if(!is.null(mechanism[['body.points']])){
