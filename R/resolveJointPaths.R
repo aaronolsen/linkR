@@ -527,7 +527,8 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 						'} by finding rotations of U-joint ', mechanism[['joint.names']][joint_idx[3]], '(', joint_idx[3], ')', 
 						' that places joint ', mechanism[['joint.names']][joint_idx[5]], '(', joint_idx[5], ')', 
 						' at the initial length of ', signif(J45_length, 3), ' from joint ', 
-						mechanism[['joint.names']][joint_idx[4]], '(', joint_idx[4], ') and using previous position of joint ',
+						mechanism[['joint.names']][joint_idx[4]], '(', joint_idx[4], ') at {', paste0(signif(joint_current$coor[4,,joint_sets[4,1]], 3), collapse=','), '}',
+						' and using previous position of joint ',
 						mechanism[['joint.names']][joint_idx[2]], ' {', paste0(signif(toggle_jt_compare[1,], 3), collapse=','), 
 						'} as a starting point for the optimization\n')
 					cat(solve_str)
@@ -538,16 +539,31 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				
 				# Find starting parameter corresponding to compare point
 				t_start <- circleAngle(params[['circle']], p_cir_cmp)
+				t_start <- t_start - 0.1
 
 				# Try optimization with limited range around starting value (compare point)
 				# 	to get point that doesn't toggle too far away
-				u_jt_fit <- tryCatch(
-					expr={
-						nlminb(start=t_start, objective=path_min_p1c_u_dp23, lower=t_start-pi, upper=t_start+pi, params=params)
-					},
-					error=function(cond) {print(cond);return(NULL)},
-					warning=function(cond) {print(cond);return(NULL)}
-				)
+				n_tries <- 0
+				for(try_add in c(0, -0.1, 0.15, -0.15, -0.05, 0.1, 0.05)){
+				
+					# Set starting value to try
+					t_start_try <- t_start + try_add
+
+					# Find optimal value
+					u_jt_fit <- tryCatch(
+						expr={
+							nlminb(start=t_start_try, objective=path_min_p1c_u_dp23, lower=t_start_try-pi, upper=t_start_try+pi, params=params)
+						},
+						error=function(cond) {print(cond);return(NULL)},
+						warning=function(cond) {print(cond);return(NULL)}
+					)
+					
+					# Update number of tries
+					n_tries <- n_tries + 1
+					
+					# If error is below threshold stop trying values
+					if(u_jt_fit$objective < 1e-7) break
+				}
 				
 				# What to do if no solution... need to add something here
 				if(is.null(u_jt_fit)) stop("No solution found for path_min_p1c_u_dp23 optimization. Add operation.")
@@ -555,7 +571,7 @@ resolveJointPaths <- function(mechanism, iter, print.progress = FALSE, indent = 
 				# Report optimization error
 				if(print.progress){
 					solve_str <- paste0(paste0(rep(indent, indent.level+2), collapse=''), 
-						'Error after optimization: ', signif(u_jt_fit$objective, 3), '\n')
+						'Error from optimization after ', n_tries, ' try/tries: ', signif(u_jt_fit$objective, 3), '\n')
 					cat(solve_str)
 				}
 				
